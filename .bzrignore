@@ -8,3 +8,5 @@ debian/files
 debian/python-rayopt
 debian/*.substvars
 debian/*-stampdir
+./glass
+./debian/tmp

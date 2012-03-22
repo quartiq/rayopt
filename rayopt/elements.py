@@ -147,6 +147,7 @@ class Spheroid(Interface):
     curvature = Float(0)
     conic = Float(1) # assert self.radius**2 < 1/(self.conic*self.curvature**2)
     aspherics = Array(dtype=np.float64)
+    material = Trait(air, Material)
 
     def shape_func(self, p):
         x, y, z = p.T

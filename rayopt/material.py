@@ -170,10 +170,8 @@ class GlassCatalog(HasTraits):
             pickle.dump(c, open(filpick, "wb"), protocol=2)
         return c
 
-#catpath = "/home/rj/.wine/drive_c/Program Files/ZEMAX/Glasscat/"
-catpath = "/home/rjordens/work/nist/glass/"
-schott = GlassCatalog.cached_or_import(catpath+"SCHOTT.AGF")
-#schott = GlassCatalog.cached_or_import(catpath+"schott-17-03-2009.agf")
+catpath = "glass/"
+schott = GlassCatalog.cached_or_import(catpath+"schott.agf")
 ohara = GlassCatalog.cached_or_import(catpath+"ohara.agf")
-misc = GlassCatalog.cached_or_import(catpath+"MISC.AGF")
-infrared = GlassCatalog.cached_or_import(catpath+"INFRARED.AGF")
+misc = GlassCatalog.cached_or_import(catpath+"misc.agf")
+infrared = GlassCatalog.cached_or_import(catpath+"infrared.agf")

@@ -64,7 +64,7 @@ class System(HasTraits):
                 "Material after", "N", "V")
         if self.object:
             dia = (self.object.radius == np.inf and
-                self.object.field_angle or self.object.radius)
+                self.object.field_angle*2 or self.object.radius*2)
             s += "%-2s %1s %-12s %-12s %10.5g %15s %5.2f %5.2f\n" % (
                 "", self.object.typestr, "", "", dia,
                 self.object.material,

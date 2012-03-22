@@ -31,6 +31,10 @@ included in the highly recommended Python distributions Python(x,y)
 Usage
 -----
 
+http://www.us.schott.com/advanced_optics/english/our_products/materials/data_tools/index.html
+http://www.ohara-inc.co.jp/en/product/optical/list/index.html
+
+
 User Interface
 ..............
 
