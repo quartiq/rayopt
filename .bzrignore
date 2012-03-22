@@ -2,8 +2,9 @@
 ./dist
 ./build
 debian/*.debhelper
+debian/compat
 debian/*.log
 debian/files
-debian/python-bullseye
+debian/python-rayopt
 debian/*.substvars
 debian/*-stampdir
