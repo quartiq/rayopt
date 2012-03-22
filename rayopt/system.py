@@ -149,10 +149,10 @@ class System(HasTraits):
 
     def propagate(self, rays):
         for a, b in zip([self.object] + self.elements,
-		        self.elements + [self.image]):
+                        self.elements + [self.image]):
             a_rays, rays = b.propagate(rays)
             yield a, a_rays
-	yield b, rays
+        yield b, rays
 
     def propagate_through(self, rays):
         for element, rays in self.propagate(rays):
@@ -168,11 +168,11 @@ class System(HasTraits):
             paraxial_chief=True,
             paraxial_marginal=True):
         assert sum(1 for e in self.elements
-		if isinstance(e, Aperture)) == 1
+                if isinstance(e, Aperture)) == 1
        
         def stop_for_pos(x,y):
-	    # returns relative aperture height given object angles and
-	    # relative object height
+            # returns relative aperture height given object angles and
+            # relative object height
             rays.positions, rays.angles = self.object.rays_to_height(
                     (x,y), height)
             return self.height_at_aperture(rays)[0]
@@ -205,7 +205,7 @@ class System(HasTraits):
     def get_ray_bundle(self, wavelength, height, number, **kw):
         rays = Rays(wavelength=wavelength, height=height)
         c, m = self.chief_and_marginal(height, rays, **kw)
-	print c, m
+        print c, m
         p, a = self.object.rays_for_point(height, c, m, number)
         rays.positions = p
         rays.angles = a

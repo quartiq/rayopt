@@ -20,7 +20,7 @@ import numpy as np
 import cPickle as pickle
 
 from traits.api import (HasTraits, Str, Float, Dict, Instance,
-	Tuple, Array)
+    Tuple, Array)
 
 
 def sfloat(a):

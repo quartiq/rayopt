@@ -24,7 +24,7 @@ with some improvements
 import numpy as np
 
 from traits.api import (HasTraits, Float, Array, Property,
-	cached_property)
+    cached_property)
 
 from .material import lambda_d
 

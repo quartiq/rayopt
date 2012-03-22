@@ -63,7 +63,7 @@ class SystemComp(Component):
         gc.set_line_width(1.)
         gc.set_font(font)
         for element, inrays in self.system.propagate(self.rays):
-	    #print str(element), inrays.positions, inrays.angles, inrays.lengths
+            #print str(element), inrays.positions, inrays.angles, inrays.lengths
             p_start = inrays.positions[:,(i,j)]
             p_end = inrays.end_positions[:,(i,j)]
             p_good = alltrue(isfinite(p_start) & isfinite(p_end),
@@ -132,7 +132,7 @@ class Raytrace(HasTraits):
                 system.heights[-1], n, 
                 paraxial_chief=True,
                 paraxial_marginal=False)
-	print rays.positions, rays.angles
+        print rays.positions, rays.angles
 
         optrays = tuple(system.get_ray_bundle(w, xy, 7,
                 paraxial_chief=True,

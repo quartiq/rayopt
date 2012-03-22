@@ -54,9 +54,9 @@ class Element(HasTraits):
         return rays.transform(self.inverse_transform)
 
     def intercept(self, positions, angles):
-	# ray length to intersection with element
+        # ray length to intersection with element
         # only reference plane, overridden in subclasses
-	# solution for z=0
+        # solution for z=0
         s = -positions[...,2]/angles[...,2] # nan_to_num()
         return np.where(s>=0, s, np.nan)
 
@@ -121,22 +121,22 @@ class Interface(Element):
         return where(s>=0, s, nan)
 
     def refract(self, f, a, m):
-	# General Ray-Tracing Procedure
+        # General Ray-Tracing Procedure
         # G. H. SPENCER and M. V. R. K. MURTY
         # JOSA, Vol. 52, Issue 6, pp. 672-676 (1962)
-	# doi:10.1364/JOSA.52.000672
-	# sign(m) for reflection
+        # doi:10.1364/JOSA.52.000672
+        # sign(m) for reflection
         fp = self.shape_func_deriv(f)
         fp2 = dotprod(fp, fp)
         o = m*dotprod(a, fp)/fp2
-	if m**2 == 1:
-	    g = -2*o
-	else:
+        if m**2 == 1:
+            g = -2*o
+        else:
             p = (m**2-1)/fp2
             g = sign(m)*np.sqrt(o**2-p)-o
         r = m*a+(g*fp.T).T
-	#print "rfr", self, f, a, g, r
-	return r
+        #print "rfr", self, f, a, g, r
+        return r
 
     def revert(self):
         raise NotImplementedError
