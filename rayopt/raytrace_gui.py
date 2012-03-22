@@ -17,24 +17,22 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from qo.theory.raytrace import (Rays, Spheroid, System,
-        dir_to_angles, demerit_aberration3,
-        demerit_rms_position, Parameter, MaterialThickness,
-        slide_projector, tessar, lithograph, lithium, lithium2,
-        k_z_imaging, k_z_objective, schwarzschild)
+from rayopt import (Rays, Spheroid, System,
+        demerit_aberration3,
+        demerit_rms_position, Parameter, MaterialThickness)
 
-from enthought.chaco.api import Plot, ArrayPlotData
-from enthought.chaco.tools.api import PanTool, ZoomTool
+from chaco.api import Plot, ArrayPlotData
+from chaco.tools.api import PanTool, ZoomTool
 
-from enthought.traits.api import (Float, Enum, Instance, TraitRange,
+from traits.api import (Float, Enum, Instance, TraitRange,
         Trait, Instance, HasTraits)
-from enthought.traits.ui.api import Item, View, HGroup
+from traits.ui.api import Item, View, HGroup
 
-from enthought.enable.api import (Component, ColorTrait)
-from enthought.enable.component_editor import ComponentEditor
+from enable.api import (Component, ColorTrait)
+from enable.component_editor import ComponentEditor
 
-from enthought.kiva import Font
-from enthought.kiva import SWISS
+from kiva import Font
+from kiva import SWISS
 
 from numpy import (linspace, array, alltrue, extract, isfinite,
         argwhere, zeros_like, inf)

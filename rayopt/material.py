@@ -19,7 +19,7 @@
 import numpy as np
 import cPickle as pickle
 
-from enthought.traits.api import (HasTraits, Str, Float, Dict, Instance,
+from traits.api import (HasTraits, Str, Float, Dict, Instance,
 	Tuple, Array)
 
 

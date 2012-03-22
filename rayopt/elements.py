@@ -18,7 +18,7 @@
 
 import numpy as np
 
-from enthought.traits.api import (HasTraits, Float, Array,
+from traits.api import (HasTraits, Float, Array,
         Trait, cached_property, Property, Enum)
 
 from .transformations import euler_matrix, translation_matrix
