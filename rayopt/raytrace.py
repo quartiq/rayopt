@@ -21,22 +21,15 @@ Raytracing like Spencer and Murty 1962, J Opt Soc Am 52, 6
 with some improvements
 """
 
-import itertools
-import cPickle as pickle
 import numpy as np
 
-from enthought.traits.api import (HasTraits, List, Float, Array, Dict,
-        Bool, Str, Instance, Trait, cached_property, Property, Callable,
-        Tuple, Enum)
+from traits.api import (HasTraits, Float, Array, Property,
+	cached_property)
 
 from .material import lambda_d
 
-def sfloat(a):
-    try: return float(a)
-    except: return None
-
 def dir_to_angles(x,y,z):
-    r = array([x,y,z], dtype=float64)
+    r = array([x,y,z], dtype=np.float64)
     return r/linalg.norm(r)
 
 class Rays(HasTraits):
@@ -45,15 +38,15 @@ class Rays(HasTraits):
     # refractive index we are in
     refractive_index = Float(1.)
     # start positions
-    positions = Array(dtype=float64, shape=(None, 3))
+    positions = Array(dtype=np.float64, shape=(None, 3))
     # angles
-    angles = Array(dtype=float64, shape=(None, 3))
+    angles = Array(dtype=np.float64, shape=(None, 3))
     # geometric length of the rays
-    lengths = Array(dtype=float64, shape=(None,))
+    lengths = Array(dtype=np.float64, shape=(None,))
     # end positions
     end_positions = Property
     # total optical path lengths to start (including previous paths)
-    optical_path_lengths = Array(dtype=float64, shape=(None,))
+    optical_path_lengths = Array(dtype=np.float64, shape=(None,))
 
     def transform(self, t):
         n = len(self.positions)
@@ -76,17 +69,17 @@ class ParaxialTrace(HasTraits):
     wavelength = Float
     wavelength_short = Float
     wavelength_long = Float
-    refractive_indices = Array(dtype=float64, shape=(None,))
-    dispersions = Array(dtype=float64, shape=(None,))
+    refractive_indices = Array(dtype=np.float64, shape=(None,))
+    dispersions = Array(dtype=np.float64, shape=(None,))
 
     # marginal/axial,
     # principal/chief
-    heights = Array(dtype=float64, shape=(None,2))
-    angles = Array(dtype=float64, shape=(None,2))
-    incidence = Array(dtype=float64, shape=(None,2))
+    heights = Array(dtype=np.float64, shape=(None,2))
+    angles = Array(dtype=np.float64, shape=(None,2))
+    incidence = Array(dtype=np.float64, shape=(None,2))
 
-    aberration3 = Array(dtype=float64, shape=(None,7))
-    aberration5 = Array(dtype=float64, shape=(None,7))
+    aberration3 = Array(dtype=np.float64, shape=(None,7))
+    aberration5 = Array(dtype=np.float64, shape=(None,7))
 
     lagrange = Property
     focal_length = Property
@@ -109,13 +102,13 @@ class ParaxialTrace(HasTraits):
     def __init__(self, length=None, **k):
         super(ParaxialTrace, self).__init__(**k)
         if length is not None:
-            self.refractive_indices = zeros((length,), dtype=float64)
-            self.heights = zeros((length,2), dtype=float64)
-            self.angles = zeros((length,2), dtype=float64)
-            self.incidence = zeros((length,2), dtype=float64)
-            self.dispersions = zeros((length,), dtype=float64)
-            self.aberration3 = zeros((length,7), dtype=float64)
-            self.aberration5 = zeros((length,7), dtype=float64)
+            self.refractive_indices = zeros((length,), dtype=np.float64)
+            self.heights = zeros((length,2), dtype=np.float64)
+            self.angles = zeros((length,2), dtype=np.float64)
+            self.incidence = zeros((length,2), dtype=np.float64)
+            self.dispersions = zeros((length,), dtype=np.float64)
+            self.aberration3 = zeros((length,7), dtype=np.float64)
+            self.aberration5 = zeros((length,7), dtype=np.float64)
 
     def _get_lagrange(self):
         return self.refractive_indices[0]*(

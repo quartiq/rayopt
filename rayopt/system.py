@@ -16,13 +16,18 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import numpy as np
+from traits.api import (HasTraits, Str, Array, Float, Instance, List)
 
 from scipy.optimize import (newton, fsolve)
 
+from .elements import Element, Object, Image
+
+
 class System(HasTraits):
     name = Str
-    wavelengths = Array(dtype=float64, shape=(None,))
-    heights = Array(dtype=float64, shape=(None, 2))
+    wavelengths = Array(dtype=np.float64, shape=(None,))
+    heights = Array(dtype=np.float64, shape=(None, 2))
     temperature = Float(21.)
     scale = Float(1e-3)
     object = Instance(Object)

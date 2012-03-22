@@ -16,7 +16,10 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from numpy.ma import masked_invalid
+import numpy as np
+
+from traits.api import (HasTraits, Str, Callable, Float, Tuple, Bool)
+
 
 class Demerit(HasTraits):
     name = Str
@@ -28,15 +31,15 @@ class Demerit(HasTraits):
 
 demerit_rms_position = Demerit(name="rms size",
     func=lambda system, ptrace, rays:
-    [masked_invalid(r.positions[...,(0,1)]).std(axis=0) for r in rays])
+    [np.ma.masked_invalid(r.positions[...,(0,1)]).std(axis=0) for r in rays])
 
 demerit_rms_angle = Demerit(name="rms angle",
     func=lambda system, ptrace, rays:
-    [masked_invalid(r.angles[...,(0,1)]).std(axis=0) for r in rays])
+    [np.ma.masked_invalid(r.angles[...,(0,1)]).std(axis=0) for r in rays])
 
 demerit_mean_angle = Demerit(name="mean angle",
     func=lambda system, ptrace, rays:
-    [masked_invalid(r.angles[...,(0,1)]).mean(axis=0) for r in rays])
+    [np.ma.masked_invalid(r.angles[...,(0,1)]).mean(axis=0) for r in rays])
 
 demerit_aberration3 = Demerit(name="primary aberrations",
     func=lambda system, ptrace, rays:
@@ -45,7 +48,7 @@ demerit_aberration3 = Demerit(name="primary aberrations",
 
 class Parameter(HasTraits):
     name = Str
-    bounds = Tuple((-inf, inf))
+    bounds = Tuple((-np.inf, np.inf))
     scale = Float
 
     def __init__(self, name, bounds=None, scale=1, **k):

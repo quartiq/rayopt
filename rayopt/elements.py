@@ -16,15 +16,22 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import numpy as np
+
+from enthought.traits.api import (HasTraits, Float, Array,
+        Trait, cached_property, Property, Enum)
+
 from .transformations import euler_matrix, translation_matrix
+from .material import Material, air
+
 
 def dotprod(a,b):
     return (a*b).sum(-1)
 
 class Element(HasTraits):
     typestr = "E"
-    origin = Array(dtype=float64, shape=(3,))
-    angles = Array(dtype=float64, shape=(3,))
+    origin = Array(dtype=np.float64, shape=(3,))
+    angles = Array(dtype=np.float64, shape=(3,))
     transform = Property(depends_on="origin, angles")
     inverse_transform = Property(depends_on="transform")
     material = Trait(None, Material)
@@ -139,7 +146,7 @@ class Spheroid(Interface):
     typestr = "S"
     curvature = Float(0)
     conic = Float(1) # assert self.radius**2 < 1/(self.conic*self.curvature**2)
-    aspherics = Array(dtype=float64)
+    aspherics = Array(dtype=np.float64)
 
     def shape_func(self, p):
         x, y, z = p.T
@@ -230,13 +237,13 @@ class Spheroid(Interface):
 
 class Object(Element):
     typestr = "O"
-    radius = Float(inf)
+    radius = Float(np.inf)
     field_angle = Float(.1)
     material = Trait(air, Material)
     apodization = Enum(("constant", "gaussian", "cos3"))
 
     def rays_to_height(self, xy, height):
-        if self.radius == inf:
+        if self.radius == np.inf:
             p = array([(xy[0],xy[1],zeros_like(xy[0]))])
             a = array([(height[0]*self.field_angle,
                         height[1]*self.field_angle,

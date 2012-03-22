@@ -16,6 +16,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from .system import System
+from .elements import Spheroid, Aperture, Image, Object
 
 def system_from_table(data, scale):
     s = System(scale=scale)

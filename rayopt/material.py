@@ -16,14 +16,16 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from enthought.traits.api import (HasTraits, List, Float, Array, Dict,
-        Bool, Str, Instance, Trait, cached_property, Property, Callable,
-        Tuple, Enum)
+import numpy as np
+import cPickle as pickle
 
-from numpy import (array, sqrt, ones_like, float64, dot, sign, zeros,
-        linalg, where, nan, nan_to_num, finfo, inf, mgrid, ones,
-        concatenate, linspace, putmask, zeros_like, extract)
+from enthought.traits.api import (HasTraits, Str, Float, Dict, Instance,
+	Tuple, Array)
 
+
+def sfloat(a):
+    try: return float(a)
+    except: return None
 
 lambda_f = 486.1e-9
 lambda_d = 589.3e-9
@@ -43,7 +45,7 @@ class Material(HasTraits):
     thermal = Tuple
     price = Float
     transmission = Dict
-    sellmeier = Array(dtype=float64, shape=(None, 2))
+    sellmeier = Array(dtype=np.float64, shape=(None, 2))
 
     def __str__(self):
         return self.name
@@ -151,12 +153,12 @@ class GlassCatalog(HasTraits):
         return c
 
 # http://refractiveindex.info
-vacuum = FictionalMaterial(name="vacuum", nd=1., vd=inf)
+vacuum = FictionalMaterial(name="vacuum", nd=1., vd=np.inf)
 
 air = Material(name="air", sellmeier=[
     [5792105E-8, 238.0185],
     [167917E-8, 57.362],
-    ], vd=inf)
+    ], vd=np.inf)
 def air_refractive_index(wavelength):
         w2 = (wavelength/1e-6)**-2
         c0 = air.sellmeier[:,0]
