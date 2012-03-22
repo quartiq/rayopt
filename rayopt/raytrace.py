@@ -28,9 +28,11 @@ from traits.api import (HasTraits, Float, Array, Property,
 
 from .material import lambda_d
 
+
 def dir_to_angles(x,y,z):
-    r = array([x,y,z], dtype=np.float64)
-    return r/linalg.norm(r)
+    r = np.array([x,y,z], dtype=np.float64)
+    return r/np.linalg.norm(r)
+
 
 class Rays(HasTraits):
     # wavelength for all rays
@@ -55,8 +57,8 @@ class Rays(HasTraits):
         p.resize((4, n))
         a.resize((4, n))
         p[3,:] = 1
-        p = dot(t, p)
-        a = dot(t, a)
+        p = np.dot(t, p)
+        a = np.dot(t, a)
         p.resize((3, n))
         a.resize((3, n))
         return Rays(positions=p.T, angles=a.T)
@@ -102,13 +104,13 @@ class ParaxialTrace(HasTraits):
     def __init__(self, length=None, **k):
         super(ParaxialTrace, self).__init__(**k)
         if length is not None:
-            self.refractive_indices = zeros((length,), dtype=np.float64)
-            self.heights = zeros((length,2), dtype=np.float64)
-            self.angles = zeros((length,2), dtype=np.float64)
-            self.incidence = zeros((length,2), dtype=np.float64)
-            self.dispersions = zeros((length,), dtype=np.float64)
-            self.aberration3 = zeros((length,7), dtype=np.float64)
-            self.aberration5 = zeros((length,7), dtype=np.float64)
+            self.refractive_indices = np.zeros((length,), dtype=np.float64)
+            self.heights = np.zeros((length,2), dtype=np.float64)
+            self.angles = np.zeros((length,2), dtype=np.float64)
+            self.incidence = np.zeros((length,2), dtype=np.float64)
+            self.dispersions = np.zeros((length,), dtype=np.float64)
+            self.aberration3 = np.zeros((length,7), dtype=np.float64)
+            self.aberration5 = np.zeros((length,7), dtype=np.float64)
 
     def _get_lagrange(self):
         return self.refractive_indices[0]*(

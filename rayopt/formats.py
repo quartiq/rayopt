@@ -18,6 +18,8 @@
 
 from .system import System
 from .elements import Spheroid, Aperture, Image, Object
+from .material import air, misc
+
 
 def system_from_table(data, scale):
     s = System(scale=scale)

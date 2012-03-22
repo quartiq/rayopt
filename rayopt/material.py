@@ -55,7 +55,7 @@ class Material(HasTraits):
         c0 = self.sellmeier[:,0]
         c1 = self.sellmeier[:,1]
         n2 = 1.+(c0*w2/(w2-c1)).sum(-1)
-        return sqrt(n2)
+        return np.sqrt(n2)
 
     def _nd_default(self):
         return self.refractive_index(lambda_d)
@@ -86,14 +86,14 @@ class Material(HasTraits):
 
 class FictionalMaterial(Material):
     def refractive_index(self, wavelength):
-        return ones_like(wavelength)*self.nd
+        return np.ones_like(wavelength)*self.nd
 
     def dispersion(self, wavelength_short, wavelength_mid,
             wavelength_long):
-        return ones_like(wavelength_mid)*self.vd
+        return np.ones_like(wavelength_mid)*self.vd
 
     def delta_n(self, wavelength_short, wavelength_long):
-        return (self.nd-1)/self.vd*ones_like(wavelength_short)
+        return (self.nd-1)/self.vd*np.ones_like(wavelength_short)
 
 
 class GlassCatalog(HasTraits):
@@ -121,8 +121,8 @@ class GlassCatalog(HasTraits):
                     args = map(float, args.split())
                     g.alpham3070, g.alpha20300, g.density = args[0:3]
                 elif cmd == "CD":
-                    s = array(map(float, args.split())).reshape((-1,2))
-                    g.sellmeier = array([si for si in s if not si[0] == 0])
+                    s = np.array(map(float, args.split())).reshape((-1,2))
+                    g.sellmeier = np.array([si for si in s if not si[0] == 0])
                 elif cmd == "TD":
                     s = map(float, args.split())
                     g.thermal = s
@@ -159,12 +159,14 @@ air = Material(name="air", sellmeier=[
     [5792105E-8, 238.0185],
     [167917E-8, 57.362],
     ], vd=np.inf)
+
 def air_refractive_index(wavelength):
         w2 = (wavelength/1e-6)**-2
         c0 = air.sellmeier[:,0]
         c1 = air.sellmeier[:,1]
         n  = 1.+(c0/(c1-w2)).sum(-1)
         return n
+
 air.refractive_index = air_refractive_index
 
 
@@ -175,4 +177,3 @@ schott = GlassCatalog.cached_or_import(catpath+"SCHOTT.AGF")
 ohara = GlassCatalog.cached_or_import(catpath+"ohara.agf")
 misc = GlassCatalog.cached_or_import(catpath+"MISC.AGF")
 infrared = GlassCatalog.cached_or_import(catpath+"INFRARED.AGF")
-

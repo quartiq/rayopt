@@ -41,11 +41,11 @@ class Element(HasTraits):
     def _get_transform(self):
         r = euler_matrix(axes="rxyz", *self.angles)
         t = translation_matrix(-self.origin)
-        return dot(r,t)
+        return np.dot(r,t)
 
     #@cached_property
     def _get_inverse_transform(self):
-        return linalg.inv(self.transform)
+        return np.linalg.inv(self.transform)
 
     def transform_to(self, rays):
         return rays.transform(self.transform)
@@ -58,7 +58,7 @@ class Element(HasTraits):
         # only reference plane, overridden in subclasses
 	# solution for z=0
         s = -positions[...,2]/angles[...,2] # nan_to_num()
-        return where(s>=0, s, nan)
+        return np.where(s>=0, s, np.nan)
 
     def propagate(self, in_rays):
         out_rays = self.transform_to(in_rays)
@@ -110,11 +110,11 @@ class Interface(Element):
         raise NotImplementedError
 
     def intercept(self, p, a):
-        s = zeros_like(p[:,0])
+        s = np.zeros_like(p[:,0])
         for i in range(p.shape[0]):
             try:
                 s[i] = newton(func=lambda s: self.shape_func(p[i]+s*a[i]),
-                    fprime=lambda s: dot(self.shape_func_deriv(p[i]+s*a[i]),
+                    fprime=lambda s: np.dot(self.shape_func_deriv(p[i]+s*a[i]),
                         a[i]), x0=-p[i,2]/a[i,2], tol=1e-7, maxiter=15)
             except RuntimeError:
                 s[i] = nan
@@ -133,7 +133,7 @@ class Interface(Element):
 	    g = -2*o
 	else:
             p = (m**2-1)/fp2
-            g = sign(m)*sqrt(o**2-p)-o
+            g = sign(m)*np.sqrt(o**2-p)-o
         r = m*a+(g*fp.T).T
 	#print "rfr", self, f, a, g, r
 	return r
@@ -153,18 +153,18 @@ class Spheroid(Interface):
         r2 = x**2+y**2
         j = range(len(self.aspherics))
         o = dotprod(self.aspherics,
-                array([r2**(i+2) for i in j]).T)
+                np.array([r2**(i+2) for i in j]).T)
         return z-self.curvature*r2/(1+
-                    sqrt(1-self.conic*self.curvature**2*r2))-o
+                    np.sqrt(1-self.conic*self.curvature**2*r2))-o
 
     def shape_func_deriv(self, p):
         x, y, z = p.T
         r2 = x**2+y**2
         j = range(len(self.aspherics))
         o = dotprod(2*self.aspherics,
-                nan_to_num(array([(i+2)*r2**(i+1) for i in j])).T)
-        e = self.curvature/sqrt(1-self.conic*self.curvature**2*r2)+o
-        return array([-x*e, -y*e, ones_like(e)]).T
+                np.nan_to_num(np.array([(i+2)*r2**(i+1) for i in j])).T)
+        e = self.curvature/np.sqrt(1-self.conic*self.curvature**2*r2)+o
+        return np.array([-x*e, -y*e, np.ones_like(e)]).T
 
     def intercept(self, p, a):
         if len(self.aspherics) == 0:
@@ -173,11 +173,11 @@ class Spheroid(Interface):
             if c == 0:
                 return Element.intercept(self, p, a)
             else:
-                k = array([1,1,self.conic])
+                k = np.array([1,1,self.conic])
                 d = c*dotprod(a,k*p)-a[...,2]
                 e = c*dotprod(a,k*a)
                 f = c*dotprod(p,k*p)-2*p[...,2]
-                s = (-sqrt(d**2-e*f)-d)/e
+                s = (-np.sqrt(d**2-e*f)-d)/e
         else:
             return Interface.intercept(self, p, a)
         return where(s*sign(self.origin[2])>=0, s, nan)
@@ -244,16 +244,16 @@ class Object(Element):
 
     def rays_to_height(self, xy, height):
         if self.radius == np.inf:
-            p = array([(xy[0],xy[1],zeros_like(xy[0]))])
-            a = array([(height[0]*self.field_angle,
+            p = np.array([(xy[0], xy[1], np.zeros_like(xy[0]))])
+            a = np.array([(height[0]*self.field_angle,
                         height[1]*self.field_angle,
-                        sqrt(1-(height[0]*self.field_angle)**2
+                        np.sqrt(1-(height[0]*self.field_angle)**2
                               -(height[1]*self.field_angle)**2))])
         else:
-            p = array([(height[0]*self.radius,
+            p = np.array([(height[0]*self.radius,
                         height[1]*self.radius,
-                        zeros_like(height[0]))])
-            a = array([(xy[0], xy[1], sqrt(1-xy[0]**2-xy[1]**2))])
+                        np.zeros_like(height[0]))])
+            a = np.array([(xy[0], xy[1], np.sqrt(1-xy[0]**2-xy[1]**2))])
         return p, a
 
     def rays_for_point(self, height, chief, marg, num):
@@ -265,13 +265,13 @@ class Object(Element):
         x, y = mgrid[marg_nx:marg_px:num*1j, marg_ny:marg_py:num*1j]
         x, y = x.flatten(), y.flatten()
         r2 = (((x-mmarg_x)/dmarg_x)**2+((y-mmarg_y)/dmarg_y)**2)<.25
-        x, y = extract(r2, x), extract(r2, y)
-        x = concatenate(([chief_x], linspace(marg_nx, marg_px, num),
-            ones((num,))*chief_x, x))
-        y = concatenate(([chief_y], ones((num,))*chief_y,
-            linspace(marg_nx, marg_px, num), y))
+        x, y = np.extract(r2, x), np.extract(r2, y)
+        x = np.concatenate(([chief_x], np.linspace(marg_nx, marg_px, num),
+            np.ones((num,))*chief_x, x))
+        y = np.concatenate(([chief_y], np.ones((num,))*chief_y,
+            np.linspace(marg_nx, marg_px, num), y))
         p, a = self.rays_to_height((x,y),
-                (height[0]*ones_like(x),height[1]*ones_like(y)))
+                (height[0]*np.ones_like(x), height[1]*np.ones_like(y)))
         return p[0].T, a[0].T
 
 
@@ -290,5 +290,3 @@ class Aperture(Element):
 class Image(Element):
     typestr = "I"
     radius = Float
-
-

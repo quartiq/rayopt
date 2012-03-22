@@ -22,7 +22,7 @@ from traits.api import (HasTraits, Str, Array, Float, Instance, List)
 from scipy.optimize import (newton, fsolve)
 
 from .elements import Element, Object, Image
-
+from .raytrace import ParaxialTrace, Rays
 
 class System(HasTraits):
     name = Str
@@ -63,7 +63,7 @@ class System(HasTraits):
                 "#", "T", "Distance to", "ROC", "Diameter", 
                 "Material after", "N", "V")
         if self.object:
-            dia = (self.object.radius == inf and
+            dia = (self.object.radius == np.inf and
                 self.object.field_angle or self.object.radius)
             s += "%-2s %1s %-12s %-12s %10.5g %15s %5.2f %5.2f\n" % (
                 "", self.object.typestr, "", "", dia,
@@ -71,10 +71,10 @@ class System(HasTraits):
                 self.object.material.nd, self.object.material.vd)
         for i,e in enumerate(self.elements):
             curv = getattr(e, "curvature", 0)
-            roc = curv == 0 and inf or 1/curv
+            roc = curv == 0 and np.inf or 1/curv
             mat = getattr(e, "material", None)
-            n = getattr(mat, "nd", nan)
-            v = getattr(mat, "vd", nan)
+            n = getattr(mat, "nd", np.nan)
+            v = getattr(mat, "vd", np.nan)
             s += "%-2i %1s %12.7g %12.6g %10.5g %15s %5.2f %5.2f\n" % (
                 i, e.typestr, e.origin[2], roc, e.radius*2, mat, n, v)
         if self.image:
@@ -222,10 +222,10 @@ class System(HasTraits):
                 p.set_value(self, x[i])
             p = self.paraxial_trace()
             r = [self.propagate_through(ir) for ir in rays]
-            d = [array(de(self, p, r)).reshape((-1,))*de.weight for de in demerits]
-            return concatenate(d)
+            d = [np.array(de(self, p, r)).reshape((-1,))*de.weight for de in demerits]
+            return np.concatenate(d)
 
-        x0 = array([p.get_value(self) for p in parameters])
+        x0 = np.array([p.get_value(self) for p in parameters])
         # bs = 2
         # bounds = [(min(p/bs, p*bs), max(p/bs, p*bs)) for p in x0]
         #from numpy.random import randn
@@ -235,16 +235,16 @@ class System(HasTraits):
         ineqs = [c for c in constraints if not c.equality]
 
         def equality_constraints(x):
-            return concatenate([c(self) for c in eqs])
+            return np.concatenate([c(self) for c in eqs])
         def inequality_constraints(x):
-            return concatenate([c(self) for c in ineqs])
+            return np.concatenate([c(self) for c in ineqs])
 
         from openopt import NLP
         problem = NLP(objective_function, x0,
                 c=ineqs and inequality_constraints or None,
                 h=eqs and equality_constraints or None,
-                lb=array([p.bounds[0] for p in parameters]),
-                ub=array([p.bounds[1] for p in parameters]),
+                lb=np.array([p.bounds[0] for p in parameters]),
+                ub=np.array([p.bounds[1] for p in parameters]),
                 #scale=[p.scale for p in parameters],
                 diffInt=[p.scale*1e-2 for p in parameters],
                 ftol=1e-10, gtol=1e-10, xtol=1e-14,
