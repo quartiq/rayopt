@@ -95,6 +95,24 @@ class FictionalMaterial(Material):
     def delta_n(self, wavelength_short, wavelength_long):
         return (self.nd-1)/self.vd*np.ones_like(wavelength_short)
 
+# http://refractiveindex.info
+vacuum = FictionalMaterial(name="vacuum", nd=1., vd=np.inf)
+
+air = Material(name="air", sellmeier=[
+    [5792105E-8, 238.0185],
+    [167917E-8, 57.362],
+    ], vd=np.inf)
+
+def air_refractive_index(wavelength):
+    w2 = (wavelength/1e-6)**-2
+    c0 = air.sellmeier[:,0]
+    c1 = air.sellmeier[:,1]
+    n  = 1.+(c0/(c1-w2)).sum(-1)
+    return n
+
+air.refractive_index = air_refractive_index
+
+
 
 class GlassCatalog(HasTraits):
     db = Dict(Str, Instance(Material))
@@ -151,24 +169,6 @@ class GlassCatalog(HasTraits):
             c.import_zemax(fil)
             pickle.dump(c, open(filpick, "wb"), protocol=2)
         return c
-
-# http://refractiveindex.info
-vacuum = FictionalMaterial(name="vacuum", nd=1., vd=np.inf)
-
-air = Material(name="air", sellmeier=[
-    [5792105E-8, 238.0185],
-    [167917E-8, 57.362],
-    ], vd=np.inf)
-
-def air_refractive_index(wavelength):
-        w2 = (wavelength/1e-6)**-2
-        c0 = air.sellmeier[:,0]
-        c1 = air.sellmeier[:,1]
-        n  = 1.+(c0/(c1-w2)).sum(-1)
-        return n
-
-air.refractive_index = air_refractive_index
-
 
 #catpath = "/home/rj/.wine/drive_c/Program Files/ZEMAX/Glasscat/"
 catpath = "/home/rjordens/work/nist/glass/"
