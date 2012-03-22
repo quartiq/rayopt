@@ -1,0 +1,9 @@
+./*.egg-info
+./dist
+./build
+debian/*.debhelper
+debian/*.log
+debian/files
+debian/python-bullseye
+debian/*.substvars
+debian/*-stampdir
