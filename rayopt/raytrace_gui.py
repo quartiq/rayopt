@@ -31,13 +31,12 @@ from traits.ui.api import Item, View, HGroup
 from enable.api import (Component, ColorTrait)
 from enable.component_editor import ComponentEditor
 
-from kiva import Font
-from kiva import SWISS
+from enthought.kiva import fonttools
 
 from numpy import (linspace, array, alltrue, extract, isfinite,
         argwhere, zeros_like, inf)
 
-font = Font(family=SWISS)
+font = fonttools.str_to_font("SWISS")
 
 class SystemComp(Component):
     elementcolor = ColorTrait("gray")

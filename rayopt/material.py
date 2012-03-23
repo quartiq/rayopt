@@ -170,7 +170,7 @@ class GlassCatalog(HasTraits):
             pickle.dump(c, open(filpick, "wb"), protocol=2)
         return c
 
-catpath = "glass/"
+catpath = "/home/rjordens/work/nist/pyrayopt/glass/"
 schott = GlassCatalog.cached_or_import(catpath+"schott.agf")
 ohara = GlassCatalog.cached_or_import(catpath+"ohara.agf")
 misc = GlassCatalog.cached_or_import(catpath+"misc.agf")

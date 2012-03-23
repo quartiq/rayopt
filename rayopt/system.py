@@ -76,7 +76,7 @@ class System(HasTraits):
             n = getattr(mat, "nd", np.nan)
             v = getattr(mat, "vd", np.nan)
             s += "%-2i %1s %12.7g %12.6g %10.5g %15s %5.2f %5.2f\n" % (
-                i, e.typestr, e.origin[2], roc, e.radius*2, mat, n, v)
+                i+1, e.typestr, e.origin[2], roc, e.radius*2, mat, n, v)
         if self.image:
             s += "%2s %1s %12.7g %-12s %10.5g %15s %-5s %-5s\n" % (
                 "", self.image.typestr, self.image.origin[2], "",
