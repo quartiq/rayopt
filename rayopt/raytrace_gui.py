@@ -251,7 +251,8 @@ if __name__ == "__main__":
     #s = lithium
     #s = k_z_imaging
     #s = k_z_objective
-    s = schwarzschild
+    #s = schwarzschild
+    s = double_gauss
     s.paraxial_trace()
     t = Raytrace(system=s)
     t.configure_traits()

@@ -20,7 +20,7 @@ import numpy as np
 import cPickle as pickle
 
 from traits.api import (HasTraits, Str, Float, Dict, Instance,
-    Tuple, Array)
+    Tuple, Array, Bool)
 
 
 def sfloat(a):
@@ -35,6 +35,7 @@ lambda_c = 656.3e-9
 class Material(HasTraits):
     name = Str
     comment = Str
+    solid = Bool(True)
     glasscode = Float
     nd = Float
     vd = Float
@@ -96,9 +97,9 @@ class FictionalMaterial(Material):
         return (self.nd-1)/self.vd*np.ones_like(wavelength_short)
 
 # http://refractiveindex.info
-vacuum = FictionalMaterial(name="vacuum", nd=1., vd=np.inf)
+vacuum = FictionalMaterial(name="vacuum", nd=1., vd=np.inf, solid=False)
 
-air = Material(name="air", sellmeier=[
+air = Material(name="air", solid=False, sellmeier=[
     [5792105E-8, 238.0185],
     [167917E-8, 57.362],
     ], vd=np.inf)

@@ -34,7 +34,7 @@ class Element(HasTraits):
     angles = Array(dtype=np.float64, shape=(3,))
     transform = Property(depends_on="origin, angles")
     inverse_transform = Property(depends_on="transform")
-    material = Trait(None, Material)
+    material = Trait(air, Material)
     radius = Float
 
     #@cached_property
@@ -99,6 +99,12 @@ class Element(HasTraits):
     def revert(self):
         pass
 
+    def surface(self, points, axis=0):
+	t = np.linspace(-self.radius, self.radius, 2)
+	xyz = [np.zeros_like(t)]*3
+	xyz[axis] = t
+	return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
+
 
 class Interface(Element):
     typestr = "F"
@@ -141,13 +147,19 @@ class Interface(Element):
     def revert(self):
         raise NotImplementedError
 
+    def surface(self, points, axis=0):
+	t = np.linspace(-self.radius, self.radius, points)
+	xyz = [np.zeros_like(t)]*3
+	xyz[axis] = t
+        xyz[2] = -self.shape_func(np.array(xyz).T)
+	return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
+
 
 class Spheroid(Interface):
     typestr = "S"
     curvature = Float(0)
     conic = Float(1) # assert self.radius**2 < 1/(self.conic*self.curvature**2)
     aspherics = Array(dtype=np.float64)
-    material = Trait(air, Material)
 
     def shape_func(self, p):
         x, y, z = p.T
@@ -240,7 +252,6 @@ class Object(Element):
     typestr = "O"
     radius = Float(np.inf)
     field_angle = Float(.1)
-    material = Trait(air, Material)
     apodization = Enum(("constant", "gaussian", "cos3"))
 
     def rays_to_height(self, xy, height):
@@ -286,8 +297,7 @@ class Aperture(Element):
             r = (out_rays.positions[...,(0,1)]**2).sum(axis=-1)
             putmask(out_rays.positions[...,2], r>self.radius**2, nan)
         return in_rays, out_rays
-
-
+    
 class Image(Element):
     typestr = "I"
     radius = Float

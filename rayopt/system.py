@@ -22,7 +22,7 @@ from traits.api import (HasTraits, Str, Array, Float, Instance, List)
 from scipy.optimize import (newton, fsolve)
 
 from .elements import Element, Object, Image
-from .raytrace import ParaxialTrace, Rays
+from .raytrace import Rays, ParaxialTrace
 
 class System(HasTraits):
     name = Str
@@ -83,57 +83,33 @@ class System(HasTraits):
                 self.image.radius*2, "", "", "")
         return s
 
+    def surfaces(self, axis, n=20):
+	p = [0, 0, 0]
+	l = None
+	for e in [self.object] + self.elements + [self.image]:
+            xi, zi = e.surface(n, axis)
+	    xi += p[axis]
+            zi += p[2]
+            p += e.origin
+	    if l is not None:
+		if xi[0] < l[0, 0]:
+		    cl = ([xi[0]], [l[1, 0]])
+		else:
+		    cl = ([l[0, 0]], [zi[0]])
+		if xi[-1] > l[0, -1]:
+		    cu = ([xi[-1]], [l[1, -1]])
+		else:
+		    cu = ([l[0, -1]], [zi[-1]])
+		yield np.c_[l[:, (0,)], cl, (xi, zi), cu, l[:, ::-1]]
+	    elif not e.material.solid:
+		yield xi, zi
+	    if e.material.solid:
+                l = np.array([xi, zi])
+	    else:
+		l = None
+
     def paraxial_trace(self):
-        p = ParaxialTrace(length=len(self.elements)+2)
-        p.wavelength = self.wavelengths[0]
-        p.wavelength_long = max(self.wavelengths)
-        p.wavelength_short = min(self.wavelengths)
-        p.refractive_indices[0] = self.object.material.refractive_index(
-                p.wavelength)
-        #p.heights[0], p.angles[0] = (18.5, -6.3), (0, .25) # photo
-        #p.heights[0], p.angles[0] = (6.25, -7.102), (0, .6248) # dbl gauss
-        #p.heights[0], p.angles[0] = (0, -.15), (0.25, -.0004) # k_z_i
-        #p.heights[0], p.angles[0] = (5, 0), (0, .01) # k_z_o
-        #p.heights[0], p.angles[0] = (self.object.radius, 0), (0, .5) # schwarzschild
-        p.heights[0] = (self.object.radius, 0)
-        p.angles[0] = (0, .5)
-        #print "h at aperture:", self.height_at_aperture_paraxial(p)
-        self.propagate_paraxial(p)
-        #print "heights:", p.heights
-        #print "angles:", p.angles
-        #print "incidences:", p.incidence
-        # p.aberration3 *= -2*p.image_height*p.angles[-1,0] # seidel
-        # p.aberration3 *= -p.image_height/p.angles[-1,0] # longit
-        # p.aberration3 *= p.image_height # transverse
-        s = ""
-        s += "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s\n" % (
-                "#", "T", "TSC", "CC", "TAC", "TPC", "DC", "TAchC", "TchC")
-        for i in range(1,len(p.aberration3)-1):
-            ab = p.aberration3[i]
-            s += "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g\n" % (
-                    i-1, self.elements[i-1].typestr,
-                    ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
-        ab = p.aberration3.sum(0)
-        s += "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g\n" % (
-              " ∑", "", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
-        print s
-        print "focal length:", p.focal_length
-        print "front numerical aperture:", p.front_numerical_aperture
-        print "back numerical aperture:", p.back_numerical_aperture
-        print "front focal length:", p.front_focal_length
-        print "back focal length:", p.back_focal_length
-        print "image height:", p.image_height
-        print "entrance pupil position:", p.entrance_pupil_position
-        print "exit pupil position:", p.exit_pupil_position
-        print "entrance pupil height:", p.entrance_pupil_height
-        print "exit pupil height:", p.exit_pupil_height
-        print "front f number:", p.front_f_number
-        print "back f number:", p.back_f_number
-        print "front airy radius:", p.front_airy_radius
-        print "back airy radius:", p.back_airy_radius
-        print "magnification:", p.magnification
-        print "angular magnification:", p.angular_magnification
-        return p
+	return ParaxialTrace(self)
 
     def propagate_paraxial(self, rays):
         for i,e in enumerate(self.elements):
