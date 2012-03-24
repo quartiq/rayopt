@@ -18,7 +18,31 @@
 
 from .system import System
 from .elements import Spheroid, Aperture, Image, Object
-from .material import air, misc
+from .material import air, misc, all_materials
+
+def system_from_array(data, scale, material_map={}):
+    # data is a list of (typ, radius of curvature,
+    # offset from previous, clear radius, material after)
+    s = System(scale=scale)
+    for typ, roc, off, rad, mat in data:
+        roc, off, rad = map(float, (roc, off, rad))
+        if typ == "O":
+            s.object = Object(radius=rad, origin=(0, 0, off))
+        elif typ == "S":
+            if roc == 0:
+                curv = 0
+            else:
+                curv = 1/roc
+            mat = all_materials.get(material_map.get(mat, mat), air)
+            e = Spheroid(curvature=curv, origin=(0, 0, off),
+                    radius=rad, material=mat)
+            s.elements.append(e)
+        elif typ == "A":
+            a = Aperture(radius=rad, origin=(0, 0, off))
+            s.elements.append(a)
+        elif typ == "I":
+            s.image = Image(radius=rad, origin=(0, 0, off))
+    return s
 
 
 def system_from_table(data, scale):
@@ -49,9 +73,9 @@ def system_from_table(data, scale):
             radius=rad,
             material=mat)
         s.elements.append(e)
+        pos = float(p[2])
         if s.object is None:
             s.object = Object(radius=rad, origin=(0,0,0))
-        pos = float(p[2])
     return s
 
 

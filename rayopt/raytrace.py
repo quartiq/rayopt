@@ -235,13 +235,13 @@ class ParaxialTrace(HasTraits):
         print "magnification:", p.magnification
 
     def print_trace(self):
-        print "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
-                "#", "T", "marg h", "marg a", "marg i", "", "chief h",
+        print "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s" % (
+                "#", "T", "marg h", "marg a", "marg i", "chief h",
                 "chief a", "chief i")
         for i, ((hm, hc), (am, ac), (im, ic)) in enumerate(zip(
                 self.heights, self.angles, self.incidence)):
-            print "%-2s %1s% 10.4g% 10.4g% 10.4g% 10s% 10.4g% 10.4g% 10.4g" % (
-                    i, self.system.all[i].typestr, hm, am, im, "", hc, ac, ic)
+            print "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                    i, self.system.all[i].typestr, hm, am, im, hc, ac, ic)
 
     def _get_lagrange(self):
         return self.refractive_indices[0]*(
