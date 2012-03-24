@@ -27,7 +27,7 @@ from traits.api import (HasTraits, Float, Array, Property,
     cached_property, Any, Instance)
 
 from .material import lambda_d
-
+from .system import System
 
 def dir_to_angles(x,y,z):
     r = np.array([x,y,z], dtype=np.float64)
@@ -66,9 +66,74 @@ class Rays(HasTraits):
     def _get_end_positions(self):
         return self.positions + (self.lengths*self.angles.T).T
 
+    def propagate(self, rays):
+        for a, b in zip([self.object] + self.elements,
+                        self.elements + [self.image]):
+            a_rays, rays = b.propagate(rays)
+            yield a, a_rays
+        yield b, rays
+
+    def propagate_through(self, rays):
+        for element, rays in self.propagate(rays):
+            pass
+        return rays
+
+    def height_at_aperture(self, rays):
+        for element, in_rays in self.propagate(rays):
+            if isinstance(element, Aperture):
+                return in_rays.end_positions[...,(0,1)]/element.radius
+
+    def chief_and_marginal(self, height, rays,
+            paraxial_chief=True,
+            paraxial_marginal=True):
+        assert sum(1 for e in self.elements
+                if isinstance(e, Aperture)) == 1
+       
+        def stop_for_pos(x,y):
+            # returns relative aperture height given object angles and
+            # relative object height
+            rays.positions, rays.angles = self.object.rays_to_height(
+                    (x,y), height)
+            return self.height_at_aperture(rays)[0]
+
+        d = 1e-3 # arbitrary to get newton started, TODO: better scale
+
+        if paraxial_chief:
+            d0 = stop_for_pos(0,0)
+            chief = -d*d0/(stop_for_pos(d,d)-d0)
+        else:
+            chief = fsolve(lambda p: stop_for_pos(*p),
+                    (0,0), xtol=1e-2, epsfcn=d)
+
+        if paraxial_marginal:
+            dmarg = d/(stop_for_pos(*(chief+d))-stop_for_pos(*chief))
+            marg_px, marg_py = chief+dmarg
+            marg_nx, marg_ny = chief-dmarg
+        else:
+            marg_px = newton(lambda x: stop_for_pos(x, chief[1])[0]-1,
+                    chief[0]+d)
+            marg_nx = newton(lambda x: stop_for_pos(x, chief[1])[0]+1,
+                    chief[0]-d)
+            marg_py = newton(lambda y: stop_for_pos(chief[0], y)[1]-1,
+                    chief[1]+d)
+            marg_ny = newton(lambda y: stop_for_pos(chief[0], y)[1]+1,
+                    chief[1]-d)
+
+        return chief, (marg_px, marg_nx, marg_py, marg_ny)
+
+    def get_ray_bundle(self, wavelength, height, number, **kw):
+        rays = Rays(wavelength=wavelength, height=height)
+        c, m = self.chief_and_marginal(height, rays, **kw)
+        print c, m
+        p, a = self.object.rays_for_point(height, c, m, number)
+        rays.positions = p
+        rays.angles = a
+        return rays
+
+
 
 class ParaxialTrace(HasTraits):
-    system = Any # Instance(System)
+    system = Instance(System)
 
     refractive_indices = Array(dtype=np.float64, shape=(None,))
     dispersions = Array(dtype=np.float64, shape=(None,))
@@ -83,28 +148,21 @@ class ParaxialTrace(HasTraits):
     aberration5 = Array(dtype=np.float64, shape=(None,7))
 
     lagrange = Property
-    focal_length = Property
-    back_focal_length = Property
-    front_focal_length = Property
     image_height = Property
-    entrance_pupil_height = Property
-    entrance_pupil_position = Property
-    exit_pupil_height = Property
-    exit_pupil_position = Property
-    front_f_number = Property
-    back_f_number = Property
-    back_numerical_aperture = Property
-    front_numerical_aperture = Property
-    front_airy_radius = Property
-    back_airy_radius = Property
+    focal_length = Property
+    focal_distance = Property
+    pupil_height = Property
+    pupil_position = Property
+    f_number = Property
+    numerical_aperture = Property
+    airy_radius = Property
     magnification = Property
-    angular_magnification = Property
 
-    def __init__(self, system=None, **k):
+    def __init__(self, **k):
         super(ParaxialTrace, self).__init__(**k)
+        system = self.system
         if system is None:
             return
-        self.system = system
         length = len(system.elements)+2
         self.refractive_indices = np.zeros((length,), dtype=np.float64)
         self.heights = np.zeros((length,2), dtype=np.float64)
@@ -114,6 +172,18 @@ class ParaxialTrace(HasTraits):
         self.aberration3 = np.zeros((length,7), dtype=np.float64)
         self.aberration5 = np.zeros((length,7), dtype=np.float64)
         self.trace()
+
+    def propagate_paraxial(self):
+        for i,e in enumerate(self.system.elements):
+            e.propagate_paraxial(i+1, self)
+            e.aberration3(i+1, self)
+        self.system.image.propagate_paraxial(i+2, self)
+    
+    def height_at_aperture_paraxial(self):
+        for i,e in enumerate(self.system.elements):
+            e.propagate_paraxial(i+1, self)
+            if isinstance(e, Aperture):
+                return rays.heights[i+1]
 
     def trace(self):
         sys, p = self.system, self
@@ -128,13 +198,13 @@ class ParaxialTrace(HasTraits):
         #p.heights[0], p.angles[0] = (5, 0), (0, .01) # k_z_o
         #p.heights[0], p.angles[0] = (sys.object.radius, 0), (0, .5) # schwarzschild
         if sys.object.radius == np.inf:
-            p.heights[0] = (6, -6)
+            p.heights[0] = (6.25, -7.1)
             p.angles[0] = (0, sys.object.field_angle)
         else:
             p.heights[0] = (sys.object.radius, 0)
             p.angles[0] = (0, .3)
         #print "h at aperture:", sys.height_at_aperture_paraxial(p)
-        sys.propagate_paraxial(p)
+        self.propagate_paraxial()
         #print "heights:", p.heights
         #print "angles:", p.angles
         #print "incidences:", p.incidence
@@ -155,21 +225,23 @@ class ParaxialTrace(HasTraits):
         print s
         print "lagrange:", p.lagrange
         print "focal length:", p.focal_length
-        print "front numerical aperture:", p.front_numerical_aperture
-        print "back numerical aperture:", p.back_numerical_aperture
-        print "front focal length:", p.front_focal_length
-        print "back focal length:", p.back_focal_length
         print "image height:", p.image_height
-        print "entrance pupil position:", p.entrance_pupil_position
-        print "exit pupil position:", p.exit_pupil_position
-        print "entrance pupil height:", p.entrance_pupil_height
-        print "exit pupil height:", p.exit_pupil_height
-        print "front f number:", p.front_f_number
-        print "back f number:", p.back_f_number
-        print "front airy radius:", p.front_airy_radius
-        print "back airy radius:", p.back_airy_radius
+        print "numerical aperture:", p.numerical_aperture
+        print "focal distance:", p.focal_distance
+        print "pupil position:", p.pupil_position
+        print "pupil height:", p.pupil_height
+        print "f number:", p.f_number
+        print "airy radius:", p.airy_radius
         print "magnification:", p.magnification
-        print "angular magnification:", p.angular_magnification
+
+    def print_trace(self):
+        print "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
+                "#", "T", "marg h", "marg a", "marg i", "", "chief h",
+                "chief a", "chief i")
+        for i, ((hm, hc), (am, ac), (im, ic)) in enumerate(zip(
+                self.heights, self.angles, self.incidence)):
+            print "%-2s %1s% 10.4g% 10.4g% 10.4g% 10s% 10.4g% 10.4g% 10.4g" % (
+                    i, self.system.all[i].typestr, hm, am, im, "", hc, ac, ic)
 
     def _get_lagrange(self):
         return self.refractive_indices[0]*(
@@ -181,56 +253,42 @@ class ParaxialTrace(HasTraits):
                 self.angles[0,0]*self.angles[-2,1]-
                 self.angles[0,1]*self.angles[-2,0])
 
-    def _get_front_focal_length(self):
-        return -self.heights[1,0]/self.angles[0,0]
-
-    def _get_back_focal_length(self):
-        return -self.heights[-2,0]/self.angles[-2,0]
-
     def _get_image_height(self):
         return self.lagrange/(self.refractive_indices[-2]*
                 self.angles[-2,0])
-        
-    def _get_back_numerical_aperture(self):
-        return abs(self.refractive_indices[-2]*self.angles[-2,0])
+ 
+    def _get_focal_distance(self):
+        return (-self.heights[1,0]/self.angles[0,0],
+                -self.heights[-2,0]/self.angles[-2,0])
+       
+    def _get_numerical_aperture(self):
+        return (abs(self.refractive_indices[0]*self.angles[0,0]),
+                abs(self.refractive_indices[-2]*self.angles[-2,0]))
 
-    def _get_front_numerical_aperture(self):
-        return abs(self.refractive_indices[0]*self.angles[0,0])
+    def _get_pupil_position(self):
+        return (-self.heights[1,1]/self.angles[1,1],
+                -self.heights[-2,1]/self.angles[-2,1])
 
-    def _get_entrance_pupil_position(self):
-        return -self.heights[1,1]/self.angles[1,1]
+    def _get_pupil_height(self):
+        return (self.heights[1,0]+
+                self.pupil_position[0]*self.angles[0,0],
+                self.heights[-2,0]+
+                self.pupil_position[0]*self.angles[-2,0])
 
-    def _get_exit_pupil_position(self):
-        return -self.heights[-2,1]/self.angles[-2,1]
-
-    def _get_entrance_pupil_height(self):
-        return self.heights[1,0]+\
-                self.entrance_pupil_position*self.angles[0,0]
-
-    def _get_exit_pupil_height(self):
-        return self.heights[-2,0]+\
-                self.entrance_pupil_position*self.angles[-2,0]
-
-    def _get_front_f_number(self):
+    def _get_f_number(self):
         #return self.focal_length/(2*self.entrance_pupil_height)
-        return self.refractive_indices[-2]/(
-                2*self.front_numerical_aperture)
-
-    def _get_back_f_number(self):
+        return (self.refractive_indices[-2]/(
+                2*self.numerical_aperture[0]),
         #return self.focal_length/(2*self.exit_pupil_height)
-        return self.refractive_indices[0]/(
-                2*self.back_numerical_aperture)
+               self.refractive_indices[0]/(
+                2*self.numerical_aperture[1]))
 
-    def _get_back_airy_radius(self):
-        return 1.22*self.wavelength/(2*self.back_numerical_aperture)
-
-    def _get_front_airy_radius(self):
-        return 1.22*self.wavelength/(2*self.front_numerical_aperture)
+    def _get_airy_radius(self):
+        return (1.22*self.wavelength/(2*self.numerical_aperture[0]),
+                1.22*self.wavelength/(2*self.numerical_aperture[1]))
 
     def _get_magnification(self):
-        return (self.refractive_indices[0]*self.angles[0,0])/(
-                self.refractive_indices[-2]*self.angles[-2,0])
-
-    def _get_angular_magnification(self):
-        return (self.refractive_indices[-2]*self.angles[-2,1])/(
-                self.refractive_indices[0]*self.angles[0,1])
+        return ((self.refractive_indices[0]*self.angles[0,0])/(
+                self.refractive_indices[-2]*self.angles[-2,0]),
+                (self.refractive_indices[-2]*self.angles[-2,1])/(
+                self.refractive_indices[0]*self.angles[0,1]))

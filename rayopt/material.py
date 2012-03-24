@@ -28,20 +28,20 @@ def sfloat(a):
     except: return None
 
 fraunhofer = dict(# http://en.wikipedia.org/wiki/Abbe_number
-    i  = 365.01,  # Hg  UV
-    h  = 404.66,  # Hg  violet
-    g  = 435.84,  # Hg  blue
-    Fp = 479.99,  # Cd  blue
-    F  = 486.13,  # H   blue
-    e  = 546.07,  # Hg  green
-    d  = 587.56,  # He  yellow
-    D  = 589.30,  # Na  yellow
-    Cp = 643.85,  # Cd  red
-    C  = 656.27,  # H   red
-    r  = 706.52,  # He  red
-    Ap = 768.20,  # K   IR
-    s  = 852.11,  # Cs  IR
-    t  =1013.98,  # Hg  IR
+    i  = 365.01e-9,  # Hg  UV
+    h  = 404.66e-9,  # Hg  violet
+    g  = 435.84e-9,  # Hg  blue
+    Fp = 479.99e-9,  # Cd  blue
+    F  = 486.13e-9,  # H   blue
+    e  = 546.07e-9,  # Hg  green
+    d  = 587.56e-9,  # He  yellow
+    D  = 589.30e-9,  # Na  yellow
+    Cp = 643.85e-9,  # Cd  red
+    C  = 656.27e-9,  # H   red
+    r  = 706.52e-9,  # He  red
+    Ap = 768.20e-9,  # K   IR
+    s  = 852.11e-9,  # Cs  IR
+    t  =1013.98e-9,  # Hg  IR
     )
 
 lambda_F = fraunhofer["F"]

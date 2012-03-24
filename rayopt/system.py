@@ -17,12 +17,12 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
-from traits.api import (HasTraits, Str, Array, Float, Instance, List)
+from traits.api import (HasTraits, Str, Array, Float, Instance, List,
+        Property)
 
 from scipy.optimize import (newton, fsolve)
 
 from .elements import Element, Object, Image
-from .raytrace import Rays, ParaxialTrace
 
 class System(HasTraits):
     name = Str
@@ -33,6 +33,7 @@ class System(HasTraits):
     object = Instance(Object)
     elements = List(Element)
     image = Instance(Image)
+    all = Property()
 
     def revert(self):
         m = self.object.material
@@ -46,6 +47,9 @@ class System(HasTraits):
         for e in self.elements:
             e.revert()
             d, e.origin = e.origin, d
+
+    def _get_all(self):
+        return [self.object] + self.elements + [self.image]
 
     def __str__(self):
         s = ""
@@ -103,85 +107,6 @@ class System(HasTraits):
                 l = np.array([xi, zi])
             else:
                 l = None
-
-    def paraxial_trace(self):
-        return ParaxialTrace(self)
-
-    def propagate_paraxial(self, rays):
-        for i,e in enumerate(self.elements):
-            e.propagate_paraxial(i+1, rays)
-            e.aberration3(i+1, rays)
-        self.image.propagate_paraxial(i+2, rays)
-    
-    def height_at_aperture_paraxial(self, rays):
-        for i,e in enumerate(self.elements):
-            e.propagate_paraxial(i+1, rays)
-            if isinstance(e, Aperture):
-                return rays.heights[i+1]
-
-    def propagate(self, rays):
-        for a, b in zip([self.object] + self.elements,
-                        self.elements + [self.image]):
-            a_rays, rays = b.propagate(rays)
-            yield a, a_rays
-        yield b, rays
-
-    def propagate_through(self, rays):
-        for element, rays in self.propagate(rays):
-            pass
-        return rays
-
-    def height_at_aperture(self, rays):
-        for element, in_rays in self.propagate(rays):
-            if isinstance(element, Aperture):
-                return in_rays.end_positions[...,(0,1)]/element.radius
-
-    def chief_and_marginal(self, height, rays,
-            paraxial_chief=True,
-            paraxial_marginal=True):
-        assert sum(1 for e in self.elements
-                if isinstance(e, Aperture)) == 1
-       
-        def stop_for_pos(x,y):
-            # returns relative aperture height given object angles and
-            # relative object height
-            rays.positions, rays.angles = self.object.rays_to_height(
-                    (x,y), height)
-            return self.height_at_aperture(rays)[0]
-
-        d = 1e-3 # arbitrary to get newton started, TODO: better scale
-
-        if paraxial_chief:
-            d0 = stop_for_pos(0,0)
-            chief = -d*d0/(stop_for_pos(d,d)-d0)
-        else:
-            chief = fsolve(lambda p: stop_for_pos(*p),
-                    (0,0), xtol=1e-2, epsfcn=d)
-
-        if paraxial_marginal:
-            dmarg = d/(stop_for_pos(*(chief+d))-stop_for_pos(*chief))
-            marg_px, marg_py = chief+dmarg
-            marg_nx, marg_ny = chief-dmarg
-        else:
-            marg_px = newton(lambda x: stop_for_pos(x, chief[1])[0]-1,
-                    chief[0]+d)
-            marg_nx = newton(lambda x: stop_for_pos(x, chief[1])[0]+1,
-                    chief[0]-d)
-            marg_py = newton(lambda y: stop_for_pos(chief[0], y)[1]-1,
-                    chief[1]+d)
-            marg_ny = newton(lambda y: stop_for_pos(chief[0], y)[1]+1,
-                    chief[1]-d)
-
-        return chief, (marg_px, marg_nx, marg_py, marg_ny)
-
-    def get_ray_bundle(self, wavelength, height, number, **kw):
-        rays = Rays(wavelength=wavelength, height=height)
-        c, m = self.chief_and_marginal(height, rays, **kw)
-        print c, m
-        p, a = self.object.rays_for_point(height, c, m, number)
-        rays.positions = p
-        rays.angles = a
-        return rays
 
     def solve(self):
         pass
