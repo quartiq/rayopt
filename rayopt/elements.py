@@ -37,13 +37,13 @@ class Element(HasTraits):
     material = Trait(air, Material)
     radius = Float
 
-    #@cached_property
+    @cached_property
     def _get_transform(self):
         r = euler_matrix(axes="rxyz", *self.angles)
         t = translation_matrix(-self.origin)
         return np.dot(r,t)
 
-    #@cached_property
+    @cached_property
     def _get_inverse_transform(self):
         return np.linalg.inv(self.transform)
 
@@ -57,8 +57,8 @@ class Element(HasTraits):
         # ray length to intersection with element
         # only reference plane, overridden in subclasses
         # solution for z=0
-        s = -positions[...,2]/angles[...,2] # nan_to_num()
-        return np.where(s>=0, s, np.nan)
+        s = -positions[..., 2]/angles[..., 2]
+        return s # TODO mask, np.where(s>=0, s, np.nan)
 
     def propagate(self, in_rays):
         out_rays = self.transform_to(in_rays)
@@ -99,11 +99,11 @@ class Element(HasTraits):
     def revert(self):
         pass
 
-    def surface(self, points, axis=0):
-	t = np.linspace(-self.radius, self.radius, 2)
-	xyz = [np.zeros_like(t)]*3
-	xyz[axis] = t
-	return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
+    def surface(self, axis, points=20):
+        t = np.linspace(-self.radius, self.radius, 2)
+        xyz = [np.zeros_like(t)]*3
+        xyz[axis] = t
+        return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
 
 
 class Interface(Element):
@@ -124,7 +124,7 @@ class Interface(Element):
                         a[i]), x0=-p[i,2]/a[i,2], tol=1e-7, maxiter=15)
             except RuntimeError:
                 s[i] = nan
-        return where(s>=0, s, nan)
+        return where(s>=0, s, nan) # TODO mask
 
     def refract(self, f, a, m):
         # General Ray-Tracing Procedure
@@ -147,12 +147,12 @@ class Interface(Element):
     def revert(self):
         raise NotImplementedError
 
-    def surface(self, points, axis=0):
-	t = np.linspace(-self.radius, self.radius, points)
-	xyz = [np.zeros_like(t)]*3
-	xyz[axis] = t
+    def surface(self, axis, points=20):
+        t = np.linspace(-self.radius, self.radius, points)
+        xyz = [np.zeros_like(t)]*3
+        xyz[axis] = t
         xyz[2] = -self.shape_func(np.array(xyz).T)
-	return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
+        return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
 
 
 class Spheroid(Interface):
@@ -297,7 +297,8 @@ class Aperture(Element):
             r = (out_rays.positions[...,(0,1)]**2).sum(axis=-1)
             putmask(out_rays.positions[...,2], r>self.radius**2, nan)
         return in_rays, out_rays
-    
+
+
 class Image(Element):
     typestr = "I"
     radius = Float

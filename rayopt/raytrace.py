@@ -103,8 +103,8 @@ class ParaxialTrace(HasTraits):
     def __init__(self, system=None, **k):
         super(ParaxialTrace, self).__init__(**k)
         if system is None:
-	    return
-	self.system = system
+            return
+        self.system = system
         length = len(system.elements)+2
         self.refractive_indices = np.zeros((length,), dtype=np.float64)
         self.heights = np.zeros((length,2), dtype=np.float64)
@@ -116,7 +116,7 @@ class ParaxialTrace(HasTraits):
         self.trace()
 
     def trace(self):
-	sys, p = self.system, self
+        sys, p = self.system, self
         p.wavelength = sys.wavelengths[0]
         p.wavelength_long = max(sys.wavelengths)
         p.wavelength_short = min(sys.wavelengths)

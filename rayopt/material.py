@@ -27,10 +27,26 @@ def sfloat(a):
     try: return float(a)
     except: return None
 
-lambda_f = 486.1e-9
-lambda_d = 589.3e-9
-lambda_c = 656.3e-9
+fraunhofer = dict(# http://en.wikipedia.org/wiki/Abbe_number
+    i  = 365.01,  # Hg  UV
+    h  = 404.66,  # Hg  violet
+    g  = 435.84,  # Hg  blue
+    Fp = 479.99,  # Cd  blue
+    F  = 486.13,  # H   blue
+    e  = 546.07,  # Hg  green
+    d  = 587.56,  # He  yellow
+    D  = 589.30,  # Na  yellow
+    Cp = 643.85,  # Cd  red
+    C  = 656.27,  # H   red
+    r  = 706.52,  # He  red
+    Ap = 768.20,  # K   IR
+    s  = 852.11,  # Cs  IR
+    t  =1013.98,  # Hg  IR
+    )
 
+lambda_F = fraunhofer["F"]
+lambda_d = fraunhofer["d"]
+lambda_C = fraunhofer["C"]
 
 class Material(HasTraits):
     name = Str
@@ -171,7 +187,7 @@ class GlassCatalog(HasTraits):
             pickle.dump(c, open(filpick, "wb"), protocol=2)
         return c
 
-catpath = "/home/rjordens/work/nist/pyrayopt/glass/"
+catpath = "/home/rj/work/nist/pyrayopt/glass/"
 schott = GlassCatalog.cached_or_import(catpath+"schott.agf")
 ohara = GlassCatalog.cached_or_import(catpath+"ohara.agf")
 misc = GlassCatalog.cached_or_import(catpath+"misc.agf")

@@ -47,10 +47,6 @@ class System(HasTraits):
             e.revert()
             d, e.origin = e.origin, d
 
-    def __add__(self, other):
-        self.elements += other.elements
-        return self
-
     def __str__(self):
         s = ""
         s += "System: %s\n" % self.name
@@ -84,32 +80,32 @@ class System(HasTraits):
         return s
 
     def surfaces(self, axis, n=20):
-	p = [0, 0, 0]
-	l = None
-	for e in [self.object] + self.elements + [self.image]:
-            xi, zi = e.surface(n, axis)
-	    xi += p[axis]
+        p = [0, 0, 0]
+        l = None
+        for e in [self.object] + self.elements + [self.image]:
+            xi, zi = e.surface(axis, n)
+            xi += p[axis]
             zi += p[2]
             p += e.origin
-	    if l is not None:
-		if xi[0] < l[0, 0]:
-		    cl = ([xi[0]], [l[1, 0]])
-		else:
-		    cl = ([l[0, 0]], [zi[0]])
-		if xi[-1] > l[0, -1]:
-		    cu = ([xi[-1]], [l[1, -1]])
-		else:
-		    cu = ([l[0, -1]], [zi[-1]])
-		yield np.c_[l[:, (0,)], cl, (xi, zi), cu, l[:, ::-1]]
-	    elif not e.material.solid:
-		yield xi, zi
-	    if e.material.solid:
+            if l is not None:
+                if xi[0] < l[0, 0]:
+                    cl = ([xi[0]], [l[1, 0]])
+                else:
+                    cl = ([l[0, 0]], [zi[0]])
+                if xi[-1] > l[0, -1]:
+                    cu = ([xi[-1]], [l[1, -1]])
+                else:
+                    cu = ([l[0, -1]], [zi[-1]])
+                yield np.c_[l[:, (0,)], cl, (xi, zi), cu, l[:, ::-1]]
+            elif not e.material.solid:
+                yield xi, zi
+            if e.material.solid:
                 l = np.array([xi, zi])
-	    else:
-		l = None
+            else:
+                l = None
 
     def paraxial_trace(self):
-	return ParaxialTrace(self)
+        return ParaxialTrace(self)
 
     def propagate_paraxial(self, rays):
         for i,e in enumerate(self.elements):
