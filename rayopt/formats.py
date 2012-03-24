@@ -20,10 +20,10 @@ from .system import System
 from .elements import Spheroid, Aperture, Image, Object
 from .material import air, misc, all_materials
 
-def system_from_array(data, scale, material_map={}):
+def system_from_array(data, material_map={}, **kwargs):
     # data is a list of (typ, radius of curvature,
     # offset from previous, clear radius, material after)
-    s = System(scale=scale)
+    s = System(**kwargs)
     for typ, roc, off, rad, mat in data:
         roc, off, rad = map(float, (roc, off, rad))
         if typ == "O":
@@ -33,7 +33,10 @@ def system_from_array(data, scale, material_map={}):
                 curv = 0
             else:
                 curv = 1/roc
-            mat = all_materials.get(material_map.get(mat, mat), air)
+            try:
+                mat = all_materials[material_map.get(mat, mat)]
+            except KeyError:
+                mat = air
             e = Spheroid(curvature=curv, origin=(0, 0, off),
                     radius=rad, material=mat)
             s.elements.append(e)

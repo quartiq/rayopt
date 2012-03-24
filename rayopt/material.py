@@ -89,8 +89,8 @@ class Material(HasTraits):
 
     def _vd_default(self):
         return (self.nd-1)/(
-                self.refractive_index(lambda_f)-
-                self.refractive_index(lambda_c))
+                self.refractive_index(lambda_F)-
+                self.refractive_index(lambda_C))
 
     def dn_thermal(self, t, n, wavelength):
         d0, d1, d2, e0, e1, tref, lref = self.thermal
@@ -103,6 +103,7 @@ class Material(HasTraits):
 
 class FictionalMaterial(Material):
     def refractive_index(self, wavelength):
+        # TODO vd!
         return np.ones_like(wavelength)*self.nd
 
     def dispersion(self, wavelength_short, wavelength_mid,
