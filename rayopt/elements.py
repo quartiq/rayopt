@@ -124,9 +124,11 @@ class Interface(Element):
         s = np.zeros_like(p[:,0])
         for i in range(p.shape[0]):
             try:
-                s[i] = newton(func=lambda s: self.shape_func(p[i]+s*a[i]),
-                    fprime=lambda s: np.dot(self.shape_func_deriv(p[i]+s*a[i]),
-                        a[i]), x0=-p[i,2]/a[i,2], tol=1e-7, maxiter=15)
+                s[i] = newton(
+                        func=lambda s: self.shape_func(p[i]+s*a[i]),
+                        fprime=lambda s: np.dot(
+                            self.shape_func_deriv(p[i]+s*a[i]), a[i]),
+                        x0=-p[i,2]/a[i,2], tol=1e-7, maxiter=15)
             except RuntimeError:
                 s[i] = nan
         return where(s>=0, s, nan) # TODO mask
@@ -286,7 +288,6 @@ class Object(Element):
 
 class Aperture(Element):
     typestr = "A"
-    radius = Float
 
     def propagate(self, in_rays, stop=False):
         in_rays, out_rays = super(Aperture, self).propagate(in_rays)
@@ -298,4 +299,3 @@ class Aperture(Element):
 
 class Image(Element):
     typestr = "I"
-    radius = Float
