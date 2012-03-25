@@ -81,20 +81,25 @@ class Element(HasTraits):
                     out_rays.positions, out_rays.angles, m)
         return in_rays, out_rays
    
-    def propagate_paraxial(self, index, rays):
-        rays.heights[index] = rays.heights[index-1]+\
-                self.origin[2]*rays.angles[index-1]
-        rays.angles[index] = rays.angles[index-1]
-        rays.refractive_indices[index] = \
-                rays.refractive_indices[index-1]
-        rays.dispersions[index] = rays.dispersions[index-1]
-        rays.incidence[index] = 1-rays.incidence[index-1]
+    def propagate_paraxial(self, r, j):
+        y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
+        t = self.origin[2]
+        n = self.material.refractive_index(r.l)
+        y = y0+t*u0 # propagate
+        i = u0 # incident
+        u = u0
+        r.y[0, j] = y
+        r.y[2, j] = r.y[2, j-1]+t
+        r.i[0, j] = i
+        r.u[0, j] = u
+        r.n[j] = n
+        r.v[j] = self.material.delta_n(r.l1, r.l2)
+ 
+    def aberration3(self, r, j):
+        r.c3[j] = 0
 
-    def aberration3(self, index, rays):
-        rays.aberration3[index] = 0
-
-    def aberration5(self, index, rays):
-        rays.aberration5[index] = 0
+    def aberration5(self, r, j):
+        r.c3[j] = 0
 
     def revert(self):
         pass
@@ -195,44 +200,37 @@ class Spheroid(Interface):
             return Interface.intercept(self, p, a)
         return where(s*sign(self.origin[2])>=0, s, nan)
 
-    def propagate_paraxial(self, index, rays):
+    def propagate_paraxial(self, r, j):
+        y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
         c = self.curvature
         if len(self.aspherics) > 0:
             c += 2*self.aspherics[0]
-        u0 = rays.angles[index-1]
-        y0 = rays.heights[index-1]
         t = self.origin[2]
-        y = y0+t*u0
-        rays.heights[index] = y
-        n0 = rays.refractive_indices[index-1]
-        n = self.material.refractive_index(rays.wavelength)
-        rays.refractive_indices[index] = n
+        n = self.material.refractive_index(r.l)
         mu = n0/n
-        u = mu*u0+c*(mu-1)*y
-        rays.angles[index] = u
+        y = y0+t*u0 # propagate
+        i = c*y+u0 # incidence
+        u = mu*u0+c*(mu-1.)*y # refract
+        r.y[0, j] = y
+        r.y[2, j] = r.y[2, j-1]+t
+        r.i[0, j] = i
+        r.u[0, j] = u
+        r.n[j] = n
+        r.v[j] = self.material.delta_n(r.l1, r.l2)
     
-    def aberration3(self, index, rays):
+    def aberration3(self, r, j):
+        y0, u0, n0, v0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1], r.v[j-1]
+        y, u, i, n, v = r.y[0, j], r.u[0, j], r.i[0, j], r.n[j], r.v[j]
         c = self.curvature
-        u0 = rays.angles[index-1]
-        u = rays.angles[index]
-        y = rays.heights[index]
-        n0 = rays.refractive_indices[index-1]
-        n = rays.refractive_indices[index]
         mu = n0/n
-        i = c*y+u0
-        rays.incidence[index] = i
         l = n*(u[0]*y[1]-u[1]*y[0])
         s = .5*n0*(1-mu)*y*(u+i)/l
         tsc = s[0]*i[0]**2
         cc = s[0]*i[0]*i[1]
         tac = s[0]*i[1]**2
-        tpc = (1-mu)*c*l/n0/2
+        tpc = ((1-mu)*c*l/n0/2)[0]
         dc = s[1]*i[0]*i[1]+.5*(u[1]**2-u0[1]**2)
-        dn0 = rays.dispersions[index-1]
-        dn = self.material.delta_n(rays.wavelength_short,
-             rays.wavelength_long)
-        rays.dispersions[index] = dn
-        tachc, tchc = -y[0]*i/l*(dn0-mu*dn)
+        tachc, tchc = -y[0]*i/l*(v0-mu*v)
 
         if len(self.aspherics) > 0:
            k = (4*self.aspherics[0]+(self.conic-1)*c**3/2)*(n-n0)/l
@@ -240,8 +238,7 @@ class Spheroid(Interface):
            cc += k*y[0]**3*y[1]
            tac += k*y[0]**2*y[1]**2
            dc += k*y[0]*y[1]**3
-        rays.aberration3[index] = [
-                tsc, cc, tac, tpc, dc, tachc, tchc]
+        r.c3[:, j] = [tsc, cc, tac, tpc, dc, tachc, tchc]
 
     def revert(self):
         self.curvature *= -1

@@ -68,9 +68,9 @@ class Material(HasTraits):
         return self.name
 
     def refractive_index(self, wavelength):
-        w2 = (wavelength/1e-6)**2
-        c0 = self.sellmeier[:,0]
-        c1 = self.sellmeier[:,1]
+        w2 = (wavelength[:, None]/1e-6)**2
+        c0 = self.sellmeier[None, :,0]
+        c1 = self.sellmeier[None, :,1]
         n2 = 1.+(c0*w2/(w2-c1)).sum(-1)
         return np.sqrt(n2)
 

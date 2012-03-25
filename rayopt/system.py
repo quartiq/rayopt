@@ -52,20 +52,22 @@ class System(HasTraits):
         return [self.object] + self.elements + [self.image]
 
     def __str__(self):
-        s = ""
-        s += "System: %s\n" % self.name
-        s += "Scale: %g m\n" % self.scale
-        s += "Temperature: %g C\n" % self.temperature
-        s += "Wavelengths: %s nm\n" % ",".join("%.0f" % (w/1e-9)
+        return "\n".join(self.text())
+
+    def text(self):
+        yield "System: %s" % self.name
+        yield "Scale: %g m" % self.scale
+        yield "Temperature: %g C" % self.temperature
+        yield "Wavelengths: %s nm" % ",".join("%.0f" % (w/1e-9)
                     for w in self.wavelengths)
-        s += "Surfaces:\n"
-        s += "%2s %1s %12s %12s %10s %15s %5s %5s\n" % (
+        yield "Surfaces:"
+        yield "%2s %1s %12s %12s %10s %15s %5s %5s" % (
                 "#", "T", "Distance to", "ROC", "Diameter", 
                 "Material after", "N", "V")
         if self.object:
             dia = (self.object.radius == np.inf and
                 self.object.field_angle*2 or self.object.radius*2)
-            s += "%-2s %1s %-12s %-12s %10.5g %15s %5.2f %5.2f\n" % (
+            yield "%-2s %1s %-12s %-12s %10.5g %15s %5.2f %5.2f" % (
                 "", self.object.typestr, "", "", dia,
                 self.object.material,
                 self.object.material.nd, self.object.material.vd)
@@ -75,13 +77,12 @@ class System(HasTraits):
             mat = getattr(e, "material", None)
             n = getattr(mat, "nd", np.nan)
             v = getattr(mat, "vd", np.nan)
-            s += "%-2i %1s %12.7g %12.6g %10.5g %15s %5.2f %5.2f\n" % (
+            yield "%-2i %1s %12.7g %12.6g %10.5g %15s %5.2f %5.2f" % (
                 i+1, e.typestr, e.origin[2], roc, e.radius*2, mat, n, v)
         if self.image:
-            s += "%2s %1s %12.7g %-12s %10.5g %15s %-5s %-5s\n" % (
+            yield "%2s %1s %12.7g %-12s %10.5g %15s %-5s %-5s" % (
                 "", self.image.typestr, self.image.origin[2], "",
                 self.image.radius*2, "", "", "")
-        return s
 
     def surfaces(self, axis, n=20):
         p = [0, 0, 0]
