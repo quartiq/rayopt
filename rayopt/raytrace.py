@@ -30,6 +30,7 @@ from traits.api import (HasTraits, Float, Array, Property,
 
 from .material import lambda_d
 from .system import System
+from .elements import Aperture
 
 def dir_to_angles(x,y,z):
     r = np.array([x,y,z], dtype=np.float64)
@@ -100,53 +101,53 @@ class ParaxialTrace(Trace):
         self.l[:] = self.system.wavelengths[0]
         self.l1[:] = min(self.system.wavelengths)
         self.l2[:] = max(self.system.wavelengths)
+        self.n[0] = self.system.object.material.refractive_index(self.l)
+        self.find_rays()
         self.propagate_paraxial()
 
     def __str__(self):
-        return "\n".join(itertools.chain(self.print_params(),
-            self.print_trace(), self.print_c3()))
+        t = itertools.chain(
+                self.print_params(),
+                self.print_trace(),
+                self.print_c3(),
+                )
+        return "\n".join(t)
 
     def find_rays(self):
-        # TODO introduce aperture as max(height/radius)
-        self.n[0] = self.system.object.material.refractive_index(self.l)
-
-        #print height_at_aperture_paraxial()
-
-        #p.heights[0], p.angles[0] = (18.5, -6.3), (0, .25) # photo
-        #p.heights[0], p.angles[0] = (6.25, -7.102), (0, .6248) # dbl gauss
-        #p.heights[0], p.angles[0] = (0, -.15), (0.25, -.0004) # k_z_i
-        #p.heights[0], p.angles[0] = (5, 0), (0, .01) # k_z_o
-        #p.heights[0], p.angles[0] = (sys.object.radius, 0), (0, .5) # schwarzschild
         if self.system.object.radius == np.inf:
-            self.y[0, 0] = (6.25, -7.1)
-            self.u[0, 0] = (0, self.system.object.field_angle)
+            a, b, c = self.y, self.u, self.system.object.field_angle
         else:
-            self.y[0, 0] = (self.system.object.radius, 0)
-            self.u[0, 0] = (0, .3)
-        #print "h at aperture:", self.height_at_aperture_paraxial()
-        #self.propagate_paraxial()
+            a, b, c = self.u, self.y, self.system.object.radius
+        a[0, 0], b[0, 0] = (1, 0), (0, 1)
+        r, h, k = self.aperture_paraxial()
+        a[0, 0], b[0, 0] = (r/h[0], -c*h[1]/h[0]), (0, c)
+
+        # TODO introduce aperture as max(height/radius)
+
+    def size_elements(self):
+        for i, e in enumerate(self.system.elements):
+            e.radius = abs(self.y[0, i+1, 0]) + abs(self.y[0, i+1, 1])
 
     def propagate_paraxial(self):
-        self.find_rays()
-        for i,e in enumerate(self.system.elements):
+        for i, e in enumerate(self.system.elements):
             e.propagate_paraxial(self, i+1)
             e.aberration3(self, i+1)
         self.system.image.propagate_paraxial(self, i+2)
     
-    def height_at_aperture_paraxial(self):
-        for i,e in enumerate(self.system.elements):
+    def aperture_paraxial(self):
+        for i, e in enumerate(self.system.elements):
             e.propagate_paraxial(self, i+1)
             if isinstance(e, Aperture):
-                return rays.y[0, i+1]
+                return e.radius, self.y[0, i+1], self.u[0, i+1]
+
+    def focal_length_solve(self, index):
+        pass
 
     def print_c3(self):
         sys, p = self.system, self
-        #print "heights:", p.heights
-        #print "angles:", p.angles
-        #print "incidences:", p.incidence
-        # p.aberration3 *= -2*p.image_height*p.angles[-1,0] # seidel
-        # p.aberration3 *= -p.image_height/p.angles[-1,0] # longit
-        # p.aberration3 *= p.image_height # transverse
+        # p.c3 *= -2*p.image_height*p.u[0,-1,0] # seidel
+        # p.c3 *= -p.image_height/p.u[0,-1,0] # longit
+        # p.c3 *= p.image_height # transverse
         yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "TSC", "CC", "TAC", "TPC", "DC", "TAchC", "TchC")
         for i, ab in enumerate(p.c3.swapaxes(0, 1)[1:-1]):
