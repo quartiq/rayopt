@@ -96,10 +96,10 @@ class Element(HasTraits):
         r.v[j] = self.material.delta_n(r.l1, r.l2)
  
     def aberration3(self, r, j):
-        r.c3[j] = 0
+        r.c3[:, j] = 0
 
     def aberration5(self, r, j):
-        r.c3[j] = 0
+        r.c3[:, j] = 0
 
     def revert(self):
         pass

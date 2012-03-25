@@ -32,9 +32,11 @@ from .material import lambda_d
 from .system import System
 from .elements import Aperture
 
+
 def dir_to_angles(x,y,z):
     r = np.array([x,y,z], dtype=np.float64)
     return r/np.linalg.norm(r)
+
 
 class Trace(HasTraits):
     length = Int()
@@ -68,6 +70,10 @@ class Trace(HasTraits):
     _u_default = _vector_default
     _i_default = _vector_default
 
+    def __init__(self, **kw):
+        super(Trace, self).__init__(**kw)
+        self.length = len(self.system.all)
+
 
 class ParaxialTrace(Trace):
     system = Instance(System)
@@ -97,13 +103,10 @@ class ParaxialTrace(Trace):
 
     def __init__(self, **k):
         super(ParaxialTrace, self).__init__(**k)
-        self.length = len(self.system.all)
         self.l[:] = self.system.wavelengths[0]
         self.l1[:] = min(self.system.wavelengths)
         self.l2[:] = max(self.system.wavelengths)
         self.n[0] = self.system.object.material.refractive_index(self.l)
-        self.find_rays()
-        self.propagate_paraxial()
 
     def __str__(self):
         t = itertools.chain(
@@ -119,29 +122,40 @@ class ParaxialTrace(Trace):
         else:
             a, b, c = self.u, self.y, self.system.object.radius
         a[0, 0], b[0, 0] = (1, 0), (0, 1)
-        r, h, k = self.aperture_paraxial()
+        r, h, k = self.to_aperture()
         a[0, 0], b[0, 0] = (r/h[0], -c*h[1]/h[0]), (0, c)
 
-        # TODO introduce aperture as max(height/radius)
+    # TODO introduce aperture as max(height/radius)
 
     def size_elements(self):
         for i, e in enumerate(self.system.elements):
-            e.radius = abs(self.y[0, i+1, 0]) + abs(self.y[0, i+1, 1])
+            e.radius = np.fabs(self.y[0, i+1]).sum()
 
-    def propagate_paraxial(self):
+    def propagate(self):
+        self.find_rays()
         for i, e in enumerate(self.system.elements):
             e.propagate_paraxial(self, i+1)
             e.aberration3(self, i+1)
         self.system.image.propagate_paraxial(self, i+2)
     
-    def aperture_paraxial(self):
+    def to_aperture(self):
         for i, e in enumerate(self.system.elements):
             e.propagate_paraxial(self, i+1)
             if isinstance(e, Aperture):
                 return e.radius, self.y[0, i+1], self.u[0, i+1]
 
-    def focal_length_solve(self, index):
-        pass
+    def focal_length_solve(self, f, i=None):
+        # TODO only works for last surface
+        if i is None:
+            i = len(self.system.elements)-1
+        y0, y = self.y[0, (i, i+1), 0]
+        u0, u = self.u[0, i, 0], -self.y[0, 0, 0]/f
+        n0, n = self.n[(i, i+1), 0]
+        c = (n0*u0-n*u)/(y*(n-n0))
+        self.system.elements[i].curvature = c
+
+    def focal_plane_solve(self):
+        self.system.image.origin[2] -= self.y[0, -1, 0]/self.u[0, -1, 0]
 
     def print_c3(self):
         sys, p = self.system, self
