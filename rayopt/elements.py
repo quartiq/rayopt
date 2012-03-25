@@ -17,6 +17,7 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
+from scipy.optimize import (newton, fsolve)
 
 from traits.api import (HasTraits, Float, Array,
         Trait, cached_property, Property, Enum)
@@ -26,7 +27,7 @@ from .material import Material, air
 
 
 def dotprod(a,b):
-    return (a*b).sum(-1)
+    return (a*b).sum(axis=0)
 
 class Element(HasTraits):
     typestr = "E"
@@ -37,49 +38,58 @@ class Element(HasTraits):
     material = Trait(air, Material)
     radius = Float
 
-    @cached_property
+    #@cached_property
     def _get_transform(self):
-        r = euler_matrix(axes="rxyz", *self.angles)
+        r = euler_matrix(axes="rxyz", *-self.angles)
         t = translation_matrix(-self.origin)
         return np.dot(r,t)
 
-    @cached_property
+    #@cached_property
     def _get_inverse_transform(self):
         return np.linalg.inv(self.transform)
 
-    def transform_to(self, rays):
-        return rays.transform(self.transform)
+    def transform_to(self, x):
+        return self.do_transform(self.transform, x)
 
     def transform_from(self, rays):
-        return rays.transform(self.inverse_transform)
+        return self.do_transform(self.inverse_transform, x)
 
-    def intercept(self, positions, angles):
+    def do_transform(self, t, x):
+        n = x.shape[1]
+        x = x.copy()
+        x.resize((4, n))
+        x[3] = 1.
+        x = np.dot(t, x) # TODO np.dot(t, x, out=x)
+        x = x[:3] # x.resize((3, n))
+        return x
+
+    def intercept(self, y, u):
         # ray length to intersection with element
         # only reference plane, overridden in subclasses
         # solution for z=0
-        s = -positions[..., 2]/angles[..., 2]
+        s = np.where(y[2]==0, 0., -y[2]/u[2])
         return s # TODO mask, np.where(s>=0, s, np.nan)
 
-    def propagate(self, in_rays):
-        out_rays = self.transform_to(in_rays)
+    def refract(self, y, u, mu):
+        return u
+
+    def propagate(self, r, j):
+        y0, u0, n0 = r.y[:, j-1], r.u[:, j-1], r.n[j-1]
+        y = self.transform_to(y0)
+        u = u0.copy() # FIXME no trans self.transform_to(u0)
+        #y = y0-self.origin[:, None]
+        #u = u0-0.
         # length up to surface
-        in_rays.lengths = self.intercept(
-                out_rays.positions, out_rays.angles)
-        out_rays.optical_path_lengths = in_rays.optical_path_lengths+\
-                in_rays.lengths*in_rays.refractive_index
+        r.p[j-1] = self.intercept(y, u)
         # new transverse position
-        out_rays.positions = out_rays.positions + \
-                (in_rays.lengths*out_rays.angles.T).T
-        out_rays.wavelength = in_rays.wavelength
+        r.y[:, j] = y + r.p[None, j-1]*u
         if self.material is None:
-            out_rays.refractive_index = in_rays.refractive_index
+            r.n[j] = r.n[j-1]
+            r.u[:, j] = r.u[:, j-1]
         else:
-            out_rays.refractive_index = self.material.refractive_index(
-                    out_rays.wavelength)
-            m = in_rays.refractive_index/out_rays.refractive_index
-            out_rays.angles = self.refract(
-                    out_rays.positions, out_rays.angles, m)
-        return in_rays, out_rays
+            r.n[j] = self.material.refractive_index(r.l)
+            r.u[:, j] = self.refract(r.y[:, j], u, r.n[j-1]/r.n[j])
+        # fix origin
    
     def propagate_paraxial(self, r, j):
         y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
@@ -101,12 +111,12 @@ class Element(HasTraits):
     def aberration5(self, r, j):
         r.c3[:, j] = 0
 
-    def revert(self):
+    def reverse(self):
         pass
 
     def surface(self, axis, points=20):
-        t = np.linspace(-self.radius, self.radius, 2)
-        xyz = [np.zeros_like(t)]*3
+        t = np.array([-self.radius, self.radius])
+        xyz = np.zeros((3, 2))
         xyz[axis] = t
         return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
 
@@ -120,45 +130,44 @@ class Interface(Element):
     def shape_func_deriv(self, p):
         raise NotImplementedError
 
-    def intercept(self, p, a):
-        s = np.zeros_like(p[:,0])
-        for i in range(p.shape[0]):
+    def intercept(self, y, u):
+        s = np.zeros((y.shape[1],))
+        for i in range(y.shape[1]):
             try:
+                yi, ui = y[:, i], u[:, i]
                 s[i] = newton(
-                        func=lambda s: self.shape_func(p[i]+s*a[i]),
-                        fprime=lambda s: np.dot(
-                            self.shape_func_deriv(p[i]+s*a[i]), a[i]),
-                        x0=-p[i,2]/a[i,2], tol=1e-7, maxiter=15)
+                        func=lambda si: self.shape_func(yi+si*ui),
+                        fprime=lambda si: np.dot(
+                            self.shape_func_deriv(yi+si*ui), ui),
+                        x0=-yi[2]/ui[2], tol=1e-7, maxiter=15)
             except RuntimeError:
-                s[i] = nan
-        return where(s>=0, s, nan) # TODO mask
+                s[i] = np.nan
+        return s # np.where(s>=0, s, np.nan) # TODO mask
 
-    def refract(self, f, a, m):
+    def refract(self, y, u, mu):
         # General Ray-Tracing Procedure
-        # G. H. SPENCER and M. V. R. K. MURTY
+        # G. H. Spencer and M. V. R. K. Murty
         # JOSA, Vol. 52, Issue 6, pp. 672-676 (1962)
         # doi:10.1364/JOSA.52.000672
-        # sign(m) for reflection
-        fp = self.shape_func_deriv(f)
-        fp2 = dotprod(fp, fp)
-        o = m*dotprod(a, fp)/fp2
-        if m**2 == 1:
-            g = -2*o
-        else:
-            p = (m**2-1)/fp2
-            g = sign(m)*np.sqrt(o**2-p)-o
-        r = m*a+(g*fp.T).T
-        #print "rfr", self, f, a, g, r
-        return r
+        r = self.shape_func_deriv(y)
+        r2 = (r*r).sum(axis=0)
+        a = mu*(u*r).sum(axis=0)/r2
+        # solve g**2+2*a*g+b=0
+        #if mu**2 == 1: # FIXME one
+        #    g = -2*a
+        b = (mu**2-1)/r2
+        # sign(mu) for reflection
+        g = -a+np.sign(mu)*np.sqrt(a**2-b)
+        return mu*u+g*r
 
-    def revert(self):
+    def reverse(self):
         raise NotImplementedError
 
     def surface(self, axis, points=20):
         t = np.linspace(-self.radius, self.radius, points)
-        xyz = [np.zeros_like(t)]*3
+        xyz = np.zeros((3, points))
         xyz[axis] = t
-        xyz[2] = -self.shape_func(np.array(xyz).T)
+        xyz[2] = -self.shape_func(xyz)
         return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
 
 
@@ -169,38 +178,37 @@ class Spheroid(Interface):
     aspherics = Array(dtype=np.float64)
 
     def shape_func(self, p):
-        x, y, z = p.T
+        x, y, z = p
         r2 = x**2+y**2
-        j = range(len(self.aspherics))
-        o = dotprod(self.aspherics,
-                np.array([r2**(i+2) for i in j]).T)
-        return z-self.curvature*r2/(1+
-                    np.sqrt(1-self.conic*self.curvature**2*r2))-o
+        o = np.sum([ai*r2**(i+2) for i, ai in 
+            enumerate(self.aspherics)], axis=0)
+        c, k = self.curvature, self.conic
+        return z-c*r2/(1+np.sqrt(1-k*c**2*r2))-o
 
     def shape_func_deriv(self, p):
-        x, y, z = p.T
+        x, y, z = p
         r2 = x**2+y**2
-        j = range(len(self.aspherics))
-        o = dotprod(2*self.aspherics,
-                np.nan_to_num(np.array([(i+2)*r2**(i+1) for i in j])).T)
-        e = self.curvature/np.sqrt(1-self.conic*self.curvature**2*r2)+o
-        return np.array([-x*e, -y*e, np.ones_like(e)]).T
+        o = 2*np.sum([ai*(i+2)*r2**(i+1) for i, ai in 
+            enumerate(self.aspherics)], axis=0)
+        c, k = self.curvature, self.conic
+        e = c/np.sqrt(1-k*c**2*r2)+o
+        return np.array([-x*e, -y*e, np.ones_like(e)])
 
-    def intercept(self, p, a):
+    def intercept(self, y, u):
         if len(self.aspherics) == 0:
             # replace the newton-raphson with the analytic solution
             c = self.curvature
             if c == 0:
-                return Element.intercept(self, p, a)
+                return Element.intercept(self, y, u)
             else:
-                k = np.array([1,1,self.conic])
-                d = c*dotprod(a,k*p)-a[...,2]
-                e = c*dotprod(a,k*a)
-                f = c*dotprod(p,k*p)-2*p[...,2]
-                s = (-np.sqrt(d**2-e*f)-d)/e
+                k = np.array([1., 1., self.conic])[:, None]
+                d = c*dotprod(u, k*y)-u[2]
+                e = c*dotprod(u, k*u)
+                f = c*dotprod(y, k*y)-2*y[2]
+                s = (-d-np.sqrt(d**2-e*f))/e
         else:
-            return Interface.intercept(self, p, a)
-        return where(s*sign(self.origin[2])>=0, s, nan)
+            return Interface.intercept(self, y, u)
+        return s #np.where(s*np.sign(self.origin[2])>=0, s, np.nan)
 
     def propagate_paraxial(self, r, j):
         y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
@@ -242,7 +250,7 @@ class Spheroid(Interface):
            dc += k*y[0]*y[1]**3
         r.c3[:, j] = [tsc, cc, tac, tpc, dc, tachc, tchc]
 
-    def revert(self):
+    def reverse(self):
         self.curvature *= -1
         self.aspherics *= -1
 
@@ -289,12 +297,11 @@ class Object(Element):
 class Aperture(Element):
     typestr = "A"
 
-    def propagate(self, in_rays, stop=False):
-        in_rays, out_rays = super(Aperture, self).propagate(in_rays)
+    def propagate(self, r, j, stop=False):
+        super(Aperture, self).propagate(r, j)
         if stop:
-            r = (out_rays.positions[...,(0,1)]**2).sum(axis=-1)
-            putmask(out_rays.positions[...,2], r>self.radius**2, nan)
-        return in_rays, out_rays
+            r2 = (r.y[(0, 1), j]**2).sum(axis=0)
+            np.putmask(r.y[:, j], r2>self.radius**2, np.nan)
 
 
 class Image(Element):

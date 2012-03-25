@@ -24,6 +24,7 @@ with some improvements
 import itertools
 
 import numpy as np
+from scipy.optimize import (newton, fsolve)
 
 from traits.api import (HasTraits, Float, Array, Property,
     cached_property, Instance, Int)
@@ -46,7 +47,7 @@ class Trace(HasTraits):
     l2 = Array(dtype=np.float, shape=(None)) # max l
     n = Array(dtype=np.float, shape=(None, None)) # refractive index
     v = Array(dtype=np.float, shape=(None, None)) # dispersion
-    p = Array(dtype=np.float, shape=(None, None)) # optical path length
+    p = Array(dtype=np.float, shape=(None, None)) # lengths
     y = Array(dtype=np.float, shape=(3, None, None)) # height
     u = Array(dtype=np.float, shape=(3, None, None)) # angle
     i = Array(dtype=np.float, shape=(3, None, None)) # incidence
@@ -121,9 +122,10 @@ class ParaxialTrace(Trace):
             a, b, c = self.y, self.u, self.system.object.field_angle
         else:
             a, b, c = self.u, self.y, self.system.object.radius
-        a[0, 0], b[0, 0] = (1, 0), (0, 1)
+        eps = 1e-2
+        a[0, 0], b[0, 0] = (eps, 0), (0, eps)
         r, h, k = self.to_aperture()
-        a[0, 0], b[0, 0] = (r/h[0], -c*h[1]/h[0]), (0, c)
+        a[0, 0], b[0, 0] = (r*eps/h[0], -c*h[1]/h[0]), (0, c)
 
     # TODO introduce aperture as max(height/radius)
 
@@ -239,54 +241,45 @@ class ParaxialTrace(Trace):
                 self.n[0,0]*self.u[0,0,1]))
 
 
-class Rays(HasTraits):
-    # wavelength for all rays
-    wavelength = Float(lambda_d)
-    # refractive index we are in
-    refractive_index = Float(1.)
-    # start positions
-    positions = Array(dtype=np.float64, shape=(None, 3))
-    # angles
-    angles = Array(dtype=np.float64, shape=(None, 3))
-    # geometric length of the rays
-    lengths = Array(dtype=np.float64, shape=(None,))
-    # end positions
-    end_positions = Property
-    # total optical path lengths to start (including previous paths)
-    optical_path_lengths = Array(dtype=np.float64, shape=(None,))
+class FullTrace(Trace):
+    def propagate(self):
+        for i, e in enumerate(self.system.elements):
+            e.propagate(self, i+1)
+        self.system.image.propagate(self, i+2)
+ 
+    def rays_from_paraxial(self, p):
+        self.nrays = 2
+        self.l = p.l
+        self.l1 = p.l1
+        self.l2 = p.l2
+        self.n[0] = p.n[0]
+        self.y[0, 0] = p.y[0, 0]
+        self.y[1, 0] = 0.
+        self.y[2, 0] = 0.
+        self.u[0, 0] = p.u[0, 0]/np.sqrt(1+p.u[0, 0]**2)
+        self.u[1, 0] = 0.
+        self.u[2, 0] = np.sqrt(1-self.u[0, 0]**2)
 
-    def transform(self, t):
-        n = len(self.positions)
-        p = self.positions.T.copy()
-        a = self.angles.T.copy()
-        p.resize((4, n))
-        a.resize((4, n))
-        p[3,:] = 1
-        p = np.dot(t, p)
-        a = np.dot(t, a)
-        p.resize((3, n))
-        a.resize((3, n))
-        return Rays(positions=p.T, angles=a.T)
+    def __str__(self):
+        t = itertools.chain(
+                #self.print_params(),
+                self.print_trace(),
+                #self.print_c3(),
+                )
+        return "\n".join(t)
 
-    def _get_end_positions(self):
-        return self.positions + (self.lengths*self.angles.T).T
-
-    def propagate(self, rays):
-        for a, b in zip([self.object] + self.elements,
-                        self.elements + [self.image]):
-            a_rays, rays = b.propagate(rays)
-            yield a, a_rays
-        yield b, rays
-
-    def propagate_through(self, rays):
-        for element, rays in self.propagate(rays):
-            pass
-        return rays
-
-    def height_at_aperture(self, rays):
-        for element, in_rays in self.propagate(rays):
-            if isinstance(element, Aperture):
-                return in_rays.end_positions[...,(0,1)]/element.radius
+    def print_trace(self):
+        yield "%2s %1s% 10s% 10s% 10s% 10s% 10s" % (
+                "#", "T", "height x", "height y",
+                "angle x", "angle y", "length")
+        for i in range(self.nrays):
+            yield "ray %i" % i
+            for j in range(self.length):
+                yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                        j, self.system.all[j].typestr, 
+                        self.y[0, j, i], self.y[1, j, i],
+                        self.u[0, j, i], self.u[1, j, i],
+                        self.p[j, i])
 
     def chief_and_marginal(self, height, rays,
             paraxial_chief=True,
@@ -334,5 +327,3 @@ class Rays(HasTraits):
         rays.positions = p
         rays.angles = a
         return rays
-
-

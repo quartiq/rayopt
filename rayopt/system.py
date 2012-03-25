@@ -20,8 +20,6 @@ import numpy as np
 from traits.api import (HasTraits, Str, Array, Float, Instance, List,
         Property)
 
-from scipy.optimize import (newton, fsolve)
-
 from .elements import Element, Object, Image
 
 class System(HasTraits):
@@ -35,7 +33,7 @@ class System(HasTraits):
     image = Instance(Image)
     all = Property()
 
-    def revert(self):
+    def reverse(self):
         m = self.object.material
         self.object.material = self.elements[-1].material
         for e in self.elements:
@@ -45,7 +43,7 @@ class System(HasTraits):
         self.image.origin = self.elements[0].origin
         self.elements.reverse()
         for e in self.elements:
-            e.revert()
+            e.reverse()
             d, e.origin = e.origin, d
 
     def _get_all(self):
