@@ -27,7 +27,7 @@ import numpy as np
 from scipy.optimize import (newton, fsolve)
 
 from traits.api import (HasTraits, Float, Array, Property,
-    cached_property, Instance, Int)
+    cached_property, Instance, Int, Enum)
 
 from .material import lambda_d
 from .system import System
@@ -43,22 +43,14 @@ class Trace(HasTraits):
     length = Int()
     nrays = Int()
     l = Array(dtype=np.float, shape=(None)) # wavelength
-    l1 = Array(dtype=np.float, shape=(None)) # min l
-    l2 = Array(dtype=np.float, shape=(None)) # max l
     n = Array(dtype=np.float, shape=(None, None)) # refractive index
-    v = Array(dtype=np.float, shape=(None, None)) # dispersion
-    p = Array(dtype=np.float, shape=(None, None)) # lengths
     y = Array(dtype=np.float, shape=(3, None, None)) # height
     u = Array(dtype=np.float, shape=(3, None, None)) # angle
     i = Array(dtype=np.float, shape=(3, None, None)) # incidence
 
     def allocate(self):
         self.l = np.zeros((self.nrays,), dtype=np.float)
-        self.l1 = np.zeros((self.nrays,), dtype=np.float)
-        self.l2 = np.zeros((self.nrays,), dtype=np.float)
         self.n = np.zeros((self.length, self.nrays), dtype=np.float)
-        self.v = np.zeros((self.length, self.nrays), dtype=np.float)
-        self.p = np.zeros((self.length, self.nrays), dtype=np.float)
         self.y = np.zeros((3, self.length, self.nrays), dtype=np.float)
         self.u = np.zeros((3, self.length, self.nrays), dtype=np.float)
         self.i = np.zeros((3, self.length, self.nrays), dtype=np.float)
@@ -74,8 +66,17 @@ class ParaxialTrace(Trace):
     # marginal/axial, principal/chief
     nrays = 2
 
+    v = Array(dtype=np.float, shape=(None, None)) # dispersion
+    l1 = Array(dtype=np.float, shape=(None)) # min l
+    l2 = Array(dtype=np.float, shape=(None)) # max l
+    c3 = Array(dtype=np.float, shape=(7, None)) # third order aberrations
+    c5 = Array(dtype=np.float, shape=(7, None)) # fifth order aberrations
+
     def allocate(self):
         super(ParaxialTrace, self).allocate()
+        self.v = np.zeros((self.length, self.nrays), dtype=np.float)
+        self.l1 = np.zeros((self.nrays,), dtype=np.float)
+        self.l2 = np.zeros((self.nrays,), dtype=np.float)
         self.c3 = np.zeros((7, self.length), dtype=np.float)
         self.c5 = np.zeros((7, self.length), dtype=np.float)
 
@@ -96,7 +97,8 @@ class ParaxialTrace(Trace):
         self.l[:] = self.system.object.wavelengths[0]
         self.l1[:] = min(self.system.object.wavelengths)
         self.l2[:] = max(self.system.object.wavelengths)
-        self.n[0] = self.system.object.material.refractive_index(self.l)
+        self.n[0] = map(self.system.object.material.refractive_index,
+                self.l)
 
     def __str__(self):
         t = itertools.chain(
@@ -159,7 +161,7 @@ class ParaxialTrace(Trace):
             yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i].typestr,
                     ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
-        ab = p.c3.sum(0)
+        ab = p.c3.sum(1)
         yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
               " ∑", "", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
 
@@ -206,8 +208,8 @@ class ParaxialTrace(Trace):
                 abs(self.n[-2,0]*self.u[0,-2,0]))
 
     def _get_pupil_position(self):
-        return (-self.y[0,1,1]/self.u[0,1,1],
-                -self.y[0,-2,1]/self.u[0,-2,1])
+        return (self.y[2,0,1]-self.y[0,0,1]/self.u[0,0,1],
+                self.y[2,-1,1]-self.y[0,-1,1]/self.u[0,-1,1])
 
     def _get_pupil_height(self):
         return (self.y[0,1,0]+
@@ -231,17 +233,21 @@ class ParaxialTrace(Trace):
 
 
 class FullTrace(Trace):
-    def propagate(self):
-        for i, e in enumerate(self.system.elements):
-            e.propagate(self, i+1)
-        self.system.image.propagate(self, i+2)
- 
+    o = Array(dtype=np.float, shape=(None)) # intensity
+    p = Array(dtype=np.float, shape=(None, None)) # lengths
+    distribution = Enum(("hexapolar", "random", "square", "triangular",
+           "sagittal", "meridional", "cross"))
+    apodization = Enum(("constant", "gaussian", "cos3"))
+
+    def allocate(self):
+        super(FullTrace, self).allocate()
+        self.o = np.zeros((self.nrays,), dtype=np.float)
+        self.p = np.zeros((self.length, self.nrays), dtype=np.float)
+
     def rays_like_paraxial(self, p):
         self.nrays = 2
         self.allocate()
         self.l = p.l
-        self.l1 = p.l1
-        self.l2 = p.l2
         self.n[0] = p.n[0]
         self.y[0, 0] = p.y[0, 0]
         self.y[1, 0] = 0.
@@ -249,6 +255,65 @@ class FullTrace(Trace):
         self.u[0, 0] = p.u[0, 0]/np.sqrt(1+p.u[0, 0]**2)
         self.u[1, 0] = 0.
         self.u[2, 0] = np.sqrt(1-self.u[0, 0]**2)
+
+    def rays_for_point(self, paraxial, height, wavelength, n):
+        self.nrays = n
+        # TODO apodization
+        xp, yp = self.get_rays()
+        self.nrays = xp.shape[0]
+        hp, rp = paraxial.pupil_position[0], paraxial.pupil_height[0]
+        r = self.system.object.radius
+        if self.system.object.infinity:
+            r = r/np.sqrt(1+r**2)
+            p, q = height[0]*r, height[1]*r
+            a, b = xp*rp-hp*p, yp*rp-hp*q
+        else:
+            a, b = height[0]*r, height[1]*r
+            p, q = (xp*rp-a)/hp, (yp*rp-b)/hp
+        self.allocate()
+        self.l[:] = wavelength
+        self.n[0] = self.system.object.material.refractive_index(
+                wavelength)
+        self.y[0, 0] = a
+        self.y[1, 0] = b
+        self.y[2, 0] = 0
+        self.u[0, 0] = p
+        self.u[1, 0] = q
+        self.u[2, 0] = np.sqrt(1-p**2-q**2)
+
+    def get_rays(self):
+        d = self.distribution
+        n = self.nrays
+        if d == "random":
+            xy = 2*np.random.rand(2, n*4/np.pi)-1
+            return xy[:, (xy**2).sum(0)<=1]
+        elif d == "meridional":
+            return np.linspace(-1, 1, n), np.zeros((n,))
+        elif d == "sagittal":
+            return np.zeros((n,)), np.linspace(-1, 1, n)
+        elif d == "square":
+            r = np.around(np.sqrt(n*4/np.pi))
+            x, y = np.mgrid[-1:1:1j*r, -1:1:1j*r]
+            xy = np.array([x.ravel(), y.ravel()])
+            return xy[:, (xy**2).sum(0)<=1]
+        elif d == "triangular":
+            raise NotImplementedError
+        elif d == "hexapolar":
+            r = int(np.around(np.sqrt(n/3.-1/12.)-1/2.))
+            l = [[np.array([0]), np.array([0])]]
+            for i in range(1, r+1):
+                a = np.arange(0, 2*np.pi, 2*np.pi/(6*i))
+                l.append([i*np.sin(a)/r, i*np.cos(a)/r])
+            return np.concatenate(l, axis=1)
+        elif d == "cross":
+            return np.concatenate([
+                [np.linspace(-1, 1, n/2), np.zeros((n/2,))],
+                [np.zeros((n/2,)), np.linspace(-1, 1, n/2)]], axis=1)
+
+    def propagate(self):
+        for i, e in enumerate(self.system.elements):
+            e.propagate(self, i+1)
+        self.system.image.propagate(self, i+2)
 
     def __str__(self):
         t = itertools.chain(

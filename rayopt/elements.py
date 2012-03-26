@@ -20,14 +20,11 @@ import numpy as np
 from scipy.optimize import (newton, fsolve)
 
 from traits.api import (HasTraits, Float, Array,
-        Trait, cached_property, Property, Enum, Bool)
+        Trait, cached_property, Property, Bool)
 
 from .transformations import euler_matrix, translation_matrix
 from .material import Material, air
 
-
-def dotprod(a,b):
-    return (a*b).sum(axis=0)
 
 class Element(HasTraits):
     typestr = "E"
@@ -71,7 +68,7 @@ class Element(HasTraits):
             r.n[j] = r.n[j-1]
             r.u[:, j] = r.u[:, j-1]
         else:
-            r.n[j] = self.material.refractive_index(r.l)
+            r.n[j] = map(self.material.refractive_index, r.l)
             r.u[:, j] = self.refract(r.y[:, j], u, r.n[j-1]/r.n[j])
         # fix origin
 
@@ -81,7 +78,7 @@ class Element(HasTraits):
     def propagate_paraxial(self, r, j):
         y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
         t = self.origin[2]
-        n = self.material.refractive_index(r.l)
+        n = map(self.material.refractive_index, r.l)
         y = y0+t*u0 # propagate
         i = u0 # incident
         u = u0
@@ -90,7 +87,7 @@ class Element(HasTraits):
         r.i[0, j] = i
         r.u[0, j] = u
         r.n[j] = n
-        r.v[j] = self.material.delta_n(r.l1, r.l2)
+        r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
  
     def aberration3(self, r, j):
         r.c3[:, j] = 0
@@ -145,7 +142,9 @@ class Interface(Element):
         b = (mu**2-1)/r2
         # sign(mu) for reflection
         g = -a+np.sign(mu)*np.sqrt(a**2-b)
-        return mu*u+g*r
+        u1 = mu*u+g*r
+        #print "refract", self, u, mu, u1
+        return u1
 
     def reverse(self):
         raise NotImplementedError
@@ -190,10 +189,13 @@ class Spheroid(Interface):
                 return Element.intercept(self, y, u)
             else:
                 k = np.array([1., 1., self.conic])[:, None]
-                d = c*dotprod(u, k*y)-u[2]
-                e = c*dotprod(u, k*u)
-                f = c*dotprod(y, k*y)-2*y[2]
+                ky = k*y
+                ku = k*u
+                d = c*(u*ky).sum(axis=0)-u[2]
+                e = c*(u*ku).sum(axis=0)
+                f = c*(y*ky).sum(axis=0)-2*y[2]
                 s = (-d-np.sqrt(d**2-e*f))/e
+                #print "intercept", self, u, y, d, e, f, s
         else:
             return Interface.intercept(self, y, u)
         return s #np.where(s*np.sign(self.origin[2])>=0, s, np.nan)
@@ -204,7 +206,7 @@ class Spheroid(Interface):
         if len(self.aspherics) > 0:
             c += 2*self.aspherics[0]
         t = self.origin[2]
-        n = self.material.refractive_index(r.l)
+        n = map(self.material.refractive_index, r.l)
         mu = n0/n
         y = y0+t*u0 # propagate
         i = c*y+u0 # incidence
@@ -214,7 +216,7 @@ class Spheroid(Interface):
         r.i[0, j] = i
         r.u[0, j] = u
         r.n[j] = n
-        r.v[j] = self.material.delta_n(r.l1, r.l2)
+        r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
     
     def aberration3(self, r, j):
         y0, u0, n0, v0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1], r.v[j-1]
@@ -247,11 +249,7 @@ class Object(Element):
     typestr = "O"
     infinity = Bool(True)
     wavelengths = Array(dtype=np.float64, shape=(None,))
-    heights = Array(dtype=np.float64, shape=(None, 2))
-    apodization = Enum(("constant", "gaussian", "cos3"))
 
-    def bundles(self):
-        pass
 
 class Aperture(Element):
     typestr = "A"

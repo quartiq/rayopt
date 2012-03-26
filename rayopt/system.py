@@ -63,7 +63,7 @@ class System(HasTraits):
         if self.object:
             dia = (self.object.radius == np.inf and
                 self.object.field_angle*2 or self.object.radius*2)
-            yield "%-2s %1s %-12s %-12s %10.5g %15s %5.2f %5.2f" % (
+            yield "%-2s %1s %-12s %-12s %10.5g %15s %5.3f %5.2f" % (
                 "", self.object.typestr, "", "", dia,
                 self.object.material,
                 self.object.material.nd, self.object.material.vd)
@@ -73,9 +73,9 @@ class System(HasTraits):
             mat = getattr(e, "material", None)
             n = getattr(mat, "nd", np.nan)
             v = getattr(mat, "vd", np.nan)
-            yield "%-2i %1s %12.7g %12.6g %10.5g %15s %5.2f %5.2f" % (
-                    i+1, e.typestr, e.origin[2] or "", roc or "",
-                    e.radius*2 or "", mat or "", n, v or "")
+            yield "%-2i %1s %12.7g %12.6g %10.5g %15s %5.3f %5.2f" % (
+                    i+1, e.typestr, e.origin[2], roc,
+                    e.radius*2, mat or "", n, v)
         if self.image:
             yield "%2s %1s %12.7g %-12s %10.5g %15s %-5s %-5s" % (
                 "", self.image.typestr, self.image.origin[2], "",

@@ -68,14 +68,14 @@ class Material(HasTraits):
         return self.name
 
     def refractive_index(self, wavelength):
-        w2 = (wavelength[:, None]/1e-6)**2
-        c0 = self.sellmeier[None, :,0]
-        c1 = self.sellmeier[None, :,1]
+        w2 = (wavelength/1e-6)**2
+        c0 = self.sellmeier[:, 0]
+        c1 = self.sellmeier[:, 1]
         n2 = 1.+(c0*w2/(w2-c1)).sum(-1)
         return np.sqrt(n2)
 
     def _nd_default(self):
-        return self.refractive_index(lambda_d)
+        return float(self.refractive_index(lambda_d))
 
     def dispersion(self, wavelength_short, wavelength_mid,
             wavelength_long):
@@ -88,9 +88,9 @@ class Material(HasTraits):
                 self.refractive_index(wavelength_long))
 
     def _vd_default(self):
-        return (self.nd-1)/(
+        return float((self.nd-1)/(
                 self.refractive_index(lambda_F)-
-                self.refractive_index(lambda_C))
+                self.refractive_index(lambda_C)))
 
     def dn_thermal(self, t, n, wavelength):
         d0, d1, d2, e0, e1, tref, lref = self.thermal
@@ -121,10 +121,11 @@ air = Material(name="air", solid=False, sellmeier=[
     [167917E-8, 57.362],
     ], vd=np.inf)
 
+@np.vectorize
 def air_refractive_index(wavelength):
-    w2 = (wavelength/1e-6)**-2
-    c0 = air.sellmeier[:,0]
-    c1 = air.sellmeier[:,1]
+    w2 = (wavelength/1e-6)**2
+    c0 = air.sellmeier[:, 0]
+    c1 = air.sellmeier[:, 1]
     n  = 1.+(c0/(c1-w2)).sum(-1)
     return n
 
