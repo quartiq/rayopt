@@ -52,24 +52,16 @@ class Trace(HasTraits):
     u = Array(dtype=np.float, shape=(3, None, None)) # angle
     i = Array(dtype=np.float, shape=(3, None, None)) # incidence
 
-    def _constant_default(self):
-        return np.empty((self.nrays,), dtype=np.float)
- 
-    def _scalar_default(self):
-        return np.empty((self.length, self.nrays), dtype=np.float)
-    
-    def _vector_default(self):
-        return np.empty((3, self.length, self.nrays), dtype=np.float)
-
-    _l_default = _constant_default
-    _l1_default = _constant_default
-    _l2_default = _constant_default
-    _n_default = _scalar_default
-    _v_default = _scalar_default
-    _p_default = _scalar_default
-    _y_default = _vector_default
-    _u_default = _vector_default
-    _i_default = _vector_default
+    def allocate(self):
+        self.l = np.zeros((self.nrays,), dtype=np.float)
+        self.l1 = np.zeros((self.nrays,), dtype=np.float)
+        self.l2 = np.zeros((self.nrays,), dtype=np.float)
+        self.n = np.zeros((self.length, self.nrays), dtype=np.float)
+        self.v = np.zeros((self.length, self.nrays), dtype=np.float)
+        self.p = np.zeros((self.length, self.nrays), dtype=np.float)
+        self.y = np.zeros((3, self.length, self.nrays), dtype=np.float)
+        self.u = np.zeros((3, self.length, self.nrays), dtype=np.float)
+        self.i = np.zeros((3, self.length, self.nrays), dtype=np.float)
 
     def __init__(self, **kw):
         super(Trace, self).__init__(**kw)
@@ -82,14 +74,10 @@ class ParaxialTrace(Trace):
     # marginal/axial, principal/chief
     nrays = 2
 
-    c3 = Array(dtype=np.float, shape=(7, None)) # third order aberration
-    c5 = Array(dtype=np.float, shape=(7, None)) # fifth order aberration
-
-    def _aberration_default(self):
-        return np.empty((7, self.length), dtype=np.float)
-
-    _c3_default = _aberration_default
-    _c5_default = _aberration_default
+    def allocate(self):
+        super(ParaxialTrace, self).allocate()
+        self.c3 = np.zeros((7, self.length), dtype=np.float)
+        self.c5 = np.zeros((7, self.length), dtype=np.float)
 
     lagrange = Property
     image_height = Property
@@ -104,9 +92,10 @@ class ParaxialTrace(Trace):
 
     def __init__(self, **k):
         super(ParaxialTrace, self).__init__(**k)
-        self.l[:] = self.system.wavelengths[0]
-        self.l1[:] = min(self.system.wavelengths)
-        self.l2[:] = max(self.system.wavelengths)
+        self.allocate()
+        self.l[:] = self.system.object.wavelengths[0]
+        self.l1[:] = min(self.system.object.wavelengths)
+        self.l2[:] = max(self.system.object.wavelengths)
         self.n[0] = self.system.object.material.refractive_index(self.l)
 
     def __str__(self):
@@ -118,10 +107,10 @@ class ParaxialTrace(Trace):
         return "\n".join(t)
 
     def find_rays(self):
-        if self.system.object.radius == np.inf:
-            a, b, c = self.y, self.u, self.system.object.field_angle
-        else:
-            a, b, c = self.u, self.y, self.system.object.radius
+        c = self.system.object.radius
+        a, b = self.u, self.y
+        if self.system.object.infinity:
+            a, b = b, a
         eps = 1e-2
         a[0, 0], b[0, 0] = (eps, 0), (0, eps)
         r, h, k = self.to_aperture()
@@ -247,8 +236,9 @@ class FullTrace(Trace):
             e.propagate(self, i+1)
         self.system.image.propagate(self, i+2)
  
-    def rays_from_paraxial(self, p):
+    def rays_like_paraxial(self, p):
         self.nrays = 2
+        self.allocate()
         self.l = p.l
         self.l1 = p.l1
         self.l2 = p.l2
@@ -280,50 +270,3 @@ class FullTrace(Trace):
                         self.y[0, j, i], self.y[1, j, i],
                         self.u[0, j, i], self.u[1, j, i],
                         self.p[j, i])
-
-    def chief_and_marginal(self, height, rays,
-            paraxial_chief=True,
-            paraxial_marginal=True):
-        assert sum(1 for e in self.elements
-                if isinstance(e, Aperture)) == 1
-       
-        def stop_for_pos(x,y):
-            # returns relative aperture height given object angles and
-            # relative object height
-            rays.positions, rays.angles = self.object.rays_to_height(
-                    (x,y), height)
-            return self.height_at_aperture(rays)[0]
-
-        d = 1e-3 # arbitrary to get newton started, TODO: better scale
-
-        if paraxial_chief:
-            d0 = stop_for_pos(0,0)
-            chief = -d*d0/(stop_for_pos(d,d)-d0)
-        else:
-            chief = fsolve(lambda p: stop_for_pos(*p),
-                    (0,0), xtol=1e-2, epsfcn=d)
-
-        if paraxial_marginal:
-            dmarg = d/(stop_for_pos(*(chief+d))-stop_for_pos(*chief))
-            marg_px, marg_py = chief+dmarg
-            marg_nx, marg_ny = chief-dmarg
-        else:
-            marg_px = newton(lambda x: stop_for_pos(x, chief[1])[0]-1,
-                    chief[0]+d)
-            marg_nx = newton(lambda x: stop_for_pos(x, chief[1])[0]+1,
-                    chief[0]-d)
-            marg_py = newton(lambda y: stop_for_pos(chief[0], y)[1]-1,
-                    chief[1]+d)
-            marg_ny = newton(lambda y: stop_for_pos(chief[0], y)[1]+1,
-                    chief[1]-d)
-
-        return chief, (marg_px, marg_nx, marg_py, marg_ny)
-
-    def get_ray_bundle(self, wavelength, height, number, **kw):
-        rays = Rays(wavelength=wavelength, height=height)
-        c, m = self.chief_and_marginal(height, rays, **kw)
-        print c, m
-        p, a = self.object.rays_for_point(height, c, m, number)
-        rays.positions = p
-        rays.angles = a
-        return rays

@@ -20,7 +20,7 @@ import numpy as np
 from scipy.optimize import (newton, fsolve)
 
 from traits.api import (HasTraits, Float, Array,
-        Trait, cached_property, Property, Enum)
+        Trait, cached_property, Property, Enum, Bool)
 
 from .transformations import euler_matrix, translation_matrix
 from .material import Material, air
@@ -33,35 +33,24 @@ class Element(HasTraits):
     typestr = "E"
     origin = Array(dtype=np.float64, shape=(3,))
     angles = Array(dtype=np.float64, shape=(3,))
+    rotation = Property(depends_on="angles")
     transform = Property(depends_on="origin, angles")
-    inverse_transform = Property(depends_on="transform")
+    inverse_transform = Property(depends_on="origin, angles")
     material = Trait(air, Material)
     radius = Float
 
-    #@cached_property
-    def _get_transform(self):
-        r = euler_matrix(axes="rxyz", *-self.angles)
-        t = translation_matrix(-self.origin)
-        return np.dot(r,t)
+    @cached_property
+    def _get_rotation(self):
+        return euler_matrix(axes="rxyz", *-self.angles)
 
-    #@cached_property
+    @cached_property
+    def _get_transform(self):
+        t = translation_matrix(-self.origin)
+        return np.dot(self.rotation,t)
+
+    @cached_property
     def _get_inverse_transform(self):
         return np.linalg.inv(self.transform)
-
-    def transform_to(self, x):
-        return self.do_transform(self.transform, x)
-
-    def transform_from(self, rays):
-        return self.do_transform(self.inverse_transform, x)
-
-    def do_transform(self, t, x):
-        n = x.shape[1]
-        x = x.copy()
-        x.resize((4, n))
-        x[3] = 1.
-        x = np.dot(t, x) # TODO np.dot(t, x, out=x)
-        x = x[:3] # x.resize((3, n))
-        return x
 
     def intercept(self, y, u):
         # ray length to intersection with element
@@ -70,15 +59,10 @@ class Element(HasTraits):
         s = np.where(y[2]==0, 0., -y[2]/u[2])
         return s # TODO mask, np.where(s>=0, s, np.nan)
 
-    def refract(self, y, u, mu):
-        return u
-
     def propagate(self, r, j):
         y0, u0, n0 = r.y[:, j-1], r.u[:, j-1], r.n[j-1]
-        y = self.transform_to(y0)
-        u = u0.copy() # FIXME no trans self.transform_to(u0)
-        #y = y0-self.origin[:, None]
-        #u = u0-0.
+        y = np.dot(self.rotation[:3, :3], y0-self.origin[:, None])
+        u = np.dot(self.rotation[:3, :3], u0)
         # length up to surface
         r.p[j-1] = self.intercept(y, u)
         # new transverse position
@@ -90,7 +74,10 @@ class Element(HasTraits):
             r.n[j] = self.material.refractive_index(r.l)
             r.u[:, j] = self.refract(r.y[:, j], u, r.n[j-1]/r.n[j])
         # fix origin
-   
+
+    def refract(self, y, u, mu):
+        return u
+  
     def propagate_paraxial(self, r, j):
         y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
         t = self.origin[2]
@@ -163,7 +150,7 @@ class Interface(Element):
     def reverse(self):
         raise NotImplementedError
 
-    def surface(self, axis, points=20):
+    def surface(self, axis, points=20): # TODO 2d
         t = np.linspace(-self.radius, self.radius, points)
         xyz = np.zeros((3, points))
         xyz[axis] = t
@@ -174,7 +161,8 @@ class Interface(Element):
 class Spheroid(Interface):
     typestr = "S"
     curvature = Float(0)
-    conic = Float(1) # assert self.radius**2 < 1/(self.conic*self.curvature**2)
+    conic = Float(1)
+    # TODO: assert self.radius**2 < 1/(self.conic*self.curvature**2)
     aspherics = Array(dtype=np.float64)
 
     def shape_func(self, p):
@@ -257,42 +245,13 @@ class Spheroid(Interface):
 
 class Object(Element):
     typestr = "O"
-    radius = Float(np.inf)
-    field_angle = Float(.1)
+    infinity = Bool(True)
+    wavelengths = Array(dtype=np.float64, shape=(None,))
+    heights = Array(dtype=np.float64, shape=(None, 2))
     apodization = Enum(("constant", "gaussian", "cos3"))
 
-    def rays_to_height(self, xy, height):
-        if self.radius == np.inf:
-            p = np.array([(xy[0], xy[1], np.zeros_like(xy[0]))])
-            a = np.array([(height[0]*self.field_angle,
-                        height[1]*self.field_angle,
-                        np.sqrt(1-(height[0]*self.field_angle)**2
-                              -(height[1]*self.field_angle)**2))])
-        else:
-            p = np.array([(height[0]*self.radius,
-                        height[1]*self.radius,
-                        np.zeros_like(height[0]))])
-            a = np.array([(xy[0], xy[1], np.sqrt(1-xy[0]**2-xy[1]**2))])
-        return p, a
-
-    def rays_for_point(self, height, chief, marg, num):
-        chief_x, chief_y = chief
-        marg_px, marg_nx, marg_py, marg_ny = marg
-        mmarg_x, mmarg_y = marg_px+marg_nx, marg_py+marg_ny
-        dmarg_x, dmarg_y = marg_px-marg_nx, marg_py-marg_ny
-
-        x, y = mgrid[marg_nx:marg_px:num*1j, marg_ny:marg_py:num*1j]
-        x, y = x.flatten(), y.flatten()
-        r2 = (((x-mmarg_x)/dmarg_x)**2+((y-mmarg_y)/dmarg_y)**2)<.25
-        x, y = np.extract(r2, x), np.extract(r2, y)
-        x = np.concatenate(([chief_x], np.linspace(marg_nx, marg_px, num),
-            np.ones((num,))*chief_x, x))
-        y = np.concatenate(([chief_y], np.ones((num,))*chief_y,
-            np.linspace(marg_nx, marg_px, num), y))
-        p, a = self.rays_to_height((x,y),
-                (height[0]*np.ones_like(x), height[1]*np.ones_like(y)))
-        return p[0].T, a[0].T
-
+    def bundles(self):
+        pass
 
 class Aperture(Element):
     typestr = "A"

@@ -24,8 +24,6 @@ from .elements import Element, Object, Image
 
 class System(HasTraits):
     name = Str
-    wavelengths = Array(dtype=np.float64, shape=(None,))
-    heights = Array(dtype=np.float64, shape=(None, 2))
     temperature = Float(21.)
     scale = Float(1e-3)
     object = Instance(Object)
@@ -57,7 +55,7 @@ class System(HasTraits):
         yield "Scale: %g m" % self.scale
         yield "Temperature: %g C" % self.temperature
         yield "Wavelengths: %s nm" % ",".join("%.0f" % (w/1e-9)
-                    for w in self.wavelengths)
+                    for w in self.object.wavelengths)
         yield "Surfaces:"
         yield "%2s %1s %12s %12s %10s %15s %5s %5s" % (
                 "#", "T", "Distance to", "ROC", "Diameter", 
@@ -76,7 +74,8 @@ class System(HasTraits):
             n = getattr(mat, "nd", np.nan)
             v = getattr(mat, "vd", np.nan)
             yield "%-2i %1s %12.7g %12.6g %10.5g %15s %5.2f %5.2f" % (
-                i+1, e.typestr, e.origin[2], roc, e.radius*2, mat, n, v)
+                    i+1, e.typestr, e.origin[2] or "", roc or "",
+                    e.radius*2 or "", mat or "", n, v or "")
         if self.image:
             yield "%2s %1s %12.7g %-12s %10.5g %15s %-5s %-5s" % (
                 "", self.image.typestr, self.image.origin[2], "",
@@ -152,6 +151,3 @@ class System(HasTraits):
         for i,p in enumerate(parameters):
              p.set_value(self, x[i])
         return x0,x,f
-        
-
-
