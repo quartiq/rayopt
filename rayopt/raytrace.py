@@ -161,7 +161,7 @@ class ParaxialTrace(Trace):
         sys, p = self.system, self
         # p.c3 *= -2*p.image_height*p.u[0,-1,0] # seidel
         # p.c3 *= -p.image_height/p.u[0,-1,0] # longit
-        # p.c3 *= p.image_height # transverse
+        p.c3 *= p.image_height # transverse
         yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "TSC", "CC", "TAC", "TPC", "DC", "TAchC", "TchC")
         for i, ab in enumerate(p.c3.swapaxes(0, 1)[1:-1]):
@@ -242,9 +242,6 @@ class ParaxialTrace(Trace):
 class FullTrace(Trace):
     o = Array(dtype=np.float, shape=(None)) # intensity
     p = Array(dtype=np.float, shape=(None, None)) # lengths
-    distribution = Enum(("hexapolar", "random", "square", "triangular",
-           "sagittal", "meridional", "cross"))
-    apodization = Enum(("constant", "gaussian", "cos3"))
 
     def allocate(self):
         super(FullTrace, self).allocate()
@@ -292,7 +289,7 @@ class FullTrace(Trace):
     def plot_fan(self, heights, wavelengths, fig=None, paraxial=None,
             npoints=50):
         if fig is None:
-            fig = plt.figure(figsize=(16, 9))
+            fig = plt.figure(figsize=(10, 8))
             fig.subplotpars.left = .05
             fig.subplotpars.bottom = .05
             fig.subplotpars.right = .95
@@ -305,32 +302,37 @@ class FullTrace(Trace):
         nh = len(heights)
         ia = self.system.aperture_index
         n = npoints
+        gs = plt.GridSpec(nh, 4)
         for i, hi in enumerate(heights):
-            axm = fig.add_subplot(nh, 3, i*3+1)
+            axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2))
             # axm.set_title("meridional, h=%s, %s" % hi)
             # axm.set_xlabel("Y")
             # axm.set_ylabel("tanU")
-            axs = fig.add_subplot(nh, 3, i*3+2)
+            axs = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1))
             # axs.set_title("sagittal, h=%s, %s" % hi)
             # axs.set_xlabel("x")
             # axs.set_ylabel("X")
-            axp = fig.add_subplot(nh, 3, i*3+3, aspect="equal")
+            axp = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
+                aspect="equal", sharey=axm, sharex=axs)
             axp.set_title("h=%s, %s" % hi)
             # axp.set_ylabel("X")
             # axp.set_ylabel("Y")
             for j, wi in enumerate(wavelengths):
-                self.rays_for_point(paraxial, hi, wi, npoints, "cross")
+                self.rays_for_point(paraxial, hi, wi, npoints, "tee")
                 self.propagate()
-                axm.plot(tanarcsin(self.u[0, -1, :n/2]-paraxial.u[0, -1, 1]*hi[0]),
-                        self.y[0, -1, :n/2]-paraxial.y[0, -1, 1]*hi[0],
+                axm.plot(tanarcsin(self.u[0, -1, :2*n/3])
+                        -tanarcsin(paraxial.u[0, -1, 1]*hi[0]),
+                        self.y[0, -1, :2*n/3]-paraxial.y[0, -1, 1]*hi[0],
                         "-", label="%s" % wi)
-                axs.plot(self.y[1, ia, n/2:], self.y[1, -1, n/2:],
+                axs.plot(self.y[1, -1, 2*n/3:],
+                        tanarcsin(self.u[1, -1, 2*n/3:]),
                         "-", label="%s" % wi)
-                self.rays_for_point(paraxial, hi, wi, npoints, "hexapolar")
+                self.rays_for_point(paraxial, hi, wi, npoints,
+                        "hexapolar")
                 self.propagate()
                 axp.plot(self.y[1, -1]-paraxial.y[0, -1, 1]*hi[1],
                         self.y[0, -1]-paraxial.y[0, -1, 1]*hi[0],
-                        ".", label="%s" % wi)
+                        ".", markeredgewidth=0, label="%s" % wi)
         return fig
 
     def get_rays(self, distribution):
@@ -349,7 +351,10 @@ class FullTrace(Trace):
             xy = np.array([x.ravel(), y.ravel()])
             return xy[:, (xy**2).sum(0)<=1]
         elif d == "triangular":
-            raise NotImplementedError
+            r = np.around(np.sqrt(n*4/np.pi))
+            x, y = np.mgrid[-1:1:1j*r, -1:1:1j*r]
+            xy = np.array([x.ravel(), y.ravel()])
+            return xy[:, (xy**2).sum(0)<=1]
         elif d == "hexapolar":
             r = int(np.around(np.sqrt(n/3.-1/12.)-1/2.))
             l = [[np.array([0]), np.array([0])]]
@@ -361,6 +366,10 @@ class FullTrace(Trace):
             return np.concatenate([
                 [np.linspace(-1, 1, n/2), np.zeros((n/2,))],
                 [np.zeros((n/2,)), np.linspace(-1, 1, n/2)]], axis=1)
+        elif d == "tee":
+            return np.concatenate([
+                [np.linspace(-1, 1, 2*n/3), np.zeros((2*n/3,))],
+                [np.zeros((n/3,)), np.linspace(0, 1, n/3)]], axis=1)
 
     def propagate(self):
         for i, e in enumerate(self.system.elements):

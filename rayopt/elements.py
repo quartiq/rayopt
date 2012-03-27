@@ -219,17 +219,26 @@ class Spheroid(Interface):
         r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
     
     def aberration3(self, r, j):
+        # need to multiply by h=image height = inv/(n[-2] u[-2])
         y0, u0, n0, v0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1], r.v[j-1]
         y, u, i, n, v = r.y[0, j], r.u[0, j], r.i[0, j], r.n[j], r.v[j]
         c = self.curvature
         mu = n0/n
         l = n*(u[0]*y[1]-u[1]*y[0])
         s = .5*n0*(1-mu)*y*(u+i)/l
+        # transverse third-order spherical
         tsc = s[0]*i[0]**2
+        # sagittal third-order coma
         cc = s[0]*i[0]*i[1]
+        # tangential third-order com
+        # 3*cc
+        # transverse third-order astigmatism
         tac = s[0]*i[1]**2
+        # transverse third-order Petzval
         tpc = ((1-mu)*c*l/n0/2)[0]
+        # third-order distortion
         dc = s[1]*i[0]*i[1]+.5*(u[1]**2-u0[1]**2)
+        # paraxial transverse axial, lateral chromatic
         tachc, tchc = -y[0]*i/l*(v0-mu*v)
 
         if len(self.aspherics) > 0:
