@@ -270,6 +270,12 @@ class Aperture(Element):
             r2 = (r.y[(0, 1), j]**2).sum(axis=0)
             np.putmask(r.y[2, j], r2>self.radius**2, np.nan)
 
+    def surface(self, axis, points=20):
+        t = np.array([-self.radius*1.5, -self.radius, np.nan,
+            self.radius, self.radius*1.5])
+        xyz = np.zeros((3, 5))
+        xyz[axis] = t
+        return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
 
 class Image(Element):
     typestr = "I"

@@ -313,7 +313,7 @@ class FullTrace(Trace):
             #axs.set_xlabel("X")
             #axs.set_ylabel("tanV")
             axp = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
-                aspect="equal", sharey=axm) #, sharex=axs)
+                aspect="equal", sharey=axm, sharex=axs)
             #axp.set_title("rays h=%s, %s" % hi)
             #axp.set_ylabel("X")
             #axp.set_ylabel("Y")
@@ -332,7 +332,8 @@ class FullTrace(Trace):
                 self.propagate()
                 axp.plot(self.y[1, -1]-paraxial.y[0, -1, 1]*hi[1],
                         self.y[0, -1]-paraxial.y[0, -1, 1]*hi[0],
-                        ".", markeredgewidth=0, label="%s" % wi)
+                        ".", markersize=2, markeredgewidth=0,
+                        label="%s" % wi)
         return fig
 
     def get_rays(self, distribution):
