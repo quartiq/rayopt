@@ -303,12 +303,17 @@ class FullTrace(Trace):
         ia = self.system.aperture_index
         n = npoints
         gs = plt.GridSpec(nh, 4)
+        axm0, axs0 = None, None
         for i, hi in enumerate(heights):
-            axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2))
+            axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2),
+                    sharex=axm0, sharey=axm0)
+            if axm0 is None: axm0 = axm
             #axm.set_title("meridional h=%s, %s" % hi)
             #axm.set_xlabel("Y")
             #axm.set_ylabel("tanU")
-            axs = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1))
+            axs = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1),
+                    sharex=axs0, sharey=axs0)
+            if axs0 is None: axs0 = axs
             #axs.set_title("sagittal h=%s, %s" % hi)
             #axs.set_xlabel("X")
             #axs.set_ylabel("tanV")
@@ -320,19 +325,20 @@ class FullTrace(Trace):
             for j, wi in enumerate(wavelengths):
                 self.rays_for_point(paraxial, hi, wi, npoints, "tee")
                 self.propagate()
-                axm.plot(tanarcsin(self.u[0, -1, :2*n/3])
-                        -tanarcsin(paraxial.u[0, -1, 1])*hi[0],
+                # top rays (small tanU) are right/top
+                axm.plot(-tanarcsin(self.u[0, -1, :2*n/3])
+                        +tanarcsin(paraxial.u[0, -1, 1])*hi[0],
                         self.y[0, -1, :2*n/3]-paraxial.y[0, -1, 1]*hi[0],
                         "-", label="%s" % wi)
                 axs.plot(self.y[1, -1, 2*n/3:],
-                        tanarcsin(self.u[1, -1, 2*n/3:]),
+                        -tanarcsin(self.u[1, -1, 2*n/3:]),
                         "-", label="%s" % wi)
                 self.rays_for_point(paraxial, hi, wi, npoints,
                         "hexapolar")
                 self.propagate()
                 axp.plot(self.y[1, -1]-paraxial.y[0, -1, 1]*hi[1],
                         self.y[0, -1]-paraxial.y[0, -1, 1]*hi[0],
-                        ".", markersize=2, markeredgewidth=0,
+                        ".", markersize=3, markeredgewidth=0,
                         label="%s" % wi)
         return fig
 
