@@ -25,6 +25,7 @@ import itertools
 
 import numpy as np
 from scipy.optimize import (newton, fsolve)
+import matplotlib.pyplot as plt
 
 from traits.api import (HasTraits, Float, Array, Property,
     cached_property, Instance, Int, Enum)
@@ -37,6 +38,12 @@ from .elements import Aperture
 def dir_to_angles(x,y,z):
     r = np.array([x,y,z], dtype=np.float64)
     return r/np.linalg.norm(r)
+
+def tanarcsin(u):
+    return u/np.sqrt(1-u**2)
+
+def sinarctan(u):
+    return u/np.sqrt(1+u**2)
 
 
 class Trace(HasTraits):
@@ -244,33 +251,34 @@ class FullTrace(Trace):
         self.o = np.zeros((self.nrays,), dtype=np.float)
         self.p = np.zeros((self.length, self.nrays), dtype=np.float)
 
-    def rays_like_paraxial(self, p):
+    def rays_like_paraxial(self, paraxial):
         self.nrays = 2
         self.allocate()
-        self.l = p.l
-        self.n[0] = p.n[0]
-        self.y[0, 0] = p.y[0, 0]
+        self.l = paraxial.l
+        self.n[0] = paraxial.n[0]
+        self.y[0, 0] = paraxial.y[0, 0]
         self.y[1, 0] = 0.
         self.y[2, 0] = 0.
-        self.u[0, 0] = p.u[0, 0]/np.sqrt(1+p.u[0, 0]**2)
+        self.u[0, 0] = sinarctan(paraxial.u[0, 0])
         self.u[1, 0] = 0.
         self.u[2, 0] = np.sqrt(1-self.u[0, 0]**2)
 
-    def rays_for_point(self, paraxial, height, wavelength, n):
-        self.nrays = n
+    def rays_for_point(self, paraxial, height, wavelength, nrays,
+            distribution):
+        self.nrays = nrays
         # TODO apodization
-        xp, yp = self.get_rays()
+        xp, yp = self.get_rays(distribution)
         self.nrays = xp.shape[0]
+        self.allocate()
         hp, rp = paraxial.pupil_position[0], paraxial.pupil_height[0]
         r = self.system.object.radius
         if self.system.object.infinity:
-            r = r/np.sqrt(1+r**2)
+            r = sinarctan(r)
             p, q = height[0]*r, height[1]*r
-            a, b = xp*rp-hp*p, yp*rp-hp*q
+            a, b = xp*rp-hp*tanarcsin(p), yp*rp-hp*tanarcsin(q)
         else:
             a, b = height[0]*r, height[1]*r
-            p, q = (xp*rp-a)/hp, (yp*rp-b)/hp
-        self.allocate()
+            p, q = sinarctan((xp*rp-a)/hp), sinarctan((yp*rp-b)/hp)
         self.l[:] = wavelength
         self.n[0] = self.system.object.material.refractive_index(
                 wavelength)
@@ -281,8 +289,49 @@ class FullTrace(Trace):
         self.u[1, 0] = q
         self.u[2, 0] = np.sqrt(1-p**2-q**2)
 
-    def get_rays(self):
-        d = self.distribution
+    def plot_fan(self, heights, wavelengths, fig=None, paraxial=None,
+            npoints=50):
+        if fig is None:
+            fig = plt.figure(figsize=(16, 9))
+            fig.subplotpars.left = .05
+            fig.subplotpars.bottom = .05
+            fig.subplotpars.right = .95
+            fig.subplotpars.top = .95
+            fig.subplotpars.hspace = .13
+            fig.subplotpars.wspace = .13
+        if paraxial is None:
+            paraxial = ParaxialTrace(system=self.system)
+            paraxial.propagate()
+        nh = len(heights)
+        n = npoints
+        for i, hi in enumerate(heights):
+            axm = fig.add_subplot(nh, 3, i*3+1)
+            # axm.set_title("meridional, h=%s, %s" % hi)
+            # axm.set_xlabel("Y")
+            # axm.set_ylabel("tanU")
+            axs = fig.add_subplot(nh, 3, i*3+2)
+            # axs.set_title("sagittal, h=%s, %s" % hi)
+            # axs.set_xlabel("x")
+            # axs.set_ylabel("X")
+            axp = fig.add_subplot(nh, 3, i*3+3, aspect="equal")
+            axp.set_title("h=%s, %s" % hi)
+            # axp.set_ylabel("X")
+            # axp.set_ylabel("Y")
+            for j, wi in enumerate(wavelengths):
+                self.rays_for_point(paraxial, hi, wi, npoints, "cross")
+                self.propagate()
+                axm.plot(tanarcsin(self.u[0, -1, :n/2]), self.y[0, -1, :n/2], "-",
+                        label="%s" % wi)
+                axs.plot(self.y[1, 0, n/2:], self.y[1, -1, n/2:], "-",
+                        label="%s" % wi)
+                self.rays_for_point(paraxial, hi, wi, npoints, "hexapolar")
+                self.propagate()
+                axp.plot(self.y[1, -1], self.y[0, -1], ".",
+                        label="%s" % wi)
+        return fig
+
+    def get_rays(self, distribution):
+        d = distribution
         n = self.nrays
         if d == "random":
             xy = 2*np.random.rand(2, n*4/np.pi)-1
@@ -328,6 +377,7 @@ class FullTrace(Trace):
                 "#", "T", "height x", "height y",
                 "angle x", "angle y", "length")
         for i in range(self.nrays):
+            yield ""
             yield "ray %i" % i
             for j in range(self.length):
                 yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
