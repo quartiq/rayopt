@@ -55,18 +55,18 @@ def system_from_table(data, scale):
         p = line.split()
         if not p:
             continue
+        if p[0] == "Stop":
+            s.elements.append(Aperture(
+                origin=(0,0,0),
+                radius=rad))
+            continue
         roc = float(p[1])
         if roc == 0:
             curv = 0
         else:
             curv = 1/roc
-        if p[-1]=="Stop":
-            del p[-1]
-            s.elements.append(Aperture(
-                origin=(0,0,0),
-                radius=rad))
         rad = float(p[-1])/2
-        if "Silica" in p:
+        if "Silica" in p: # FIXME
             mat = misc["SILICA"]
         else:
             mat = air

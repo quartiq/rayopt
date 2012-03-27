@@ -242,11 +242,12 @@ class Spheroid(Interface):
         tachc, tchc = -y[0]*i/l*(v0-mu*v)
 
         if len(self.aspherics) > 0:
-           k = (4*self.aspherics[0]+(self.conic-1)*c**3/2)*(n-n0)/l
-           tsc += k*y[0]**4
-           cc += k*y[0]**3*y[1]
-           tac += k*y[0]**2*y[1]**2
-           dc += k*y[0]*y[1]**3
+            # FIXME check
+            k = (4*self.aspherics[0]+(self.conic-1)*c**3/2)*(n-n0)/l
+            tsc += k*y[0]**4
+            cc += k*y[0]**3*y[1]
+            tac += k*y[0]**2*y[1]**2
+            dc += k*y[0]*y[1]**3
         r.c3[:, j] = [tsc, cc, tac, tpc, dc, tachc, tchc]
 
     def reverse(self):
@@ -267,7 +268,7 @@ class Aperture(Element):
         super(Aperture, self).propagate(r, j)
         if stop:
             r2 = (r.y[(0, 1), j]**2).sum(axis=0)
-            np.putmask(r.y[:, j], r2>self.radius**2, np.nan)
+            np.putmask(r.y[2, j], r2>self.radius**2, np.nan)
 
 
 class Image(Element):

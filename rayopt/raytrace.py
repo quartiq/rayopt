@@ -294,8 +294,8 @@ class FullTrace(Trace):
             fig.subplotpars.bottom = .05
             fig.subplotpars.right = .95
             fig.subplotpars.top = .95
-            fig.subplotpars.hspace = .13
-            fig.subplotpars.wspace = .13
+            fig.subplotpars.hspace = .2
+            fig.subplotpars.wspace = .2
         if paraxial is None:
             paraxial = ParaxialTrace(system=self.system)
             paraxial.propagate()
@@ -305,23 +305,23 @@ class FullTrace(Trace):
         gs = plt.GridSpec(nh, 4)
         for i, hi in enumerate(heights):
             axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2))
-            # axm.set_title("meridional, h=%s, %s" % hi)
-            # axm.set_xlabel("Y")
-            # axm.set_ylabel("tanU")
+            #axm.set_title("meridional h=%s, %s" % hi)
+            #axm.set_xlabel("Y")
+            #axm.set_ylabel("tanU")
             axs = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1))
-            # axs.set_title("sagittal, h=%s, %s" % hi)
-            # axs.set_xlabel("x")
-            # axs.set_ylabel("X")
+            #axs.set_title("sagittal h=%s, %s" % hi)
+            #axs.set_xlabel("X")
+            #axs.set_ylabel("tanV")
             axp = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
-                aspect="equal", sharey=axm, sharex=axs)
-            axp.set_title("h=%s, %s" % hi)
-            # axp.set_ylabel("X")
-            # axp.set_ylabel("Y")
+                aspect="equal", sharey=axm) #, sharex=axs)
+            #axp.set_title("rays h=%s, %s" % hi)
+            #axp.set_ylabel("X")
+            #axp.set_ylabel("Y")
             for j, wi in enumerate(wavelengths):
                 self.rays_for_point(paraxial, hi, wi, npoints, "tee")
                 self.propagate()
                 axm.plot(tanarcsin(self.u[0, -1, :2*n/3])
-                        -tanarcsin(paraxial.u[0, -1, 1]*hi[0]),
+                        -tanarcsin(paraxial.u[0, -1, 1])*hi[0],
                         self.y[0, -1, :2*n/3]-paraxial.y[0, -1, 1]*hi[0],
                         "-", label="%s" % wi)
                 axs.plot(self.y[1, -1, 2*n/3:],
