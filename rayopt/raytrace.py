@@ -303,6 +303,7 @@ class FullTrace(Trace):
             paraxial = ParaxialTrace(system=self.system)
             paraxial.propagate()
         nh = len(heights)
+        ia = self.system.aperture_index
         n = npoints
         for i, hi in enumerate(heights):
             axm = fig.add_subplot(nh, 3, i*3+1)
@@ -320,14 +321,16 @@ class FullTrace(Trace):
             for j, wi in enumerate(wavelengths):
                 self.rays_for_point(paraxial, hi, wi, npoints, "cross")
                 self.propagate()
-                axm.plot(tanarcsin(self.u[0, -1, :n/2]), self.y[0, -1, :n/2], "-",
-                        label="%s" % wi)
-                axs.plot(self.y[1, 0, n/2:], self.y[1, -1, n/2:], "-",
-                        label="%s" % wi)
+                axm.plot(tanarcsin(self.u[0, -1, :n/2]-paraxial.u[0, -1, 1]*hi[0]),
+                        self.y[0, -1, :n/2]-paraxial.y[0, -1, 1]*hi[0],
+                        "-", label="%s" % wi)
+                axs.plot(self.y[1, ia, n/2:], self.y[1, -1, n/2:],
+                        "-", label="%s" % wi)
                 self.rays_for_point(paraxial, hi, wi, npoints, "hexapolar")
                 self.propagate()
-                axp.plot(self.y[1, -1], self.y[0, -1], ".",
-                        label="%s" % wi)
+                axp.plot(self.y[1, -1]-paraxial.y[0, -1, 1]*hi[1],
+                        self.y[0, -1]-paraxial.y[0, -1, 1]*hi[0],
+                        ".", label="%s" % wi)
         return fig
 
     def get_rays(self, distribution):

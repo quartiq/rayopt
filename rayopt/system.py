@@ -30,6 +30,7 @@ class System(HasTraits):
     elements = List(Element)
     image = Instance(Image)
     all = Property()
+    aperture_index = Property()
 
     def reverse(self):
         m = self.object.material
@@ -106,8 +107,10 @@ class System(HasTraits):
             else:
                 l = None
 
-    def solve(self):
-        pass
+    def _get_aperture_index(self):
+        for i, e in enumerate(self.all):
+            if e.typestr == "A":
+                return i
 
     def optimize(self, rays, parameters, demerits, constraints=(),
             method="ralg"):
