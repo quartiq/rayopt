@@ -56,7 +56,11 @@ class Element(HasTraits):
         s = np.where(y[2]==0, 0., -y[2]/u[2])
         return s # TODO mask, np.where(s>=0, s, np.nan)
 
-    def propagate(self, r, j):
+    def clip(self, u, y):
+        r2 = (y[(0, 1), :]**2).sum(axis=0)
+        np.putmask(u[2], r2>self.radius**2, np.nan)
+
+    def propagate(self, r, j, clip):
         y0, u0, n0 = r.y[:, j-1], r.u[:, j-1], r.n[j-1]
         y = np.dot(self.rotation[:3, :3], y0-self.origin[:, None])
         u = np.dot(self.rotation[:3, :3], u0)
@@ -64,13 +68,15 @@ class Element(HasTraits):
         r.p[j-1] = self.intercept(y, u)
         # new transverse position
         r.y[:, j] = y + r.p[None, j-1]*u
+        if clip:
+            self.clip(u, r.y[:, j])
         if self.material is None:
             r.n[j] = r.n[j-1]
             r.u[:, j] = r.u[:, j-1]
         else:
             r.n[j] = map(self.material.refractive_index, r.l)
             r.u[:, j] = self.refract(r.y[:, j], u, r.n[j-1]/r.n[j])
-        # fix origin
+        # TODO: fix y for origin, transform back
 
     def refract(self, y, u, mu):
         return u
@@ -263,12 +269,6 @@ class Object(Element):
 
 class Aperture(Element):
     typestr = "A"
-
-    def propagate(self, r, j, stop=False):
-        super(Aperture, self).propagate(r, j)
-        if stop:
-            r2 = (r.y[(0, 1), j]**2).sum(axis=0)
-            np.putmask(r.y[2, j], r2>self.radius**2, np.nan)
 
     def surface(self, axis, points=20):
         t = np.array([-self.radius*1.5, -self.radius, np.nan,

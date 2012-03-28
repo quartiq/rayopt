@@ -26,22 +26,22 @@ def system_from_array(data, material_map={}, **kwargs):
     s = System(**kwargs)
     for typ, roc, off, rad, mat in data:
         roc, off, rad = map(float, (roc, off, rad))
+        if roc == 0:
+            curv = 0
+        else:
+            curv = 1/roc
+        try:
+            mat = all_materials[material_map.get(mat, mat)]
+        except KeyError:
+            mat = air
         if typ == "O":
             s.object = Object(radius=rad, origin=(0, 0, off))
         elif typ == "S":
-            if roc == 0:
-                curv = 0
-            else:
-                curv = 1/roc
-            try:
-                mat = all_materials[material_map.get(mat, mat)]
-            except KeyError:
-                mat = air
             e = Spheroid(curvature=curv, origin=(0, 0, off),
                     radius=rad, material=mat)
             s.elements.append(e)
         elif typ == "A":
-            a = Aperture(radius=rad, origin=(0, 0, off))
+            a = Aperture(radius=rad, origin=(0, 0, off), material=mat)
             s.elements.append(a)
         elif typ == "I":
             s.image = Image(radius=rad, origin=(0, 0, off))

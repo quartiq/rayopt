@@ -262,11 +262,8 @@ class FullTrace(Trace):
 
     def rays_for_point(self, paraxial, height, wavelength, nrays,
             distribution):
-        self.nrays = nrays
         # TODO apodization
-        xp, yp = self.get_rays(distribution)
-        self.nrays = xp.shape[0]
-        self.allocate()
+        xp, yp = self.get_rays(distribution, nrays)
         hp, rp = paraxial.pupil_position[0], paraxial.pupil_height[0]
         r = self.system.object.radius
         if self.system.object.infinity:
@@ -276,6 +273,8 @@ class FullTrace(Trace):
         else:
             a, b = height[0]*r, height[1]*r
             p, q = sinarctan((xp*rp-a)/hp), sinarctan((yp*rp-b)/hp)
+        self.nrays = xp.shape[0]
+        self.allocate()
         self.l[:] = wavelength
         self.n[0] = self.system.object.material.refractive_index(
                 wavelength)
@@ -286,8 +285,35 @@ class FullTrace(Trace):
         self.u[1, 0] = q
         self.u[2, 0] = np.sqrt(1-p**2-q**2)
 
-    def plot_fan(self, heights, wavelengths, fig=None, paraxial=None,
-            npoints=50):
+    def rays_for_object(self, paraxial, wavelength, nrays, eps=1e-6):
+        hp, rp = paraxial.pupil_position[0], paraxial.pupil_height[0]
+        r = self.system.object.radius
+        if self.system.object.infinity:
+            r = sinarctan(r)
+        xi, yi = np.tile([np.linspace(0, r, nrays), np.zeros((nrays,), dtype=np.float)], 3)
+        xp, yp = np.zeros_like(xi), np.zeros_like(yi)
+        xp[nrays:2*nrays] = eps*rp
+        yp[2*nrays:] = eps*rp
+        if self.system.object.infinity:
+            p, q = xi, yi
+            a, b = xp-hp*tanarcsin(p), yp-hp*tanarcsin(q)
+        else:
+            a, b = xi, yi
+            p, q = sinarctan((xp-a)/hp), sinarctan((yp-b)/hp)
+        self.nrays = nrays*3
+        self.allocate()
+        self.l[:] = wavelength
+        self.n[0] = self.system.object.material.refractive_index(
+                wavelength)
+        self.y[0, 0] = a
+        self.y[1, 0] = b
+        self.y[2, 0] = 0
+        self.u[0, 0] = p
+        self.u[1, 0] = q
+        self.u[2, 0] = np.sqrt(1-p**2-q**2)
+
+    def plot_transverse(self, heights, wavelengths, fig=None, paraxial=None,
+            npoints_spot=100, npoints_line=30):
         if fig is None:
             fig = plt.figure(figsize=(10, 8))
             fig.subplotpars.left = .05
@@ -301,29 +327,29 @@ class FullTrace(Trace):
             paraxial.propagate()
         nh = len(heights)
         ia = self.system.aperture_index
-        n = npoints
+        n = npoints_line
         gs = plt.GridSpec(nh, 4)
         axm0, axs0 = None, None
         for i, hi in enumerate(heights):
             axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2),
-                    sharex=axm0, sharey=axm0)
+                    ) #sharex=axm0, sharey=axm0)
             if axm0 is None: axm0 = axm
             #axm.set_title("meridional h=%s, %s" % hi)
             #axm.set_xlabel("Y")
             #axm.set_ylabel("tanU")
             axs = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1),
-                    sharex=axs0, sharey=axs0)
+                    ) #sharex=axs0, sharey=axs0)
             if axs0 is None: axs0 = axs
             #axs.set_title("sagittal h=%s, %s" % hi)
             #axs.set_xlabel("X")
             #axs.set_ylabel("tanV")
             axp = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
-                aspect="equal", sharey=axm, sharex=axs)
+                aspect="equal") #, sharey=axm, sharex=axs)
             #axp.set_title("rays h=%s, %s" % hi)
             #axp.set_ylabel("X")
             #axp.set_ylabel("Y")
             for j, wi in enumerate(wavelengths):
-                self.rays_for_point(paraxial, hi, wi, npoints, "tee")
+                self.rays_for_point(paraxial, hi, wi, npoints_line, "tee")
                 self.propagate()
                 # top rays (small tanU) are right/top
                 axm.plot(-tanarcsin(self.u[0, -1, :2*n/3])
@@ -333,7 +359,7 @@ class FullTrace(Trace):
                 axs.plot(self.y[1, -1, 2*n/3:],
                         -tanarcsin(self.u[1, -1, 2*n/3:]),
                         "-", label="%s" % wi)
-                self.rays_for_point(paraxial, hi, wi, npoints,
+                self.rays_for_point(paraxial, hi, wi, npoints_spot,
                         "hexapolar")
                 self.propagate()
                 axp.plot(self.y[1, -1]-paraxial.y[0, -1, 1]*hi[1],
@@ -342,9 +368,45 @@ class FullTrace(Trace):
                         label="%s" % wi)
         return fig
 
-    def get_rays(self, distribution):
+    def plot_longitudinal(self, wavelengths, fig=None, paraxial=None,
+            npoints=20):
+        if fig is None:
+            fig = plt.figure(figsize=(6, 4))
+            fig.subplotpars.left = .05
+            fig.subplotpars.bottom = .05
+            fig.subplotpars.right = .95
+            fig.subplotpars.top = .95
+            fig.subplotpars.hspace = .2
+            fig.subplotpars.wspace = .2
+        if paraxial is None:
+            paraxial = ParaxialTrace(system=self.system)
+            paraxial.propagate()
+        n = npoints
+        gs = plt.GridSpec(1, 2)
+        axl = fig.add_subplot(gs.new_subplotspec((0, 0), 1, 1))
+        #axl.set_title("distortion")
+        #axl.set_xlabel("D")
+        #axl.set_ylabel("Y")
+        axc = fig.add_subplot(gs.new_subplotspec((0, 1), 1, 1))
+        #axl.set_title("field curvature")
+        #axl.set_xlabel("Z")
+        #axl.set_ylabel("Y")
+        for i, (wi, ci) in enumerate(zip(wavelengths, "bgrcmyk")):
+            self.rays_for_object(paraxial, wi, npoints)
+            self.propagate()
+            axl.plot(self.y[0, -1, :npoints]-np.linspace(0, paraxial.image_height, npoints),
+                self.y[0, -1, :npoints], ci+"-", label="d")
+            xt = -(self.y[0, -1, npoints:2*npoints]-self.y[0, -1, :npoints])/(
+                  tanarcsin(self.u[0, -1, npoints:2*npoints])-tanarcsin(self.u[0, -1, :npoints]))
+            xs = -(self.y[1, -1, 2*npoints:]-self.y[1, -1, :npoints])/(
+                  tanarcsin(self.u[1, -1, 2*npoints:])-tanarcsin(self.u[1, -1, :npoints]))
+            axc.plot(xt, self.y[0, -1, :npoints], ci+"--", label="zt")
+            axc.plot(xs, self.y[0, -1, :npoints], ci+"-", label="zs")
+        return fig
+
+    def get_rays(self, distribution, nrays):
         d = distribution
-        n = self.nrays
+        n = nrays
         if d == "random":
             xy = 2*np.random.rand(2, n*4/np.pi)-1
             return xy[:, (xy**2).sum(0)<=1]
@@ -378,10 +440,10 @@ class FullTrace(Trace):
                 [np.linspace(-1, 1, 2*n/3), np.zeros((2*n/3,))],
                 [np.zeros((n/3,)), np.linspace(0, 1, n/3)]], axis=1)
 
-    def propagate(self):
+    def propagate(self, clip=True):
         for i, e in enumerate(self.system.elements):
-            e.propagate(self, i+1)
-        self.system.image.propagate(self, i+2)
+            e.propagate(self, i+1, clip)
+        self.system.image.propagate(self, i+2, clip)
 
     def __str__(self):
         t = itertools.chain(
