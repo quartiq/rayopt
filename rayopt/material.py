@@ -116,6 +116,8 @@ class FictionalMaterial(Material):
 # http://refractiveindex.info
 vacuum = FictionalMaterial(name="vacuum", nd=1., vd=np.inf, solid=False)
 
+mirror = FictionalMaterial(name="mirror", nd=-1., vd=np.inf, solid=False)
+
 air = Material(name="air", solid=False, sellmeier=[
     [5792105E-8, 238.0185],
     [167917E-8, 57.362],
@@ -198,3 +200,6 @@ infrared = GlassCatalog.cached_or_import(catpath+"infrared.agf")
 all_materials = GlassCatalog()
 for cat in misc, infrared, ohara, schott:
     all_materials.db.update(cat.db)
+
+for m in air, vacuum, mirror:
+	all_materials.db[m.name] = m
