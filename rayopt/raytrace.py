@@ -219,10 +219,8 @@ class ParaxialTrace(Trace):
                 self.y[2,-1,1]-self.y[0,-1,1]/self.u[0,-1,1])
 
     def _get_pupil_height(self):
-        return (self.y[0,1,0]+
-                self.pupil_position[0]*self.u[0,0,0],
-                self.y[0,-2,0]+
-                self.pupil_position[0]*self.u[0,-2,0])
+        return (self.y[0,0,0]+(self.pupil_position[0]-self.y[2,0,0])*self.u[0,0,0],
+                self.y[0,-1,0]+(self.pupil_position[1]-self.y[2,-1,0])*self.u[0,-1,0])
 
     def _get_f_number(self):
         return (1/(2*self.numerical_aperture[0]),

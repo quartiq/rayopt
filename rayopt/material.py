@@ -116,14 +116,18 @@ class FictionalMaterial(Material):
 # http://refractiveindex.info
 vacuum = FictionalMaterial(name="vacuum", nd=1., vd=np.inf, solid=False)
 
-mirror = FictionalMaterial(name="mirror", nd=-1., vd=np.inf, solid=False)
+vacuum_mirror = FictionalMaterial(name="vacuum_mirror", nd=-1., vd=np.inf, solid=False)
 
 air = Material(name="air", solid=False, sellmeier=[
     [5792105E-8, 238.0185],
     [167917E-8, 57.362],
     ], vd=np.inf)
+air_mirror = Material(name="air_mirror", solid=False, sellmeier=[
+    [5792105E-8, 238.0185],
+    [167917E-8, 57.362],
+    ], vd=np.inf)
 
-@np.vectorize
+#@np.vectorize
 def air_refractive_index(wavelength):
     w2 = (wavelength/1e-6)**2
     c0 = air.sellmeier[:, 0]
@@ -132,6 +136,15 @@ def air_refractive_index(wavelength):
     return n
 
 air.refractive_index = air_refractive_index
+
+def air_mirror_refractive_index(wavelength):
+    w2 = (wavelength/1e-6)**2
+    c0 = air.sellmeier[:, 0]
+    c1 = air.sellmeier[:, 1]
+    n  = -1.-(c0/(c1-w2)).sum(-1)
+    return n
+
+air_mirror.refractive_index = air_mirror_refractive_index
 
 
 
@@ -201,5 +214,5 @@ all_materials = GlassCatalog()
 for cat in misc, infrared, ohara, schott:
     all_materials.db.update(cat.db)
 
-for m in air, vacuum, mirror:
-	all_materials.db[m.name] = m
+for m in air, vacuum, air_mirror, vacuum_mirror:
+    all_materials.db[m.name] = m
