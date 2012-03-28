@@ -155,7 +155,7 @@ class ParaxialTrace(Trace):
         self.system.elements[i].curvature = c
 
     def focal_plane_solve(self):
-        self.system.image.origin[2] -= self.y[0, -1, 0]/self.u[0, -1, 0]
+        self.system.image.origin[2] = -self.y[0, -2, 0]/self.u[0, -2, 0]
 
     def print_c3(self):
         sys, p = self.system, self
@@ -168,7 +168,7 @@ class ParaxialTrace(Trace):
             yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i].typestr,
                     ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
-        ab = p.c3.sum(1)
+        ab = p.c3.sum(axis=1)
         yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
               " ∑", "", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
 
@@ -454,15 +454,15 @@ class FullTrace(Trace):
         return "\n".join(t)
 
     def print_trace(self):
-        yield "%2s %1s% 10s% 10s% 10s% 10s% 10s" % (
-                "#", "T", "height x", "height y",
-                "angle x", "angle y", "length")
+        yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
+                "#", "T", "height x", "height y", "height z",
+                "angle x", "angle y", "angle z", "length")
         for i in range(self.nrays):
             yield ""
             yield "ray %i" % i
             for j in range(self.length):
-                yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                         j, self.system.all[j].typestr, 
-                        self.y[0, j, i], self.y[1, j, i],
-                        self.u[0, j, i], self.u[1, j, i],
+                        self.y[0, j, i], self.y[1, j, i], self.y[2, j, i],
+                        self.u[0, j, i], self.u[1, j, i], self.u[2, j, i],
                         self.p[j, i])
