@@ -108,7 +108,7 @@ class System(HasTraits):
                 l = None
 
     def _get_aperture_index(self):
-        for i, e in enumerate(self.all):
+        for i, e in enumerate(self.elements):
             if e.typestr == "A":
                 return i
 

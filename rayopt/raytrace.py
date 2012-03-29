@@ -324,7 +324,7 @@ class FullTrace(Trace):
             paraxial = ParaxialTrace(system=self.system)
             paraxial.propagate()
         nh = len(heights)
-        ia = self.system.aperture_index
+        ia = self.system.aperture_index+1
         n = npoints_line
         gs = plt.GridSpec(nh, 4)
         axm0, axs0 = None, None
