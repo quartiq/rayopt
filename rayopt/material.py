@@ -209,9 +209,10 @@ schott = GlassCatalog.cached_or_import(catpath+"schott.agf")
 ohara = GlassCatalog.cached_or_import(catpath+"ohara.agf")
 misc = GlassCatalog.cached_or_import(catpath+"misc.agf")
 infrared = GlassCatalog.cached_or_import(catpath+"infrared.agf")
+heraeus = GlassCatalog.cached_or_import(catpath+"heraeus.agf")
 
 all_materials = GlassCatalog()
-for cat in misc, infrared, ohara, schott:
+for cat in misc, infrared, ohara, schott, heraeus:
     all_materials.db.update(cat.db)
 
 for m in air, vacuum, air_mirror, vacuum_mirror:

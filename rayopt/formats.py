@@ -158,9 +158,9 @@ def system_from_zemax(fil):
         elif cmd == "GLAS":
             args = args.split()
             name = args[0]
-            for db in schott, ohara, infrared, misc:
-                if name in db.db:
-                    e.material = db[name]
+	    print name
+            if name in all_materials.db:
+                e.material = all_materials[name]
             if not e.material:
                 e.material = {
                         "SILICA": misc["SILICA"],
