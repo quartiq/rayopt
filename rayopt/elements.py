@@ -207,7 +207,7 @@ class Spheroid(Interface):
                 s = (-d-np.sign(u[2])*np.sqrt(d**2-e*f))/e
                 #print "intercept", self, u, y, d, e, f, s
         else:
-            return Interface.intercept(self, y, u, mu)
+            return Interface.intercept(self, y, u)
         return s #np.where(s*np.sign(self.origin[2])>=0, s, np.nan)
 
     def propagate_paraxial(self, r, j):
@@ -254,6 +254,7 @@ class Spheroid(Interface):
         if len(self.aspherics) > 0:
             # FIXME check
             k = (4*self.aspherics[0]+(self.conic-1)*c**3/2)*(n-n0)/l
+            k = k[0]
             tsc += k*y[0]**4
             cc += k*y[0]**3*y[1]
             tac += k*y[0]**2*y[1]**2
