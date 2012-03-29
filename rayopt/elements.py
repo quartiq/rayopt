@@ -69,19 +69,18 @@ class Element(HasTraits):
         if self.material is not None:
             n = map(self.material.refractive_index, r.l)
         mu = n0/n
-        r.n[j] = np.fabs(n)
         # length up to surface
-        r.p[j-1] = self.intercept(y, u, mu)
+        p = self.intercept(y, u, mu)
         # new transverse position
-        r.y[:, j] = y + r.p[None, j-1]*u
+        y = y + p[None, :]*u
         if clip:
-            self.clip(u, r.y[:, j])
-        if self.material is None:
-            r.u[:, j] = u
-        else:
-            r.u[:, j] = self.refract(r.y[:, j], u, mu)
-        # TODO: fix y for origin, transform back
-
+            self.clip(u, y)
+        if self.material is not None:
+            u = self.refract(y, u, mu)
+        r.n[j] = np.fabs(n)
+        r.p[j-1] = p
+        r.y[:, j] = np.dot(self.rotation[:3, :3].T, y)#+self.origin[:, None]
+        r.u[:, j] = np.dot(self.rotation[:3, :3].T, u)
     def refract(self, y, u, mu):
         return u
   

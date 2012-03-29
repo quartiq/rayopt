@@ -158,14 +158,8 @@ def system_from_zemax(fil):
         elif cmd == "GLAS":
             args = args.split()
             name = args[0]
-	    print name
             if name in all_materials.db:
                 e.material = all_materials[name]
-            if not e.material:
-                e.material = {
-                        "SILICA": misc["SILICA"],
-                        "CAF2": misc["CAF2"],
-                        "O_S-BSM81": ohara["S-BSM81"],}[name]
         elif cmd == "COMM":
             pass
         elif cmd == "DIAM":
