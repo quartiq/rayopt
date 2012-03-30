@@ -132,7 +132,7 @@ class Interface(Element):
                         func=lambda si: self.shape_func(yi+si*ui),
                         fprime=lambda si: np.dot(
                             self.shape_func_deriv(yi+si*ui), ui),
-                        x0=-yi[2]/ui[2], tol=1e-7, maxiter=15)
+                        x0=-yi[2]/ui[2], tol=1e-7, maxiter=10)
             except RuntimeError:
                 s[i] = np.nan
         return s # np.where(s>=0, s, np.nan) # TODO mask

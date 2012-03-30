@@ -211,6 +211,7 @@ misc = GlassCatalog.cached_or_import(catpath+"misc.agf")
 infrared = GlassCatalog.cached_or_import(catpath+"infrared.agf")
 heraeus = GlassCatalog.cached_or_import(catpath+"heraeus.agf")
 corning = GlassCatalog.cached_or_import(catpath+"corning.agf")
+hoya = GlassCatalog.cached_or_import(catpath+"hoya.agf")
 
 all_materials = GlassCatalog()
 for cat in misc, infrared, ohara, schott, heraeus, corning:

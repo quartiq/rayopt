@@ -49,18 +49,18 @@ def sinarctan(u):
 class Trace(HasTraits):
     length = Int()
     nrays = Int()
-    l = Array(dtype=np.float, shape=(None)) # wavelength
-    n = Array(dtype=np.float, shape=(None, None)) # refractive index
-    y = Array(dtype=np.float, shape=(3, None, None)) # height
-    u = Array(dtype=np.float, shape=(3, None, None)) # angle
-    i = Array(dtype=np.float, shape=(3, None, None)) # incidence
+    l = Array(dtype=np.float64, shape=(None)) # wavelength
+    n = Array(dtype=np.float64, shape=(None, None)) # refractive index
+    y = Array(dtype=np.float64, shape=(3, None, None)) # height
+    u = Array(dtype=np.float64, shape=(3, None, None)) # angle
+    i = Array(dtype=np.float64, shape=(3, None, None)) # incidence
 
     def allocate(self):
-        self.l = np.zeros((self.nrays,), dtype=np.float)
-        self.n = np.zeros((self.length, self.nrays), dtype=np.float)
-        self.y = np.zeros((3, self.length, self.nrays), dtype=np.float)
-        self.u = np.zeros((3, self.length, self.nrays), dtype=np.float)
-        self.i = np.zeros((3, self.length, self.nrays), dtype=np.float)
+        self.l = np.zeros((self.nrays,), dtype=np.float64)
+        self.n = np.zeros((self.length, self.nrays), dtype=np.float64)
+        self.y = np.zeros((3, self.length, self.nrays), dtype=np.float64)
+        self.u = np.zeros((3, self.length, self.nrays), dtype=np.float64)
+        self.i = np.zeros((3, self.length, self.nrays), dtype=np.float64)
 
     def __init__(self, **kw):
         super(Trace, self).__init__(**kw)
@@ -73,19 +73,19 @@ class ParaxialTrace(Trace):
     # marginal/axial, principal/chief
     nrays = 2
 
-    v = Array(dtype=np.float, shape=(None, None)) # dispersion
-    l1 = Array(dtype=np.float, shape=(None)) # min l
-    l2 = Array(dtype=np.float, shape=(None)) # max l
-    c3 = Array(dtype=np.float, shape=(7, None)) # third order aberrations
-    c5 = Array(dtype=np.float, shape=(7, None)) # fifth order aberrations
+    v = Array(dtype=np.float64, shape=(None, None)) # dispersion
+    l1 = Array(dtype=np.float64, shape=(None)) # min l
+    l2 = Array(dtype=np.float64, shape=(None)) # max l
+    c3 = Array(dtype=np.float64, shape=(7, None)) # third order aberrations
+    c5 = Array(dtype=np.float64, shape=(7, None)) # fifth order aberrations
 
     def allocate(self):
         super(ParaxialTrace, self).allocate()
-        self.v = np.zeros((self.length, self.nrays), dtype=np.float)
-        self.l1 = np.zeros((self.nrays,), dtype=np.float)
-        self.l2 = np.zeros((self.nrays,), dtype=np.float)
-        self.c3 = np.zeros((7, self.length), dtype=np.float)
-        self.c5 = np.zeros((7, self.length), dtype=np.float)
+        self.v = np.zeros((self.length, self.nrays), dtype=np.float64)
+        self.l1 = np.zeros((self.nrays,), dtype=np.float64)
+        self.l2 = np.zeros((self.nrays,), dtype=np.float64)
+        self.c3 = np.zeros((7, self.length), dtype=np.float64)
+        self.c5 = np.zeros((7, self.length), dtype=np.float64)
 
     lagrange = Property
     image_height = Property
@@ -238,13 +238,13 @@ class ParaxialTrace(Trace):
 
 
 class FullTrace(Trace):
-    o = Array(dtype=np.float, shape=(None)) # intensity
-    p = Array(dtype=np.float, shape=(None, None)) # lengths
+    o = Array(dtype=np.float64, shape=(None)) # intensity
+    p = Array(dtype=np.float64, shape=(None, None)) # lengths
 
     def allocate(self):
         super(FullTrace, self).allocate()
-        self.o = np.zeros((self.nrays,), dtype=np.float)
-        self.p = np.zeros((self.length, self.nrays), dtype=np.float)
+        self.o = np.zeros((self.nrays,), dtype=np.float64)
+        self.p = np.zeros((self.length, self.nrays), dtype=np.float64)
 
     def rays_like_paraxial(self, paraxial):
         self.nrays = 2
@@ -288,7 +288,8 @@ class FullTrace(Trace):
         r = self.system.object.radius
         if self.system.object.infinity:
             r = sinarctan(r)
-        xi, yi = np.tile([np.linspace(0, r, nrays), np.zeros((nrays,), dtype=np.float)], 3)
+        xi, yi = np.tile([np.linspace(0, r, nrays), np.zeros((nrays,),
+	    dtype=np.float64)], 3)
         xp, yp = np.zeros_like(xi), np.zeros_like(yi)
         xp[nrays:2*nrays] = eps*rp
         yp[2*nrays:] = eps*rp
@@ -358,7 +359,7 @@ class FullTrace(Trace):
                         -tanarcsin(self.u[1, -1, 2*n/3:]),
                         "-", label="%s" % wi)
                 self.rays_for_point(paraxial, hi, wi, npoints_spot,
-                        "hexapolar")
+                        "square")
                 self.propagate()
                 axp.plot(self.y[1, -1]-paraxial.y[0, -1, 1]*hi[1],
                         self.y[0, -1]-paraxial.y[0, -1, 1]*hi[0],
