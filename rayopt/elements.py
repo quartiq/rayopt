@@ -212,8 +212,8 @@ class Spheroid(Interface):
     def propagate_paraxial(self, r, j):
         y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
         c = self.curvature
-        if len(self.aspherics) > 0:
-            c += 2*self.aspherics[0]
+        #if len(self.aspherics) > 0:
+        #    c += 2*self.aspherics[0]
         t = self.origin[2]
         n = map(self.material.refractive_index, r.l)
         mu = n0/n
