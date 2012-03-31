@@ -289,7 +289,7 @@ class FullTrace(Trace):
         if self.system.object.infinity:
             r = sinarctan(r)
         xi, yi = np.tile([np.linspace(0, r, nrays), np.zeros((nrays,),
-	    dtype=np.float64)], 3)
+            dtype=np.float64)], 3)
         xp, yp = np.zeros_like(xi), np.zeros_like(yi)
         xp[nrays:2*nrays] = eps*rp
         yp[2*nrays:] = eps*rp
