@@ -89,11 +89,9 @@ class Element(HasTraits):
         t = self.origin[2]
         n = map(self.material.refractive_index, r.l)
         y = y0+t*u0 # propagate
-        i = u0 # incident
         u = u0
         r.y[0, j] = y
         r.y[2, j] = r.y[2, j-1]+t
-        r.i[0, j] = i
         r.u[0, j] = u
         r.n[j] = np.fabs(n)
         r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
@@ -218,11 +216,9 @@ class Spheroid(Interface):
         n = map(self.material.refractive_index, r.l)
         mu = n0/n
         y = y0+t*u0 # propagate
-        i = c*y+u0 # incidence
         u = mu*u0+c*(mu-1.)*y # refract
         r.y[0, j] = y
         r.y[2, j] = r.y[2, j-1]+t
-        r.i[0, j] = i
         r.u[0, j] = u
         r.n[j] = np.fabs(n)
         r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
@@ -230,9 +226,10 @@ class Spheroid(Interface):
     def aberration3(self, r, j):
         # need to multiply by h=image height = inv/(n[-2] u[-2])
         y0, u0, n0, v0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1], r.v[j-1]
-        y, u, i, n, v = r.y[0, j], r.u[0, j], r.i[0, j], r.n[j], r.v[j]
+        y, u, n, v = r.y[0, j], r.u[0, j], r.n[j], r.v[j]
         c = self.curvature
         mu = n0/n
+        i = c*y+u0 # incidence
         l = n*(u[0]*y[1]-u[1]*y[0])
         s = .5*n0*(1-mu)*y*(u+i)/l
         # transverse third-order spherical

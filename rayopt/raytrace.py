@@ -53,14 +53,12 @@ class Trace(HasTraits):
     n = Array(dtype=np.float64, shape=(None, None)) # refractive index
     y = Array(dtype=np.float64, shape=(3, None, None)) # height
     u = Array(dtype=np.float64, shape=(3, None, None)) # angle
-    i = Array(dtype=np.float64, shape=(3, None, None)) # incidence
 
     def allocate(self):
         self.l = np.zeros((self.nrays,), dtype=np.float64)
         self.n = np.zeros((self.length, self.nrays), dtype=np.float64)
         self.y = np.zeros((3, self.length, self.nrays), dtype=np.float64)
         self.u = np.zeros((3, self.length, self.nrays), dtype=np.float64)
-        self.i = np.zeros((3, self.length, self.nrays), dtype=np.float64)
 
     def __init__(self, **kw):
         super(Trace, self).__init__(**kw)
@@ -109,8 +107,8 @@ class ParaxialTrace(Trace):
 
     def __str__(self):
         t = itertools.chain(
-                self.print_params(),
-                self.print_trace(),
+                self.print_params(), ("",),
+                self.print_trace(), ("",),
                 self.print_c3(),
                 )
         return "\n".join(t)
@@ -185,13 +183,11 @@ class ParaxialTrace(Trace):
         yield "magnification: %.5g, %.5g" % self.magnification
 
     def print_trace(self):
-        yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s" % (
-                "#", "T", "marg h", "marg a", "marg i", "chief h",
-                "chief a", "chief i")
-        for i, ((hm, hc), (am, ac), (im, ic)) in enumerate(zip(
-                self.y[0], self.u[0], self.i[0])):
-            yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                    i, self.system.all[i].typestr, hm, am, im, hc, ac, ic)
+        yield "%2s %1s% 10s% 10s% 10s% 10s" % (
+                "#", "T", "marg h", "marg a", "chief h", "chief a")
+        for i, ((hm, hc), (am, ac)) in enumerate(zip(self.y[0], self.u[0])):
+            yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                    i, self.system.all[i].typestr, hm, am, hc, ac)
 
     def _get_lagrange(self):
         return self.n[0,0]*(
@@ -378,7 +374,7 @@ class FullTrace(Trace):
                 rb = np.bincount(
                         (r*(npoints_line/r.max())).astype(np.int),
                         minlength=npoints_line+1).cumsum()
-                axc.plot(np.linspace(r.min(), r.max(), npoints_line+1),
+                axc.plot(np.linspace(0, r.max(), npoints_line+1),
                         rb.astype(np.float)/self.y.shape[2])
             for ax in axs0, axm0, axc0:
                 ax.relim()
