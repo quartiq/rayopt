@@ -33,7 +33,7 @@ from traits.api import (HasTraits, Float, Array, Property,
 from .material import lambda_d
 from .system import System
 from .elements import Aperture
-
+from .special_sums import polar_sum
 
 def dir_to_angles(x,y,z):
     r = np.array([x,y,z], dtype=np.float64)
@@ -327,26 +327,32 @@ class FullTrace(Trace):
         nh = len(heights)
         ia = self.system.aperture_index+1
         n = npoints_line
-        gs = plt.GridSpec(nh, 4)
-        axm0, axs0 = None, None
+        gs = plt.GridSpec(nh, 5)
+        axm0, axs0, axc0 = None, None, None
         for i, hi in enumerate(heights):
             axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2),
-                    ) #sharex=axm0, sharey=axm0)
+                    sharex=axm0, sharey=axm0)
             if axm0 is None: axm0 = axm
             #axm.set_title("meridional h=%s, %s" % hi)
             #axm.set_xlabel("Y")
             #axm.set_ylabel("tanU")
             axs = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1),
-                    ) #sharex=axs0, sharey=axs0)
+                    sharex=axs0, sharey=axs0)
             if axs0 is None: axs0 = axs
             #axs.set_title("sagittal h=%s, %s" % hi)
             #axs.set_xlabel("X")
             #axs.set_ylabel("tanV")
             axp = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
-                aspect="equal") #, sharey=axm, sharex=axs)
+                    aspect="equal", sharex=axs0, sharey=axm0)
             #axp.set_title("rays h=%s, %s" % hi)
             #axp.set_ylabel("X")
             #axp.set_ylabel("Y")
+            axc = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
+                    sharex=axc0, sharey=axc0)
+            if axc0 is None: axc0 = axc
+            #axc.set_title("encircled h=%s, %s" % hi)
+            #axc.set_ylabel("R")
+            #axc.set_ylabel("E")
             for j, wi in enumerate(wavelengths):
                 self.rays_for_point(paraxial, hi, wi, npoints_line, "tee")
                 self.propagate()
@@ -359,12 +365,24 @@ class FullTrace(Trace):
                         -tanarcsin(self.u[1, -1, 2*n/3:]),
                         "-", label="%s" % wi)
                 self.rays_for_point(paraxial, hi, wi, npoints_spot,
-                        "square")
+                        "random")
                 self.propagate()
                 axp.plot(self.y[1, -1]-paraxial.y[0, -1, 1]*hi[1],
                         self.y[0, -1]-paraxial.y[0, -1, 1]*hi[0],
                         ".", markersize=3, markeredgewidth=0,
                         label="%s" % wi)
+                xy = self.y[(0, 1), -1]
+                xy = xy[:, np.all(np.isfinite(xy), 0)]
+                xym = xy.mean(axis=1)
+                r = ((xy-xym[:, None])**2).sum(axis=0)**.5
+                rb = np.bincount(
+                        (r*(npoints_line/r.max())).astype(np.int),
+                        minlength=npoints_line+1).cumsum()
+                axc.plot(np.linspace(r.min(), r.max(), npoints_line+1),
+                        rb.astype(np.float)/self.y.shape[2])
+            for ax in axs0, axm0, axc0:
+                ax.relim()
+                ax.autoscale_view(True, True, True)
         return fig
 
     def plot_longitudinal(self, wavelengths, fig=None, paraxial=None,
