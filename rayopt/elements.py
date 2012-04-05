@@ -49,7 +49,7 @@ class Element(HasTraits):
     def _get_inverse_transform(self):
         return np.linalg.inv(self.transform)
 
-    def intercept(self, y, u, mu):
+    def intercept(self, y, u):
         # ray length to intersection with element
         # only reference plane, overridden in subclasses
         # solution for z=0
@@ -66,34 +66,33 @@ class Element(HasTraits):
         y = np.dot(self.rotation[:3, :3], y0-self.origin[:, None])
         u = np.dot(self.rotation[:3, :3], u0)
         n = n0
-        if self.material is not None:
-            n = map(self.material.refractive_index, r.l)
-        mu = n0/n
         # length up to surface
-        p = self.intercept(y, u, mu)
+        p = self.intercept(y, u)
         # new transverse position
         y = y + p[None, :]*u
         if clip:
             self.clip(u, y)
         if self.material is not None:
-            u = self.refract(y, u, mu)
-        r.n[j] = np.fabs(n)
+            n = map(self.material.refractive_index, r.l)
+            u = self.refract(y, u, n0/n)
+        r.n[j] = n
         r.p[j-1] = p
         r.y[:, j] = np.dot(self.rotation[:3, :3].T, y)#+self.origin[:, None]
         r.u[:, j] = np.dot(self.rotation[:3, :3].T, u)
+
     def refract(self, y, u, mu):
         return u
   
     def propagate_paraxial(self, r, j):
-        y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
+        y0, u0 = r.y[0, j-1], r.u[0, j-1]
         t = self.origin[2]
         n = map(self.material.refractive_index, r.l)
         y = y0+t*u0 # propagate
         u = u0
+        r.n[j] = n
         r.y[0, j] = y
         r.y[2, j] = r.y[2, j-1]+t
         r.u[0, j] = u
-        r.n[j] = np.fabs(n)
         r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
  
     def aberration3(self, r, j):
@@ -140,16 +139,15 @@ class Interface(Element):
         # G. H. Spencer and M. V. R. K. Murty
         # JOSA, Vol. 52, Issue 6, pp. 672-676 (1962)
         # doi:10.1364/JOSA.52.000672
+        if np.all(mu == 1): return u
         r = self.shape_func_deriv(y)
         r2 = (r*r).sum(axis=0)
-        a = mu*(u*r).sum(axis=0)/r2
+        a = np.fabs(mu)*(u*r).sum(axis=0)/r2
         # solve g**2+2*a*g+b=0
-        #if mu**2 == 1: # FIXME one
-        #    g = -2*a
+        if np.all(mu == -1): return u-2*a*r
         b = (mu**2-1)/r2
-        # sign(mu) for reflection
-        g = -a+np.sqrt(a**2-b)
-        u1 = mu*u+g*r
+        g = -a+np.sign(mu)*np.sqrt(a**2-b)
+        u1 = np.fabs(mu)*u+g*r
         #print "refract", self, u, mu, u1
         return u1
 
@@ -188,12 +186,12 @@ class Spheroid(Interface):
         e = c/np.sqrt(1-k*c**2*r2)+o
         return np.array([-x*e, -y*e, np.ones_like(e)])
 
-    def intercept(self, y, u, mu):
+    def intercept(self, y, u):
         if len(self.aspherics) == 0:
             # replace the newton-raphson with the analytic solution
             c = self.curvature
             if c == 0:
-                return Element.intercept(self, y, u, mu)
+                return Element.intercept(self, y, u)
             else:
                 k = np.array([1., 1., self.conic])[:, None]
                 ky = k*y
@@ -220,7 +218,7 @@ class Spheroid(Interface):
         r.y[0, j] = y
         r.y[2, j] = r.y[2, j-1]+t
         r.u[0, j] = u
-        r.n[j] = np.fabs(n)
+        r.n[j] = n
         r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
     
     def aberration3(self, r, j):

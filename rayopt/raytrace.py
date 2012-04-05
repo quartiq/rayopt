@@ -126,8 +126,8 @@ class ParaxialTrace(Trace):
     # TODO introduce aperture as max(height/radius)
 
     def size_elements(self):
-        for i, e in enumerate(self.system.elements):
-            e.radius = np.fabs(self.y[0, i+1]).sum()
+        for i, e in enumerate(self.system.all):
+            e.radius = np.fabs(self.y[0, i]).sum() # marginal+chief
 
     def propagate(self):
         self.find_rays()
