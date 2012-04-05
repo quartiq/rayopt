@@ -52,6 +52,7 @@ class Material(HasTraits):
     name = Str
     comment = Str
     solid = Bool(True)
+    mirror = Bool(False)
     glasscode = Float
     nd = Float
     vd = Float
@@ -72,7 +73,10 @@ class Material(HasTraits):
         c0 = self.sellmeier[:, 0]
         c1 = self.sellmeier[:, 1]
         n2 = 1.+(c0*w2/(w2-c1)).sum(-1)
-        return np.sqrt(n2)
+        n = np.sqrt(n2)
+        if self.mirror:
+            n = -n
+        return n
 
     def _nd_default(self):
         return float(self.refractive_index(lambda_d))
