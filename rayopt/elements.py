@@ -265,6 +265,12 @@ class Object(Element):
     infinity = Bool(True)
     wavelengths = Array(dtype=np.float64, shape=(None,))
 
+    def propagate_paraxial(self, r, j):
+        pass
+    
+    def propagate(self, r, j, clip):
+        pass
+
 
 class Aperture(Element):
     typestr = "A"
@@ -275,6 +281,7 @@ class Aperture(Element):
         xyz = np.zeros((3, 5))
         xyz[axis] = t
         return xyz[axis]+self.origin[axis], xyz[2]+self.origin[2]
+
 
 class Image(Element):
     typestr = "I"

@@ -35,16 +35,15 @@ def system_from_array(data, material_map={}, **kwargs):
         except KeyError:
             mat = air
         if typ == "O":
-            s.object = Object(radius=rad, origin=(0, 0, off))
+            e = Object(radius=rad, origin=(0, 0, off))
         elif typ == "S":
             e = Spheroid(curvature=curv, origin=(0, 0, off),
                     radius=rad, material=mat)
-            s.elements.append(e)
         elif typ == "A":
-            a = Aperture(radius=rad, origin=(0, 0, off), material=mat)
-            s.elements.append(a)
+            e = Aperture(radius=rad, origin=(0, 0, off), material=mat)
         elif typ == "I":
-            s.image = Image(radius=rad, origin=(0, 0, off))
+            e = Image(radius=rad, origin=(0, 0, off))
+        s.elements.append(e)
     return s
 
 
@@ -66,8 +65,8 @@ def system_from_table(data, scale):
         else:
             curv = 1/roc
         rad = float(p[-1])/2
-        if "Silica" in p: # FIXME
-            mat = misc["SILICA"]
+        if p[-2].upper() in all_materials.db:
+            mat = all_materials[p[-2].upper()]
         else:
             mat = air
         e = Spheroid(
@@ -77,8 +76,6 @@ def system_from_table(data, scale):
             material=mat)
         s.elements.append(e)
         pos = float(p[2])
-        if s.object is None:
-            s.object = Object(radius=rad, origin=(0,0,0))
     return s
 
 
@@ -127,8 +124,9 @@ def system_from_oslo(fil):
         #assert len(s.elements) - 1 == int(args[0])
     return s
 
+
 def system_from_zemax(fil):
-    s = System(object=Object(), image=Image())
+    s = System()
     next_pos = 0.
     a = None
     for line in fil.readlines():
@@ -193,7 +191,12 @@ def system_from_zemax(fil):
             print cmd, "not handled", args
             continue
         #assert len(s.elements) - 1 == int(args[0])
-    # the first element is the object
-    s.object.radius = s.elements[0].radius
-    del s.elements[0]
+    # the first element is the object, the last is the image
+    s.object = Object()
+    s.object.radius = s.elements[1].radius
+    del s.elements[1]
+    s.image = Image()
+    s.image.radius = s.elements[-2].radius
+    s.image.origin = s.elements[-2].origin
+    del s.elements[-2]
     return s

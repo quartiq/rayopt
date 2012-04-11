@@ -26,27 +26,63 @@ class System(HasTraits):
     name = Str
     temperature = Float(21.)
     scale = Float(1e-3)
-    object = Instance(Object)
     elements = List(Element)
-    image = Instance(Image)
-    all = Property()
+    object = Property()
+    image = Property()
+    aperture = Property()
     aperture_index = Property()
 
     def reverse(self):
-        m = self.object.material
-        self.object.material = self.elements[-1].material
-        for e in self.elements:
-            if hasattr(e, "material"):
-                m, e.material = e.material, m
-        d = self.image.origin
-        self.image.origin = self.elements[0].origin
-        self.elements.reverse()
-        for e in self.elements:
+        # reverse surface order
+        self.elements[1:-1] = self.elements[-2:0:-1]
+        # swap i/o radii
+        self.object.radius, self.image.radius = (
+                self.image.radius, self.object.radius)
+        # image origin is old first surface origin
+        d, self.image.origin = (
+                self.image.origin, self.elements[-2].origin)
+        # object material is old last surface material
+        m, self.object.material = (
+                self.object.material, self.elements[1].material)
+        for e in self.elements[1:-1]:
             e.reverse()
+            # origin is old preceeding origin
             d, e.origin = e.origin, d
+            # material is old preceeding material
+            m, e.material = e.material, m
 
-    def _get_all(self):
-        return [self.object] + self.elements + [self.image]
+    def _get_aperture(self):
+        for e in self.elements:
+            if e.typestr == "A":
+                return e
+
+    def _get_aperture_index(self):
+        for i, e in enumerate(self.elements):
+            if e.typestr == "A":
+                return i
+        raise KeyError
+
+    def _get_object(self):
+        e = self.elements[0]
+        assert e.typestr == "O"
+        return e
+
+    def _set_object(self, e):
+        assert e.typestr == "O"
+        if self.elements and self.elements[0].typestr == "O":
+            del self.elements[0]
+        self.elements.insert(0, e)
+
+    def _get_image(self):
+        e = self.elements[-1]
+        assert e.typestr == "I"
+        return e
+
+    def _set_image(self, e):
+        assert e.typestr == "I"
+        if self.elements and self.elements[-1].typestr == "I":
+            del self.elements[-1]
+        self.elements.append(e)
 
     def __str__(self):
         return "\n".join(self.text())
@@ -55,37 +91,26 @@ class System(HasTraits):
         yield "System: %s" % self.name
         yield "Scale: %g m" % self.scale
         yield "Temperature: %g C" % self.temperature
-        yield "Wavelengths: %s nm" % ",".join("%.0f" % (w/1e-9)
+        yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.object.wavelengths)
         yield "Surfaces:"
         yield "%2s %1s %12s %12s %10s %15s %5s %5s" % (
-                "#", "T", "Distance to", "ROC", "Diameter", 
-                "Material after", "N", "V")
-        if self.object:
-            dia = (self.object.radius == np.inf and
-                self.object.field_angle*2 or self.object.radius*2)
-            yield "%-2s %1s %-12s %-12s %10.5g %15s %5.3f %5.2f" % (
-                "", self.object.typestr, "", "", dia,
-                self.object.material,
-                self.object.material.nd, self.object.material.vd)
+                "#", "T", "Distance", "ROC", "Diameter", 
+                "Material", "N", "V")
         for i,e in enumerate(self.elements):
             curv = getattr(e, "curvature", 0)
             roc = curv == 0 and np.inf or 1/curv
             mat = getattr(e, "material", None)
             n = getattr(mat, "nd", np.nan)
             v = getattr(mat, "vd", np.nan)
-            yield "%-2i %1s %12.7g %12.6g %10.5g %15s %5.3f %5.2f" % (
-                    i+1, e.typestr, e.origin[2], roc,
+            yield "%2i %1s %12.7g %12.6g %10.5g %15s %5.3f %5.2f" % (
+                    i, e.typestr, e.origin[2], roc,
                     e.radius*2, mat or "", n, v)
-        if self.image:
-            yield "%2s %1s %12.7g %-12s %10.5g %15s %-5s %-5s" % (
-                "", self.image.typestr, self.image.origin[2], "",
-                self.image.radius*2, "", "", "")
 
     def surfaces(self, axis, n=20):
         p = [0, 0, 0]
         l = None
-        for e in [self.object] + self.elements + [self.image]:
+        for e in self.elements:
             xi, zi = e.surface(axis, n)
             xi += p[axis]
             zi += p[2]
@@ -106,11 +131,6 @@ class System(HasTraits):
                 l = np.array([xi, zi])
             else:
                 l = None
-
-    def _get_aperture_index(self):
-        for i, e in enumerate(self.elements):
-            if e.typestr == "A":
-                return i
 
     def optimize(self, rays, parameters, demerits, constraints=(),
             method="ralg"):

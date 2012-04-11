@@ -32,7 +32,6 @@ from traits.api import (HasTraits, Float, Array, Property,
 
 from .material import lambda_d
 from .system import System
-from .elements import Aperture
 from .special_sums import polar_sum
 
 def dir_to_angles(x,y,z):
@@ -62,7 +61,7 @@ class Trace(HasTraits):
 
     def __init__(self, **kw):
         super(Trace, self).__init__(**kw)
-        self.length = len(self.system.all)
+        self.length = len(self.system.elements)
 
 
 class ParaxialTrace(Trace):
@@ -123,37 +122,37 @@ class ParaxialTrace(Trace):
         r, h, k = self.to_aperture()
         a[0, 0], b[0, 0] = (r*eps/h[0], -c*h[1]/h[0]), (0, c)
 
-    # TODO introduce aperture as max(height/radius)
+    # TODO introduce aperture at argmax(abs(y_marginal)/radius)
+    # or at argmin(abs(u_marginal))
 
     def size_elements(self):
-        for i, e in enumerate(self.system.all):
-            e.radius = np.fabs(self.y[0, i]).sum() # marginal+chief
+        for e, y in zip(self.system.elements[1:], self.y[0, 1:]):
+            e.radius = np.fabs(y).sum() # marginal+chief
 
     def propagate(self):
         self.find_rays()
         for i, e in enumerate(self.system.elements):
-            e.propagate_paraxial(self, i+1)
-            e.aberration3(self, i+1)
-        self.system.image.propagate_paraxial(self, i+2)
+            e.propagate_paraxial(self, i)
+            e.aberration3(self, i)
     
     def to_aperture(self):
         for i, e in enumerate(self.system.elements):
-            e.propagate_paraxial(self, i+1)
-            if isinstance(e, Aperture):
-                return e.radius, self.y[0, i+1], self.u[0, i+1]
+            e.propagate_paraxial(self, i)
+            if e.typestr == "A":
+                return e.radius, self.y[0, i], self.u[0, i]
 
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
         if i is None:
-            i = len(self.system.elements)-1
-        y0, y = self.y[0, (i, i+1), 0]
-        u0, u = self.u[0, i, 0], -self.y[0, 0, 0]/f
-        n0, n = self.n[(i, i+1), 0]
+            i = len(self.system.elements)-2
+        y0, y = self.y[0, (i-1, i), 0]
+        u0, u = self.u[0, i-1, 0], -self.y[0, 0, 0]/f
+        n0, n = self.n[(i-1, i), 0]
         c = (n0*u0-n*u)/(y*(n-n0))
         self.system.elements[i].curvature = c
 
     def focal_plane_solve(self):
-        self.system.image.origin[2] = -self.y[0, -2, 0]/self.u[0, -2, 0]
+        self.system.image.origin[2] -= self.y[0, -1, 0]/self.u[0, -1, 0]
 
     def print_c3(self):
         sys, p = self.system, self
@@ -163,11 +162,11 @@ class ParaxialTrace(Trace):
         yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "TSC", "CC", "TAC", "TPC", "DC", "TAchC", "TchC")
         for i, ab in enumerate(p.c3.swapaxes(0, 1)[1:-1]):
-            yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i].typestr,
                     ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
         ab = p.c3.sum(axis=1)
-        yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+        yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
               " ∑", "", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
 
     def print_params(self):
@@ -186,8 +185,8 @@ class ParaxialTrace(Trace):
         yield "%2s %1s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "marg h", "marg a", "chief h", "chief a")
         for i, ((hm, hc), (am, ac)) in enumerate(zip(self.y[0], self.u[0])):
-            yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                    i, self.system.all[i].typestr, hm, am, hc, ac)
+            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                    i, self.system.elements[i].typestr, hm, am, hc, ac)
 
     def _get_lagrange(self):
         return self.n[0,0]*(
@@ -229,8 +228,8 @@ class ParaxialTrace(Trace):
     def _get_magnification(self):
         return ((self.n[0,0]*self.u[0,0,0])/(
                 self.n[-2,0]*self.u[0,-2,0]),
-                (self.n[-2,0]*self.u[0,-2,1])/(
-                self.n[0,0]*self.u[0,0,1]))
+                (self.n[-2,1]*self.u[0,-2,1])/(
+                self.n[0,1]*self.u[0,0,1]))
 
 
 class FullTrace(Trace):
@@ -321,7 +320,7 @@ class FullTrace(Trace):
             paraxial = ParaxialTrace(system=self.system)
             paraxial.propagate()
         nh = len(heights)
-        ia = self.system.aperture_index+1
+        ia = self.system.aperture_index
         n = npoints_line
         gs = plt.GridSpec(nh, 6)
         axm0, axs0, axl0, axc0 = None, None, None, None
@@ -469,8 +468,7 @@ class FullTrace(Trace):
 
     def propagate(self, clip=True):
         for i, e in enumerate(self.system.elements):
-            e.propagate(self, i+1, clip)
-        self.system.image.propagate(self, i+2, clip)
+            e.propagate(self, i, clip)
 
     def __str__(self):
         t = itertools.chain(
@@ -488,8 +486,8 @@ class FullTrace(Trace):
             yield ""
             yield "ray %i" % i
             for j in range(self.length):
-                yield "%-2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                        j, self.system.all[j].typestr, 
+                yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                        j, self.system.elements[j].typestr, 
                         self.y[0, j, i], self.y[1, j, i], self.y[2, j, i],
                         self.u[0, j, i], self.u[1, j, i], self.u[2, j, i],
                         self.p[j, i])
