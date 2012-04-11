@@ -138,16 +138,17 @@ def system_from_zemax(fil):
             args = args[0]
         if not cmd:
             continue
-
         if cmd in ("VERS", "MODE", "NOTE"):
             pass
         elif cmd == "UNIT":
             if args.split()[0] == "MM":
                 s.scale = 1e-3
-        elif cmd == "NAME":
+            else:
+                raise ValueError, "unknown units %s" % args
+        elif cmd == "NAME" and args:
             s.name = args.strip("\"")
         elif cmd == "SURF":
-            e = Spheroid(origin=(0,0,next_pos))
+            e = Spheroid(origin=(0, 0, next_pos))
             s.elements.append(e)
         elif cmd in ("TYPE", "HIDE", "MIRR", "SLAB", "POPS"):
             pass
@@ -167,19 +168,12 @@ def system_from_zemax(fil):
             e.radius = float(args[0])/2
             if a is not None:
                 a.radius = e.radius
-            a = None
+                a = None
         elif cmd == "STOP":
-            a = Aperture(radius=e.radius, origin=(0,0,0))
+            a = Aperture(radius=e.radius, origin=(0, 0, 0))
             s.elements.append(a)
         elif cmd == "WAVN":
-            s.wavelengths = [float(i)*1e-6 for i in args.split() if
-                    float(i) > 0 and float(i) != .55]
-        elif cmd == "XFLN":
-            ohx = [float(i) for j,i in enumerate(args.split()) if
-                    float(i) > 0 or j == 0]
-        elif cmd == "YFLN":
-            ohy = [float(i) for j,i in enumerate(args.split()) if
-                    float(i) > 0 or j == 0]
+            s.wavelengths = [float(i)*1e-6 for i in args.split() if float(i) > 0]
         elif cmd == "ENPD":
             s.object.radius = float(args)/2
             s.object.origin = (0,0,0)
@@ -187,16 +181,19 @@ def system_from_zemax(fil):
                      "SDMA", "RAIM", "GFAC", "PUSH", "PICB", "ROPD",
                      "PWAV", "POLS", "GLRS", "BLNK", "COFN", "NSCD",
                      "GSTD", "CONF", "DMFS", "ISNA", "VDSZ", "PUPD", "ENVD",
-                     "ZVDX", "ZVDY", "ZVCX", "ZVCY", "ZVAN",
+                     "ZVDX", "ZVDY", "ZVCX", "ZVCY", "ZVAN", "XFLN", "YFLN",
                      "VDXN", "VDYN", "VCXN", "VCYN", "VANN",
                      "FWGT", "FWGN", "WWGT", "WWGN",
                      "WAVL", "WAVM", "XFLD", "YFLD",
                      "MNCA", "MNEA", "MNCG", "MNEG", "MXCA", "MXCG",
-                     "EFFL", "RGLA"):
+                     "EFFL", "RGLA", "TRAC", "FLAP", "TCMM", "FLOA",
+                     "PMAG", "TOTR"):
             pass
         else:
             print cmd, "not handled", args
             continue
         #assert len(s.elements) - 1 == int(args[0])
-    s.heights = [(x,y) for x in ohx for y in ohy]
+    # the first element is the object
+    s.object.radius = s.elements[0].radius
+    del s.elements[0]
     return s

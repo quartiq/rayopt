@@ -323,8 +323,8 @@ class FullTrace(Trace):
         nh = len(heights)
         ia = self.system.aperture_index+1
         n = npoints_line
-        gs = plt.GridSpec(nh, 5)
-        axm0, axs0, axc0 = None, None, None
+        gs = plt.GridSpec(nh, 6)
+        axm0, axs0, axl0, axc0 = None, None, None, None
         for i, hi in enumerate(heights):
             axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2),
                     sharex=axm0, sharey=axm0)
@@ -338,12 +338,18 @@ class FullTrace(Trace):
             #axs.set_title("sagittal h=%s, %s" % hi)
             #axs.set_xlabel("X")
             #axs.set_ylabel("tanV")
-            axp = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
+            axl = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
+                    sharex=axl0, sharey=axl0)
+            if axl0 is None: axl0 = axl
+            #axl.set_title("longitudinal h=%s, %s" % hi)
+            #axl.set_xlabel("Z")
+            #axl.set_ylabel("H")
+            axp = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
                     aspect="equal", sharex=axs0, sharey=axm0)
             #axp.set_title("rays h=%s, %s" % hi)
             #axp.set_ylabel("X")
             #axp.set_ylabel("Y")
-            axc = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
+            axc = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
                     sharex=axc0, sharey=axc0)
             if axc0 is None: axc0 = axc
             #axc.set_title("encircled h=%s, %s" % hi)
@@ -359,6 +365,10 @@ class FullTrace(Trace):
                         "-", label="%s" % wi)
                 axs.plot(self.y[1, -1, 2*n/3:],
                         -tanarcsin(self.u[1, -1, 2*n/3:]),
+                        "-", label="%s" % wi)
+                axl.plot(-(self.y[0, -1, :2*n/3]-self.y[0, -1, n/3])*
+                        self.u[2, -1, :2*n/3]/self.u[0, -1, :2*n/3],
+                        self.y[0, ia, :2*n/3],
                         "-", label="%s" % wi)
                 self.rays_for_point(paraxial, hi, wi, npoints_spot,
                         "random")
@@ -409,8 +419,12 @@ class FullTrace(Trace):
             self.propagate()
             axl.plot(self.y[0, -1, :npoints]-np.linspace(0, paraxial.image_height, npoints),
                 self.y[0, -1, :npoints], ci+"-", label="d")
+            # tangential field curvature
+            # -(real_y-parax_y)/(tanarcsin(real_u)-tanarcsin(parax_u))
             xt = -(self.y[0, -1, npoints:2*npoints]-self.y[0, -1, :npoints])/(
                   tanarcsin(self.u[0, -1, npoints:2*npoints])-tanarcsin(self.u[0, -1, :npoints]))
+            # sagittal field curvature
+            # -(real_x-parax_x)/(tanarcsin(real_v)-tanarcsin(parax_v))
             xs = -(self.y[1, -1, 2*npoints:]-self.y[1, -1, :npoints])/(
                   tanarcsin(self.u[1, -1, 2*npoints:])-tanarcsin(self.u[1, -1, :npoints]))
             axc.plot(xt, self.y[0, -1, :npoints], ci+"--", label="zt")
