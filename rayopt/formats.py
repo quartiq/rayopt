@@ -23,32 +23,26 @@ from .material import air, misc, all_materials
 def system_from_array(data, material_map={}, **kwargs):
     # data is a list of (typ, radius of curvature,
     # offset from previous, clear radius, material after)
+    element_map = {"O": Object, "S": Spheroid, "A": Aperture, "I": Image}
     s = System(**kwargs)
-    for typ, roc, off, rad, mat in data:
-        roc, off, rad = map(float, (roc, off, rad))
-        if roc == 0:
-            curv = 0
-        else:
-            curv = 1/roc
-        try:
-            mat = all_materials[material_map.get(mat, mat)]
-        except KeyError:
-            mat = air
-        if typ == "O":
-            e = Object(radius=rad, origin=(0, 0, off))
-        elif typ == "S":
-            e = Spheroid(curvature=curv, origin=(0, 0, off),
-                    radius=rad, material=mat)
-        elif typ == "A":
-            e = Aperture(radius=rad, origin=(0, 0, off), material=mat)
-        elif typ == "I":
-            e = Image(radius=rad, origin=(0, 0, off))
+    for line in data:
+        typ, mat = line[0], line[4]
+        roc, off, rad = map(float, line[1:4])
+        extra = line[5:]
+        e = element_map[typ](*extra)
+        e.radius = rad
+        e.origin = (0, 0, off)
+        e.curvature = roc and 1/roc or 0.
+        e.material = all_materials.db.get(material_map.get(mat, mat), air)
         s.elements.append(e)
     return s
 
+def system_from_text(data, **kwargs):
+    return system_from_array(line.split()
+            for line in data.splitlines() if line.strip(), **kwargs)
 
-def system_from_table(data, scale):
-    s = System(scale=scale)
+def system_from_table(data, **kwargs):
+    s = System(**kwargs)
     pos = 0.
     for line in data.splitlines():
         p = line.split()
@@ -126,30 +120,21 @@ def system_from_oslo(fil):
 
 
 def system_from_zemax(fil):
-    s = System()
+    s = System(elements=[Object(), Image()])
     next_pos = 0.
     a = None
     for line in fil.readlines():
+        if not line.strip(): continue
         line = line.strip().split(" ", 1)
-        cmd, args = line[0], line[1:]
-        if args:
-            args = args[0]
-        if not cmd:
-            continue
-        if cmd in ("VERS", "MODE", "NOTE"):
-            pass
-        elif cmd == "UNIT":
-            if args.split()[0] == "MM":
-                s.scale = 1e-3
-            else:
-                raise ValueError, "unknown units %s" % args
-        elif cmd == "NAME" and args:
+        cmd = line[0]
+        args = len(line) == 2 and line[1] or ""
+        if cmd == "UNIT":
+            s.scale = {"MM": 1e-3}[args.split()[0]]
+        elif cmd == "NAME":
             s.name = args.strip("\"")
         elif cmd == "SURF":
             e = Spheroid(origin=(0, 0, next_pos))
-            s.elements.append(e)
-        elif cmd in ("TYPE", "HIDE", "MIRR", "SLAB", "POPS"):
-            pass
+            s.elements.insert(-1, e)
         elif cmd == "CURV":
             e.curvature = float(args.split()[0])
         elif cmd == "DISZ":
@@ -157,46 +142,48 @@ def system_from_zemax(fil):
         elif cmd == "GLAS":
             args = args.split()
             name = args[0]
-            if name in all_materials.db:
-                e.material = all_materials[name]
-        elif cmd == "COMM":
-            pass
+            if name not in all_materials.db:
+                print "material not found: %s" % name
+            e.material = all_materials.db.get(name, air)
         elif cmd == "DIAM":
-            args = args.split()
-            e.radius = float(args[0])/2
-            if a is not None:
-                a.radius = e.radius
-                a = None
+            e.radius = float(args.split()[0])/2
         elif cmd == "STOP":
-            a = Aperture(radius=e.radius, origin=(0, 0, 0))
-            s.elements.append(a)
-        elif cmd == "WAVN":
-            s.wavelengths = [float(i)*1e-6 for i in args.split() if float(i) > 0]
-        elif cmd == "ENPD":
-            s.object.radius = float(args)/2
-            s.object.origin = (0,0,0)
-        elif cmd in ("GCAT", "OPDX", "TOL", "MNUM", "MOFF", "FTYP",
-                     "SDMA", "RAIM", "GFAC", "PUSH", "PICB", "ROPD",
-                     "PWAV", "POLS", "GLRS", "BLNK", "COFN", "NSCD",
-                     "GSTD", "CONF", "DMFS", "ISNA", "VDSZ", "PUPD", "ENVD",
-                     "ZVDX", "ZVDY", "ZVCX", "ZVCY", "ZVAN", "XFLN", "YFLN",
-                     "VDXN", "VDYN", "VCXN", "VCYN", "VANN",
-                     "FWGT", "FWGN", "WWGT", "WWGN",
-                     "WAVL", "WAVM", "XFLD", "YFLD",
-                     "MNCA", "MNEA", "MNCG", "MNEG", "MXCA", "MXCG",
-                     "EFFL", "RGLA", "TRAC", "FLAP", "TCMM", "FLOA",
-                     "PMAG", "TOTR"):
+            s.elements.insert(-1, Aperture())
+        elif cmd == "WAVL":
+            s.object.wavelengths = [float(i)*1e-6 for i in args.split() if i]
+        elif cmd in ("GCAT", # glass catalog names
+                     "OPDX", # opd
+                     "RAIM", # ray aiming
+                     "CONF", # configurations
+                     "ENPD", "PUPD", # pupil
+                     "EFFL", # focal lengths
+                     "VERS", # version
+                     "MODE", # mode
+                     "NOTE", # note
+                     "TYPE", # surface type
+                     "HIDE", # surface hide
+                     "MIRR", # surface is mirror
+                     "TOL", "MNUM", "MOFF", "FTYP", "SDMA", "GFAC",
+                     "PUSH", "PICB", "ROPD", "PWAV", "POLS", "GLRS",
+                     "BLNK", "COFN", "NSCD", "GSTD", "DMFS", "ISNA",
+                     "VDSZ", "ENVD", "ZVDX", "ZVDY", "ZVCX", "ZVCY",
+                     "ZVAN", "XFLN", "YFLN", "VDXN", "VDYN", "VCXN",
+                     "VCYN", "VANN", "FWGT", "FWGN", "WWGT", "WWGN",
+                     "WAVN", "WAVM", "XFLD", "YFLD", "MNCA", "MNEA",
+                     "MNCG", "MNEG", "MXCA", "MXCG", "RGLA", "TRAC",
+                     "FLAP", "TCMM", "FLOA", "PMAG", "TOTR", "SLAB",
+                     "POPS", "COMM",
+                     ):
             pass
         else:
             print cmd, "not handled", args
             continue
         #assert len(s.elements) - 1 == int(args[0])
-    # the first element is the object, the last is the image
-    s.object = Object()
+    # the first element is the object, the last is the image, convert them
     s.object.radius = s.elements[1].radius
     del s.elements[1]
-    s.image = Image()
     s.image.radius = s.elements[-2].radius
     s.image.origin = s.elements[-2].origin
     del s.elements[-2]
+    s.aperture.radius = s.elements[s.aperture_index-1].radius
     return s
