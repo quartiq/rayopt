@@ -85,7 +85,7 @@ class ParaxialTrace(Trace):
         self.c5 = np.zeros((7, self.length), dtype=np.float64)
 
     lagrange = Property
-    image_height = Property
+    height = Property
     focal_length = Property
     focal_distance = Property
     pupil_height = Property
@@ -156,9 +156,9 @@ class ParaxialTrace(Trace):
 
     def print_c3(self):
         sys, p = self.system, self
-        # p.c3 *= -2*p.image_height*p.u[0,-1,0] # seidel
-        # p.c3 *= -p.image_height/p.u[0,-1,0] # longit
-        p.c3 *= p.image_height # transverse
+        # p.c3 *= -2*p.height[1]*p.u[0,-1,0] # seidel
+        # p.c3 *= -p.height[1]/p.u[0,-1,0] # longit
+        p.c3 *= p.height[1] # transverse
         yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "TSC", "CC", "TAC", "TPC", "DC", "TAchC", "TchC")
         for i, ab in enumerate(p.c3.swapaxes(0, 1)[1:-1]):
@@ -172,14 +172,14 @@ class ParaxialTrace(Trace):
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
         yield "focal length: %.5g" % self.focal_length
-        yield "image height: %.5g" % self.image_height
-        yield "focal distance: %.5g, %.5g" % self.focal_distance
-        yield "pupil position: %.5g, %.5g" % self.pupil_position
-        yield "pupil height: %.5g, %.5g" % self.pupil_height
-        yield "numerical aperture: %.5g, %.5g" % self.numerical_aperture
-        yield "f number: %.5g, %.5g" % self.f_number
-        yield "airy radius: %.5g, %.5g" % self.airy_radius
-        yield "magnification: %.5g, %.5g" % self.magnification
+        yield "object, image height: %.5g, %.5g" % self.height
+        yield "front, back focal distance: %.5g, %.5g" % self.focal_distance
+        yield "entry, exit pupil position: %.5g, %.5g" % self.pupil_position
+        yield "entry, exit pupil height: %.5g, %.5g" % self.pupil_height
+        yield "front, back numerical aperture: %.5g, %.5g" % self.numerical_aperture
+        yield "front, back working f number: %.5g, %.5g" % self.f_number
+        yield "front, back airy radius: %.5g, %.5g" % self.airy_radius
+        yield "transverse, angular magnification: %.5g, %.5g" % self.magnification
 
     def print_trace(self):
         yield "%2s %1s% 10s% 10s% 10s% 10s" % (
@@ -198,8 +198,8 @@ class ParaxialTrace(Trace):
                 self.u[0,0,0]*self.u[0,-2,1]-
                 self.u[0,0,1]*self.u[0,-2,0])
 
-    def _get_image_height(self):
-        return self.lagrange/(self.n[-2,0]*self.u[0,-2,0])
+    def _get_height(self):
+        return self.y[0, 0, 1], self.lagrange/(self.n[-2,0]*self.u[0,-2,0])
  
     def _get_focal_distance(self):
         return (-self.y[0,1,0]/self.u[0,0,0],
@@ -365,7 +365,7 @@ class FullTrace(Trace):
                 axs.plot(self.y[1, -1, 2*n/3:],
                         -tanarcsin(self.u[1, -1, 2*n/3:]),
                         "-", label="%s" % wi)
-                axl.plot(-(self.y[0, -1, :2*n/3]-self.y[0, -1, n/3])*
+                axl.plot(-(self.y[0, -1, :2*n/3]-paraxial.y[0, -1, 1]*hi[0])*
                         self.u[2, -1, :2*n/3]/self.u[0, -1, :2*n/3],
                         self.y[0, ia, :2*n/3],
                         "-", label="%s" % wi)
@@ -416,7 +416,7 @@ class FullTrace(Trace):
         for i, (wi, ci) in enumerate(zip(wavelengths, "bgrcmyk")):
             self.rays_for_object(paraxial, wi, npoints)
             self.propagate()
-            axl.plot(self.y[0, -1, :npoints]-np.linspace(0, paraxial.image_height, npoints),
+            axl.plot(self.y[0, -1, :npoints]-np.linspace(0, paraxial.height[1], npoints),
                 self.y[0, -1, :npoints], ci+"-", label="d")
             # tangential field curvature
             # -(real_y-parax_y)/(tanarcsin(real_u)-tanarcsin(parax_u))
