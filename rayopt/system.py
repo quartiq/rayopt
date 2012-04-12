@@ -132,6 +132,12 @@ class System(HasTraits):
             else:
                 l = None
 
+    def paraxial_matrices(self, l):
+        n0 = self.object.material.refractive_index(l)
+        for e in self.elements:
+            n0, m = e.paraxial_matrix(l, n0)
+            yield m
+
     def optimize(self, rays, parameters, demerits, constraints=(),
             method="ralg"):
 

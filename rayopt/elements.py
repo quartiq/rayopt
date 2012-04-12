@@ -94,7 +94,13 @@ class Element(HasTraits):
         r.y[2, j] = r.y[2, j-1]+t
         r.u[0, j] = u
         r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
- 
+
+    def paraxial_matrix(self, l, n0):
+        # [y', u'] = M * [y, u]
+        n = self.material.refractive_index(l)
+        d = self.origin[2]
+        return n, np.matrix([[1, d], [0, 1]])
+
     def aberration3(self, r, j):
         r.c3[:, j] = 0
 
@@ -220,7 +226,14 @@ class Spheroid(Interface):
         r.u[0, j] = u
         r.n[j] = n
         r.v[j] = [self.material.delta_n(l1, l2) for l1, l2 in zip(r.l1, r.l2)]
-    
+
+    def paraxial_matrix(self, l, n0):
+        # [y', u'] = M * [y, u]
+        n = self.material.refractive_index(l)
+        d = self.origin[2]
+        p = (n-n0)*self.curvature/n
+        return n, np.matrix([[1, d], [-p, n0/n-d*p]])
+   
     def aberration3(self, r, j):
         # need to multiply by h=image height = inv/(n[-2] u[-2])
         y0, u0, n0, v0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1], r.v[j-1]
