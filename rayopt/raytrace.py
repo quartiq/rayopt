@@ -163,7 +163,7 @@ class ParaxialTrace(Trace):
                 "#", "T", "TSC", "CC", "TAC", "TPC", "DC", "TAchC", "TchC")
         for i, ab in enumerate(p.c3.swapaxes(0, 1)[1:-1]):
             yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                    i+1, sys.elements[i].typestr,
+                    i+1, sys.elements[i+1].typestr,
                     ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
         ab = p.c3.sum(axis=1)
         yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
