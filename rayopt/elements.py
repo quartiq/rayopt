@@ -278,12 +278,12 @@ class Spheroid(Interface):
         c = self.curvature
 
         # 3rd order helpers
-        mu = n/n0
+        mu = n0/n
         i, ib = c*y-u0, c*yb-ub0 # incidence
         e, eb = mu*i, mu*ib # excidence
         l = n*(y*ub-yb*u) # lagrange
         s, sb = n0*y*(u-i)*(1-mu)/(2*l), n0*yb*(ub-ib)*(1-mu)/(2*l)
-        
+
         # 3rd order coefficients
         p3 = (mu-1)*c/n0 # 3 petzval
         b3, b3b = s*i**2, -sb*ib**2 # 3 spherical

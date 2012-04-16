@@ -172,9 +172,21 @@ class ParaxialTrace(Trace):
             yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i+1].typestr,
                     ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
+            ab3 = p.aberration3[:, i+1]
+            ab5 = p.aberration5[:, i+1]
+            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                    i+1, sys.elements[i+1].typestr,
+                    ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[6],
+                    ab3[12])
+
         ab = p.c3.sum(axis=1)
+        ab3 = p.aberration3.sum(axis=1)
+        ab5 = p.aberration3.sum(axis=1)
         yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
               " ∑", "", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
+        yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+              " ∑", "", ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[5],
+              ab3[12])
 
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
