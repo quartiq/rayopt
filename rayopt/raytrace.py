@@ -75,6 +75,9 @@ class ParaxialTrace(Trace):
     l2 = Array(dtype=np.float64, shape=(None)) # max l
     c3 = Array(dtype=np.float64, shape=(7, None)) # third order aberrations
     c5 = Array(dtype=np.float64, shape=(7, None)) # fifth order aberrations
+    aberration3 = Array(dtype=np.float64, shape=(13, None)) # 3rd order
+    aberration5_intrinsic = Array(dtype=np.float64, shape=(13, None)) # 3rd order
+    aberration5 = Array(dtype=np.float64, shape=(13, None)) # 3rd order
 
     def allocate(self):
         super(ParaxialTrace, self).allocate()
@@ -83,6 +86,9 @@ class ParaxialTrace(Trace):
         self.l2 = np.zeros((self.nrays,), dtype=np.float64)
         self.c3 = np.zeros((7, self.length), dtype=np.float64)
         self.c5 = np.zeros((7, self.length), dtype=np.float64)
+        self.aberration3 = np.zeros((13, self.length), dtype=np.float64)
+        self.aberration5_intrinsic = np.zeros((13, self.length), dtype=np.float64)
+        self.aberration5 = np.zeros((13, self.length), dtype=np.float64)
 
     lagrange = Property
     height = Property
@@ -133,7 +139,8 @@ class ParaxialTrace(Trace):
         self.find_rays()
         for i, e in enumerate(self.system.elements):
             e.propagate_paraxial(self, i)
-            e.aberration3(self, i)
+            e.set_aberration3(self, i)
+            e.aberration(self, i)
     
     def to_aperture(self):
         for i, e in enumerate(self.system.elements):

@@ -101,11 +101,13 @@ class Element(HasTraits):
         d = self.origin[2]
         return n, np.matrix([[1, d], [0, 1]])
 
-    def aberration3(self, r, j):
+    def set_aberration3(self, r, j):
         r.c3[:, j] = 0
-
-    def aberration5(self, r, j):
-        r.c3[:, j] = 0
+    
+    def aberration(self, r, j):
+        r.aberration3[:, j] = 0
+        r.aberration5_intrinsic[:, j] = 0
+        r.aberration5[:, j] = 0
 
     def reverse(self):
         pass
@@ -214,8 +216,8 @@ class Spheroid(Interface):
     def propagate_paraxial(self, r, j):
         y0, u0, n0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1]
         c = self.curvature
-        #if len(self.aspherics) > 0:
-        #    c += 2*self.aspherics[0]
+        if len(self.aspherics) > 0:
+            c += 2*self.aspherics[0]
         t = self.origin[2]
         n = map(self.material.refractive_index, r.l)
         mu = n0/n
@@ -234,7 +236,7 @@ class Spheroid(Interface):
         p = (n-n0)*self.curvature/n
         return n, np.matrix([[1, d], [-p, n0/n-d*p]])
    
-    def aberration3(self, r, j):
+    def set_aberration3(self, r, j):
         # need to multiply by h=image height = inv/(n[-2] u[-2])
         y0, u0, n0, v0 = r.y[0, j-1], r.u[0, j-1], r.n[j-1], r.v[j-1]
         y, u, n, v = r.y[0, j], r.u[0, j], r.n[j], r.v[j]
@@ -267,6 +269,124 @@ class Spheroid(Interface):
             tac += k*y[0]**2*y[1]**2
             dc += k*y[0]*y[1]**3
         r.c3[:, j] = [tsc, cc, tac, tpc, dc, tachc, tchc]
+
+    def aberration(self, r, j):
+        y, yb = r.y[0, j]
+        (u0, ub0), (u, ub) = -r.u[0, j-1:j+1]
+        n0, n = r.n[j-1:j+1, 0]
+        v0, v = r.v[j-1:j+1, 0]
+        c = self.curvature
+
+        # 3rd order helpers
+        mu = n/n0
+        i, ib = c*y-u0, c*yb-ub0 # incidence
+        e, eb = mu*i, mu*ib # excidence
+        l = n*(y*ub-yb*u) # lagrange
+        s, sb = n0*y*(u-i)*(1-mu)/(2*l), n0*yb*(ub-ib)*(1-mu)/(2*l)
+        
+        # 3rd order coefficients
+        p3 = (mu-1)*c/n0 # 3 petzval
+        b3, b3b = s*i**2, -sb*ib**2 # 3 spherical
+        f3, f3b = s*i*ib, -sb*i*ib # 3 coma
+        c3, c3b = s*ib**2, -sb*i**2 # 3 astigmatism
+        d3, d3b = c3+p3*l/2., c3b-p3*l/2. # 3 curvature
+        e3, e3b = -f3b+(ub**2-ub0**2)/2, -f3+(u**2-u0**2)/2. # 3 distortion
+        g3, g3b = y*(v0-mu*v)*i, y*(v0-mu*v)*ib # long, lat color
+
+        check = 2*(c3+c3b)+(u0*ub0-u*ub)
+        #assert check == 0, check
+        check = ib*d3-i*e3
+        #assert check == 0, check
+        check = i*d3b-i*e3b
+        #assert check == 0, check
+
+        if len(self.aspherics) > 0:
+            w = ((self.conic-1)/8.+self.aspherics[1])
+            k = 4*(n0-n)*k/l
+            b3 += k*y**4
+            b3b += -k*yb**4
+            f3 += k*y**3*yb
+            f3b += -k*yb**3*y
+            c3 += k*y**2*yb**2
+            c3b += -k*yb**2*y**2
+            d3 += k*y**2*yb**2
+            d3b += -k*yb**2*y**2
+            e3 += k*y*yb**3
+            e3b += -k*yb*y**3
+        
+        r.aberration3[:, j] = (p3, b3, f3, c3, d3, e3, g3, 
+                b3b, f3b, c3b, d3b, e3b, g3b)
+        (p3s, b3s, f3s, c3s, d3s, e3s, g3s,
+                b3bs, f3bs, c3bs, d3bs, e3bs, g3bs
+                ) = r.aberration3[:, :j].sum(axis=1)
+
+        # 5th order helpers
+        x73 = 3*i*e+2*u**2-3*u0**2
+        x74 = 3*i*eb+2*u*ub-3*u0*ub0
+        x75 = 3*ib*eb+2*ub**2-3*ub0**2
+        x76 = -i*(3*u0-u)
+        x77 = -ib*(2*u0-u)-i*ub0
+        x78 = -ib*(3*ub0-ub)
+        x42 = yb**2*c*i-y*ib*(ub+ub0) # yb*i*(ib-u0b)+...
+        x82 = -yb**2*c*u0+y*eb*(ub+ub0) # yb*u0*(ib-u0b)-...
+        xb42 = y**2*c*ib+yb*i*(u+u0) # y*ib*(i-u0)+...
+        xb82 = -y**2*c*ub0+yb*e*(u+u0) # y*u0b*(i-u0)+...
+        w = (i**2+e**2+u**2-3*u0**2)/8.
+
+        s1p = 3*w*s*i/2.
+        s2p = s*(ib*x73+i*x74-ub*x76-u*x77)/4.
+        s3p = n0*(mu-1)*(x42*x73+x76*x82+y*(i+u)*(i*x75-u*x78))/4.
+        s4p = s*(ib*x74-ub*x77)/2.
+        s5p = n0*(mu-1)*(x42*x74+x77*x82+y*(i+u)*(ib*x75-ub*x78))/4.
+        s6p = n0*(mu-1)*(x42*x75+x78*x82)/8.
+        s1q = n0*(mu-1)*(xb42*x73+x76*xb82)/8.
+
+        # intrinsic 5th order
+        b5 = 2*i*s2p # spherical coma
+        # coma
+        f5a, f5b = 2*ib*s1p+i*s2p, i*s2p
+        # oblique spherical
+        m5a, m5b, m5c = 2*ib*s2p, 2*i*s3p, 2*i*s4p
+        # elliptical coma
+        n5a, n5b, n5c = 2*ib*s3p, 2*ib*s4p+2*i*s5p, 2*i*s5p
+        c5 = ib*s5p/2. # astigmatism
+        p5 = 2*i*s6p-ib*s5p/2. # petzval
+        e5 = 2*ib*s6p # image distortion
+        e5b = 2*i*s1q # pupil distortion
+
+        r.aberration5_intrinsic[:, j] = (b5, f5a, f5b, m5a, m5b, m5c,
+                n5a, n5b, n5c, c5, p5, e5, e5b)
+
+        # extrinsic 5th order
+        b5e = 3*(f3*b3s-b3*f3s)/(2*l) # spherical
+        # coma
+        f5ae = ((p3+4*c)*b3s+(5*f3s-4*e3s)*f3-(2*p3s+5*c3bs)*b3)/(2*l)
+        f5be = ((p3+2*c)*b3s+2*(2*f3s-e3bs)*f3-(p3s+4*c3bs)*b3)/(2*l)
+        # oblique spherical
+        m5ae = (e3*b3s+(4*f3s-e3bs)*c3+(c3s-4*c3bs-2*p3s)*f3-b3*f3bs)/l
+        m5be = (e3*b3s+(p3+c3)*(2*f3s-e3bs)+(p3s+3*c3s-2*c3bs)*f3
+                -3*b3*f3bs)/(2*l)
+        m5ce = 2*((2*c3+p3)*f3s+(c3s-2*c3bs)*f3b-b3*f3bs)/l
+        # elliptical coma
+        n5ae = (3*e3*f3s-(p3+c3)*(p3s+c3bs)+2*c3*(p3s-c3bs)
+                +f3*(e3s-2*f3bs)-b3*b3s)/(2*l)
+        n5be = (3*e3*f3s+(p3+3*c3)*(3*c3s-c3bs+p3s)-c3*(p3s+c3s)
+                +f3*(e3s-8*f3bs)-b3*b3bs)/l
+        n5ce = (e3*f3s+(p3+c3)*(3*c3s-c3bs+p3s)+c3*(c3s+p3s)
+                +f3*(e3s-4*f3bs)-b3*b3bs)/(2*l)
+        # astigmatism
+        c5e = (e3*(4*c3s+p3s)-p3*f3bs+2*c3*(e3s-2*f3bs)-2*f3*b3bs)/(4*l)
+        # petzval
+        p5e = (e3*(p3s-2*c3s)+p3*(4*e3s-f3bs)+2*c3*(e3s+f3bs)
+                -2*f3*b3bs)/(4*l)
+        # image distortion
+        e5e = (5*e3*e3s-(p3+3*c3)*b3bs)/(2*l)
+        # pupil distortion
+        e5be = (-3*e3*e3bs+(p3+3*c3b)*b3s)/(2*l)
+        
+        r.aberration5[:, j] = r.aberration5_intrinsic[:, j] + (
+                b5e, f5ae, f5be, m5ae, m5be, m5ce, n5ae,
+                n5be, n5ce, c5e, p5e, e5e, e5be)
 
     def reverse(self):
         self.curvature *= -1
