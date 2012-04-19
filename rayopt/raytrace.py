@@ -163,25 +163,32 @@ class ParaxialTrace(Trace):
 
     def print_c3(self):
         sys, p = self.system, self
-        # p.c3 *= -2*p.height[1]*p.u[0,-1,0] # seidel
+        c3 = p.c3*-2*p.height[1]*p.u[0,-1,0] # seidel
+        c3a = p.aberration3*-2*p.height[1]*p.u[0,-1,0] # seidel
         # p.c3 *= -p.height[1]/p.u[0,-1,0] # longit
-        p.c3 *= p.height[1] # transverse
+        #c3 = p.c3*p.height[1] # transverse
+        #c3a = p.aberration3*p.height[1] # transverse
+        c5a = p.aberration5*p.height[1] # transverse
         yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "TSC", "CC", "TAC", "TPC", "DC", "TAchC", "TchC")
-        for i, ab in enumerate(p.c3.swapaxes(0, 1)[1:-1]):
+        for i, ab in enumerate(c3.swapaxes(0, 1)[1:-1]):
             yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i+1].typestr,
                     ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
-            ab3 = p.aberration3[:, i+1]
-            ab5 = p.aberration5[:, i+1]
+            ab3 = c3a[:, i+1]
+            ab5 = c5a[:, i+1]
             yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i+1].typestr,
-                    ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[6],
-                    ab3[12])
+                    ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[6], ab3[12])
+            continue
+            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                    i+1, sys.elements[i+1].typestr,
+                    ab5[0], ab5[1], ab5[2], ab5[3], ab5[4], ab5[5],
+                    ab5[6])
 
-        ab = p.c3.sum(axis=1)
-        ab3 = p.aberration3.sum(axis=1)
-        ab5 = p.aberration3.sum(axis=1)
+        ab = c3.sum(axis=1)
+        ab3 = c3a.sum(axis=1)
+        ab5 = c5a.sum(axis=1)
         yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
               " ∑", "", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
         yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (

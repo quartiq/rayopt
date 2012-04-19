@@ -281,7 +281,7 @@ class Spheroid(Interface):
         mu = n0/n
         i, ib = c*y-u0, c*yb-ub0 # incidence
         e, eb = mu*i, mu*ib # excidence
-        l = n*(y*ub-yb*u) # lagrange
+        l = n*(yb*u-y*ub) # lagrange
         s, sb = n0*y*(u-i)*(1-mu)/(2*l), n0*yb*(ub-ib)*(1-mu)/(2*l)
 
         # 3rd order coefficients
@@ -314,7 +314,7 @@ class Spheroid(Interface):
             e3 += k*y*yb**3
             e3b += -k*yb*y**3
         
-        r.aberration3[:, j] = (p3, b3, f3, c3, d3, e3, g3, 
+        r.aberration3[:, j] = (p3, b3, f3, c3, p3*l/2, e3, g3, 
                 b3b, f3b, c3b, d3b, e3b, g3b)
         (p3s, b3s, f3s, c3s, d3s, e3s, g3s,
                 b3bs, f3bs, c3bs, d3bs, e3bs, g3bs
