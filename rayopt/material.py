@@ -140,15 +140,7 @@ def air_refractive_index(wavelength):
     return n
 
 air.refractive_index = air_refractive_index
-
-def air_mirror_refractive_index(wavelength):
-    w2 = (wavelength/1e-6)**2
-    c0 = air.sellmeier[:, 0]
-    c1 = air.sellmeier[:, 1]
-    n  = -1.-(c0/(c1-w2)).sum(-1)
-    return n
-
-air_mirror.refractive_index = air_mirror_refractive_index
+air_mirror.refractive_index = lambda l: -air_refractive_index(l)
 
 
 
