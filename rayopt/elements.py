@@ -300,6 +300,8 @@ class Spheroid(Interface):
         #assert check == 0, check
 
         if len(self.aspherics) > 0:
+            k = (4*self.aspherics[0]+(self.conic-1)*c**3/2)*(n-n0)/l
+
             w = ((self.conic-1)/8.+self.aspherics[1])
             k = 4*(n0-n)*k/l
             b3 += k*y**4
