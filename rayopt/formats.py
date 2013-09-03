@@ -18,7 +18,7 @@
 
 from .system import System
 from .elements import Spheroid, Aperture, Image, Object
-from .material import air, misc, all_materials
+from .material import air, misc, all_materials, FictionalMaterial
 
 def system_from_array(data, material_map={}, **kwargs):
     # data is a list of (typ, radius of curvature,
@@ -33,7 +33,15 @@ def system_from_array(data, material_map={}, **kwargs):
         e.radius = rad
         e.origin = (0, 0, off)
         e.curvature = roc and 1/roc or 0.
-        e.material = all_materials.db.get(material_map.get(mat, mat), air)
+        mat = material_map.get(mat, mat)
+        if mat in all_materials.db:
+            m = all_materials.db[mat]
+        else:
+            try:
+                m = FictionalMaterial(nd=float(mat))
+            except ValueError:
+                m = air
+        e.material = m
         s.elements.append(e)
     return s
 
