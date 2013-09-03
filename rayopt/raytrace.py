@@ -168,7 +168,7 @@ class ParaxialTrace(Trace):
         c3a = p.aberration3*-2*p.height[1]*p.u[0,-1,0]
         yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "SPH3", "COMA3", "AST3", "PETZ3", "DIST3", "LCOLOR", "TCOLOR")
-        for i in range(c3a.shape[1] - 1):
+        for i in range(c3a.shape[1] - 2):
             ab3 = c3a[:, i+1]
             yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i+1].typestr,
@@ -187,7 +187,7 @@ class ParaxialTrace(Trace):
         yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "SPH5", "COMA5", "LCOMA5", "AST5", "PETZ5",
                 "SOBSA", "TOBSA", "DIST5", "SA7")
-        for i in range(c5a.shape[1] - 1):
+        for i in range(c5a.shape[1] - 2):
             ab5 = c5a[:, i+1]
             yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i+1].typestr,
