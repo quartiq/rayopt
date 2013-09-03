@@ -114,7 +114,8 @@ class ParaxialTrace(Trace):
         t = itertools.chain(
                 self.print_params(), ("",),
                 self.print_trace(), ("",),
-                self.print_c3(),
+                self.print_c3(), ("",),
+                self.print_c5(),
                 )
         return "\n".join(t)
 
@@ -163,37 +164,42 @@ class ParaxialTrace(Trace):
 
     def print_c3(self):
         sys, p = self.system, self
-        c3 = p.c3*-2*p.height[1]*p.u[0,-1,0] # seidel
-        c3a = p.aberration3*-2*p.height[1]*p.u[0,-1,0] # seidel
-        # p.c3 *= -p.height[1]/p.u[0,-1,0] # longit
-        #c3 = p.c3*p.height[1] # transverse
-        #c3a = p.aberration3*p.height[1] # transverse
-        c5a = p.aberration5*p.height[1] # transverse
+        # to get transverse, undo this multiplication
+        c3a = p.aberration3*-2*p.height[1]*p.u[0,-1,0]
         yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
-                "#", "T", "TSC", "CC", "TAC", "TPC", "DC", "TAchC", "TchC")
-        for i, ab in enumerate(c3.swapaxes(0, 1)[1:-1]):
-            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                    i+1, sys.elements[i+1].typestr,
-                    ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
+                "#", "T", "SPH3", "COMA3", "AST3", "PETZ3", "DIST3", "LCOLOR", "TCOLOR")
+        for i in range(c3a.shape[1] - 1):
             ab3 = c3a[:, i+1]
-            ab5 = c5a[:, i+1]
             yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i+1, sys.elements[i+1].typestr,
                     ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[6], ab3[12])
             continue
-            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                    i+1, sys.elements[i+1].typestr,
-                    ab5[0], ab5[1], ab5[2], ab5[3], ab5[4], ab5[5],
-                    ab5[6])
 
-        ab = c3.sum(axis=1)
         ab3 = c3a.sum(axis=1)
-        ab5 = c5a.sum(axis=1)
         yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-              " ∑", "", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], ab[6])
-        yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-              " ∑", "", ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[5],
+              " ∑", "", ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[6],
               ab3[12])
+
+    def print_c5(self):
+        sys, p = self.system, self
+        #c5a = p.aberration5*p.height[1] # transverse?
+        c5a = p.aberration5*-2*p.height[1]*p.u[0,-1,0]
+        yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
+                "#", "T", "SPH5", "COMA5", "LCOMA5", "AST5", "PETZ5",
+                "SOBSA", "TOBSA", "DIST5", "SA7")
+        for i in range(c5a.shape[1] - 1):
+            ab5 = c5a[:, i+1]
+            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+                    i+1, sys.elements[i+1].typestr,
+                    ab5[0], ab5[1], ab5[2], ab5[9], ab5[10], ab5[3],
+                    ab5[4], ab5[11], ab5[5])
+
+        ab5 = c5a.sum(axis=1)
+        yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
+              " ∑", "",
+                    ab5[0], ab5[1], ab5[2], ab5[9], ab5[10], ab5[3],
+                    ab5[4], ab5[11], ab5[5])
+
 
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
@@ -208,6 +214,7 @@ class ParaxialTrace(Trace):
         yield "transverse, angular magnification: %.5g, %.5g" % self.magnification
 
     def print_trace(self):
+        # TODO: would like surface incidence angles
         yield "%2s %1s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "marg h", "marg a", "chief h", "chief a")
         for i, ((hm, hc), (am, ac)) in enumerate(zip(self.y[0], self.u[0])):

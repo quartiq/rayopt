@@ -269,6 +269,7 @@ class Spheroid(Interface):
         r.c3[:, j] = [tsc, cc, tac, tpc, dc, tachc, tchc]
 
     def aberration(self, r, j):
+        # kdp5/parax2.for, Smith/ModernOpticalEngineering
         y, yb = r.y[0, j]
         (u0, ub0), (u, ub) = -r.u[0, j-1:j+1]
         n0, n = r.n[j-1:j+1, 0]
@@ -312,11 +313,14 @@ class Spheroid(Interface):
             e3 += k*y*yb**3
             e3b += -k*yb*y**3
         
-        r.aberration3[:, j] = (p3, b3, f3, c3, p3*l/2, e3, g3, 
-                b3b, f3b, c3b, d3b, e3b, g3b)
+        r.aberration3[:, j] = (p3, b3, f3, c3, p3*l/2, e3, -g3/l/2, 
+                b3b, f3b, c3b, d3b, e3b, -g3b/l/2)
         (p3s, b3s, f3s, c3s, d3s, e3s, g3s,
                 b3bs, f3bs, c3bs, d3bs, e3bs, g3bs
                 ) = r.aberration3[:, :j].sum(axis=1)
+
+        #g3 *= -l*2 # not used
+        #g3b *= -l*2 # not used
 
         # 5th order helpers
         x73 = 3*i*e+2*u**2-3*u0**2
