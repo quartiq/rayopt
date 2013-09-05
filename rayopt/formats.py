@@ -150,9 +150,16 @@ def system_from_zemax(fil):
         elif cmd == "GLAS":
             args = args.split()
             name = args[0]
-            if name not in all_materials.db:
+            if name in all_materials.db:
+                e.material = all_materials.db[name]
+            else:
                 print "material not found: %s" % name
-            e.material = all_materials.db.get(name, air)
+                try:
+                    nd = float(args[3])
+                    vd = float(args[4])
+                    e.material = FictionalMaterial(nd=nd, vd=vd)
+                except:
+                    e.material = air
         elif cmd == "DIAM":
             e.radius = float(args.split()[0])/2
         elif cmd == "STOP":
