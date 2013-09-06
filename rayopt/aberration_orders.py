@@ -201,7 +201,7 @@ def aberration(y, n, p, e, st, kmax=4):
         v, vv = 1/n[i-1], 1/n[i]
         u, w = p[i-1]
         f, g = (e[i]*h + u)/v, (e[i]*m + w)/v
-        aberration_intrinsic(e[i], f, g, h, m, v, vv, c[i], kmax)
+        aberration_intrinsic(e[i], f, g, h, m, v, vv, c[i], kmax-1)
     for ki in range(kmax):
         k = ki - 1
         for j in range(k + 1):

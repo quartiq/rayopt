@@ -33,6 +33,8 @@ from traits.api import (HasTraits, Float, Array, Property,
 from .material import lambda_d
 from .system import System
 from .special_sums import polar_sum
+from .aberration_orders import aberration_trace
+
 
 def dir_to_angles(x,y,z):
     r = np.array([x,y,z], dtype=np.float64)
@@ -73,22 +75,16 @@ class ParaxialTrace(Trace):
     v = Array(dtype=np.float64, shape=(None, None)) # dispersion
     l1 = Array(dtype=np.float64, shape=(None)) # min l
     l2 = Array(dtype=np.float64, shape=(None)) # max l
-    c3 = Array(dtype=np.float64, shape=(7, None)) # third order aberrations
-    c5 = Array(dtype=np.float64, shape=(7, None)) # fifth order aberrations
-    aberration3 = Array(dtype=np.float64, shape=(13, None)) # 3rd order
-    aberration5_intrinsic = Array(dtype=np.float64, shape=(13, None)) # 3rd order
-    aberration5 = Array(dtype=np.float64, shape=(13, None)) # 3rd order
+    aberration_c = Array(dtype=np.float64, shape=(None, 2, 2, 3, 3, 3))
+    aberration_d = Array(dtype=np.float64, shape=(None, 2, 2, 3, 3, 3))
 
     def allocate(self):
         super(ParaxialTrace, self).allocate()
         self.v = np.zeros((self.length, self.nrays), dtype=np.float64)
         self.l1 = np.zeros((self.nrays,), dtype=np.float64)
         self.l2 = np.zeros((self.nrays,), dtype=np.float64)
-        self.c3 = np.zeros((7, self.length), dtype=np.float64)
-        self.c5 = np.zeros((7, self.length), dtype=np.float64)
-        self.aberration3 = np.zeros((13, self.length), dtype=np.float64)
-        self.aberration5_intrinsic = np.zeros((13, self.length), dtype=np.float64)
-        self.aberration5 = np.zeros((13, self.length), dtype=np.float64)
+        self.aberration_c = np.zeros((self.length, 2, 2, 3, 3, 3), dtype=np.float64)
+        self.aberration_d = np.zeros((self.length, 2, 2, 3, 3, 3), dtype=np.float64)
 
     lagrange = Property
     height = Property
@@ -115,8 +111,8 @@ class ParaxialTrace(Trace):
                 self.print_params(), ("",),
                 self.print_trace(), ("",),
                 self.print_c3(), ("",),
-                self.print_h3(), ("",),
-                self.print_c5(),
+                #self.print_h3(), ("",),
+                #self.print_c5(),
                 )
         return "\n".join(t)
 
@@ -141,9 +137,8 @@ class ParaxialTrace(Trace):
         self.find_rays()
         for i, e in enumerate(self.system.elements):
             e.propagate_paraxial(self, i)
-            e.set_aberration3(self, i)
-            e.aberration(self, i)
-    
+        self.aberration_c, self.aberration_d = aberration_trace(self, kmax=3)
+
     def to_aperture(self):
         for i, e in enumerate(self.system.elements):
             e.propagate_paraxial(self, i)
@@ -172,10 +167,16 @@ class ParaxialTrace(Trace):
         yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
 
     def print_c3(self):
-        # to get transverse, undo this multiplication
-        #c3a = p.aberration3*-2*p.height[1]*p.u[0,-1,0]
-        c3a = self.aberration3*self.height[1] # transverse image seidel
-        return self.print_coeffs(c3a[(1, 2, 3, 4, 5), :].T, 
+        c = self.aberration_c
+        c = np.array([
+                -2*c[:, 0, 1, 1, 0, 0],
+                -c[:, 0, 1, 0, 1, 0],
+                -c[:, 0, 0, 0, 1, 0],
+                c[:, 0, 0, 0, 1, 0] - 2*c[:, 0, 1, 0, 0, 1],
+                -2*c[:, 0, 0, 0, 0, 1],
+                ])
+        # transverse image seidel (like oslo)
+        return self.print_coeffs(c.T*self.height[1]/2/self.lagrange,
                 "SA3 CMA3 AST3 PTZ3 DIS3".split())
 
     def print_h3(self):
@@ -184,13 +185,18 @@ class ParaxialTrace(Trace):
                 "PLC PTC".split())
 
     def print_c5(self):
-        #c5a = p.aberration5*-2*p.height[1]*p.u[0,-1,0]
-        c5a = self.aberration5*self.height[1] # transverse image seidel
-        return self.print_coeffs(c5a.T,
+        c = self.aberration_c
+        c = np.array([
+                -2*c[:, 0, 1, 1, 0, 0],
+                -c[:, 0, 1, 0, 1, 0],
+                -c[:, 0, 0, 0, 1, 0],
+                c[:, 0, 0, 0, 1, 0] - 2*c[:, 0, 1, 0, 0, 1],
+                -2*c[:, 0, 0, 0, 0, 1],
+                ])
+        # transverse image seidel (like oslo)
+        return self.print_coeffs(c.T*self.height[1]/2/self.lagrange,
                 "SA5 SCMA5a SCMA5b OSA5a OSA5b OSA5c ESA5a ESA5b ESA5c "
                 "AST5 PTZ5 DIS5 PDIS5".split())
-                #[(0, 1, 2, 9, 10, 3, 4, 11, 5), :].T,
-                #"SPH5 COMA5 LCOMA5 AST5 PETZ5 SOBSA TOBSA DIST5 SA7".split())
 
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
