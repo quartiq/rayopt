@@ -187,7 +187,7 @@ class ParaxialTrace(Trace):
         #c5a = p.aberration5*-2*p.height[1]*p.u[0,-1,0]
         c5a = self.aberration5*self.height[1] # transverse image seidel
         return self.print_coeffs(c5a.T,
-	            "SA5 SCMA5a SCMA5b OSA5a OSA5b OSA5c ESA5a ESA5b ESA5c "
+                "SA5 SCMA5a SCMA5b OSA5a OSA5b OSA5c ESA5a ESA5b ESA5c "
                 "AST5 PTZ5 DIS5 PDIS5".split())
                 #[(0, 1, 2, 9, 10, 3, 4, 11, 5), :].T,
                 #"SPH5 COMA5 LCOMA5 AST5 PETZ5 SOBSA TOBSA DIST5 SA7".split())
