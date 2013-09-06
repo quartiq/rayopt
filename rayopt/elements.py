@@ -315,8 +315,8 @@ class Spheroid(Interface):
             e3 += k*y*yb**3
             e3b += -k*yb*y**3
         
-        r.aberration3[:, j] = (p3, b3, f3, c3, p3*l/2, e3, -g3/l/2, 
-                b3b, f3b, c3b, d3b, e3b, -g3b/l/2)
+        r.aberration3[:, j] = (p3, b3, f3, c3, p3*l/2, e3, g3, 
+                b3b, f3b, c3b, d3b, e3b, g3b)
         (p3s, b3s, f3s, c3s, d3s, e3s, g3s,
                 b3bs, f3bs, c3bs, d3bs, e3bs, g3bs
                 ) = r.aberration3[:, :j].sum(axis=1)

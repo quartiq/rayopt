@@ -115,6 +115,7 @@ class ParaxialTrace(Trace):
                 self.print_params(), ("",),
                 self.print_trace(), ("",),
                 self.print_c3(), ("",),
+                self.print_h3(), ("",),
                 self.print_c5(),
                 )
         return "\n".join(t)
@@ -162,44 +163,34 @@ class ParaxialTrace(Trace):
     def focal_plane_solve(self):
         self.system.image.origin[2] -= self.y[0, -1, 0]/self.u[0, -1, 0]
 
-    def print_c3(self):
-        sys, p = self.system, self
-        # to get transverse, undo this multiplication
-        c3a = p.aberration3*-2*p.height[1]*p.u[0,-1,0]
-        yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
-                "#", "T", "SPH3", "COMA3", "AST3", "PETZ3", "DIST3", "LCOLOR", "TCOLOR")
-        for i in range(c3a.shape[1] - 2):
-            ab3 = c3a[:, i+1]
-            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                    i+1, sys.elements[i+1].typestr,
-                    ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[6], ab3[12])
-            continue
+    def print_coeffs(self, coeff, labels):
+        yield ("%2s %1s" + "% 10s" * len(labels)) % (
+                ("#", "T") + tuple(labels))
+        fmt = "%2s %1s" + "% 10.4g" * len(labels)
+        for i, a in enumerate(coeff):
+            yield fmt % ((i, self.system.elements[i].typestr) + tuple(a))
+        yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
 
-        ab3 = c3a.sum(axis=1)
-        yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-              " ∑", "", ab3[1], ab3[2], ab3[3], ab3[4], ab3[5], ab3[6],
-              ab3[12])
+    def print_c3(self):
+        # to get transverse, undo this multiplication
+        #c3a = p.aberration3*-2*p.height[1]*p.u[0,-1,0]
+        c3a = self.aberration3*self.height[1] # transverse image seidel
+        return self.print_coeffs(c3a[(1, 2, 3, 4, 5), :].T, 
+                "SA3 CMA3 AST3 PTZ3 DIS3".split())
+
+    def print_h3(self):
+        c3a = self.aberration3*8 # chromatic
+        return self.print_coeffs(c3a[(6, 12), :].T, 
+                "PLC PTC".split())
 
     def print_c5(self):
-        sys, p = self.system, self
-        #c5a = p.aberration5*p.height[1] # transverse?
-        c5a = p.aberration5*-2*p.height[1]*p.u[0,-1,0]
-        yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
-                "#", "T", "SPH5", "COMA5", "LCOMA5", "AST5", "PETZ5",
-                "SOBSA", "TOBSA", "DIST5", "SA7")
-        for i in range(c5a.shape[1] - 2):
-            ab5 = c5a[:, i+1]
-            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                    i+1, sys.elements[i+1].typestr,
-                    ab5[0], ab5[1], ab5[2], ab5[9], ab5[10], ab5[3],
-                    ab5[4], ab5[11], ab5[5])
-
-        ab5 = c5a.sum(axis=1)
-        yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-              " ∑", "",
-                    ab5[0], ab5[1], ab5[2], ab5[9], ab5[10], ab5[3],
-                    ab5[4], ab5[11], ab5[5])
-
+        #c5a = p.aberration5*-2*p.height[1]*p.u[0,-1,0]
+        c5a = self.aberration5*self.height[1] # transverse image seidel
+        return self.print_coeffs(c5a.T,
+	            "SA5 SCMA5a SCMA5b OSA5a OSA5b OSA5c ESA5a ESA5b ESA5c "
+                "AST5 PTZ5 DIS5 PDIS5".split())
+                #[(0, 1, 2, 9, 10, 3, 4, 11, 5), :].T,
+                #"SPH5 COMA5 LCOMA5 AST5 PETZ5 SOBSA TOBSA DIST5 SA7".split())
 
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
