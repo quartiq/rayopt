@@ -5,12 +5,12 @@ import numpy as np
 
 t, s = 0, 1
 
-def aberration_intrinsic(e, f, g, h, m, v, vv, c, kmax):
+def aberration_intrinsic(e, f, g, h, m, v, vv, c, k):
     c[t, s, 0, 0, 0] = 0
     c[t, t, 0, 0, 0] = 0
     c[s, s, 0, 0, 0] = 0
     c[s, t, 0, 0, 0] = 0
-    if kmax <= 0:
+    if k == 0:
         return
     c[t, s, 1, 0, 0] = -f**2*h*(v - vv)*(-e*h + f*v + f*vv)/2
     c[t, t, 1, 0, 0] = -f*g*h*(v - vv)*(-e*h + f*v + f*vv)/2
@@ -24,7 +24,7 @@ def aberration_intrinsic(e, f, g, h, m, v, vv, c, kmax):
     c[t, t, 0, 1, 0] = -g**2*h*(v - vv)*(-e*h + f*v + f*vv)
     c[s, s, 0, 1, 0] = f**2*m*(v - vv)*(-e*m + g*v + g*vv)
     c[s, t, 0, 1, 0] = f*g*m*(v - vv)*(-e*m + g*v + g*vv)
-    if kmax <= 1:
+    if k == 1:
         return
     c[t, s, 2, 0, 0] = 3*f**2*h*(v - vv)*(-e*h + f*v + f*vv)*(e**2*h**2 - 3*e*f*h*v + e*f*h*vv + f**2*v**2 - f**2*vv**2)/8
     c[t, t, 2, 0, 0] = 3*f*g*h*(v - vv)*(-e*h + f*v + f*vv)*(e**2*h**2 - 3*e*f*h*v + e*f*h*vv + f**2*v**2 - f**2*vv**2)/8
@@ -50,7 +50,7 @@ def aberration_intrinsic(e, f, g, h, m, v, vv, c, kmax):
     c[t, t, 0, 2, 0] = g*h*(v - vv)*(-e*h + f*v + f*vv)*(e**2*f*m**2 + 2*e**2*g*h*m - 6*e*f*g*m*v + 2*e*f*g*m*vv - 3*e*g**2*h*v + e*g**2*h*vv + 3*f*g**2*v**2 - 3*f*g**2*vv**2)/2
     c[s, s, 0, 2, 0] = -f*m*(v - vv)*(-e*m + g*v + g*vv)*(2*e**2*f*h*m + e**2*g*h**2 - 3*e*f**2*m*v + e*f**2*m*vv - 6*e*f*g*h*v + 2*e*f*g*h*vv + 3*f**2*g*v**2 - 3*f**2*g*vv**2)/2
     c[s, t, 0, 2, 0] = -g*m*(v - vv)*(-e*m + g*v + g*vv)*(2*e**2*f*h*m + e**2*g*h**2 - 3*e*f**2*m*v + e*f**2*m*vv - 6*e*f*g*h*v + 2*e*f*g*h*vv + 3*f**2*g*v**2 - 3*f**2*g*vv**2)/2
-    if kmax <= 2:
+    if k == 2:
         return
     c[t, s, 3, 0, 0] = -f**2*h*(v - vv)*(-e*h + f*v + f*vv)*(5*e**4*h**4 - 27*e**3*f*h**3*v + 7*e**3*f*h**3*vv + 47*e**2*f**2*h**2*v**2 - 23*e**2*f**2*h**2*v*vv - 4*e**2*f**2*h**2*vv**2 - 25*e*f**3*h*v**3 + 8*e*f**3*h*v**2*vv + 25*e*f**3*h*v*vv**2 - 8*e*f**3*h*vv**3 + 5*f**4*v**4 - 10*f**4*v**2*vv**2 + 5*f**4*vv**4)/16
     c[t, t, 3, 0, 0] = -f*g*h*(v - vv)*(-e*h + f*v + f*vv)*(5*e**4*h**4 - 27*e**3*f*h**3*v + 7*e**3*f*h**3*vv + 47*e**2*f**2*h**2*v**2 - 23*e**2*f**2*h**2*v*vv - 4*e**2*f**2*h**2*vv**2 - 25*e*f**3*h*v**3 + 8*e*f**3*h*v**2*vv + 25*e*f**3*h*v*vv**2 - 8*e*f**3*h*vv**3 + 5*f**4*v**4 - 10*f**4*v**2*vv**2 + 5*f**4*vv**4)/16
@@ -92,20 +92,21 @@ def aberration_intrinsic(e, f, g, h, m, v, vv, c, kmax):
     c[t, t, 0, 3, 0] = -g*h*(v - vv)*(-e*h + f*v + f*vv)*(2*e**4*f*h*m**3 + 3*e**4*g*h**2*m**2 - 3*e**3*f**2*m**3*v + e**3*f**2*m**3*vv - 16*e**3*f*g*h*m**2*v + 4*e**3*f*g*h*m**2*vv - 8*e**3*g**2*h**2*m*v + 2*e**3*g**2*h**2*m*vv + 15*e**2*f**2*g*m**2*v**2 - 8*e**2*f**2*g*m**2*v*vv - e**2*f**2*g*m**2*vv**2 + 27*e**2*f*g**2*h*m*v**2 - 12*e**2*f*g**2*h*m*v*vv - 3*e**2*f*g**2*h*m*vv**2 + 5*e**2*g**3*h**2*v**2 - 3*e**2*g**3*h**2*v*vv - 15*e*f**2*g**2*m*v**3 + 5*e*f**2*g**2*m*v**2*vv + 15*e*f**2*g**2*m*v*vv**2 - 5*e*f**2*g**2*m*vv**3 - 10*e*f*g**3*h*v**3 + 3*e*f*g**3*h*v**2*vv + 10*e*f*g**3*h*v*vv**2 - 3*e*f*g**3*h*vv**3 + 5*f**2*g**3*v**4 - 10*f**2*g**3*v**2*vv**2 + 5*f**2*g**3*vv**4)/2
     c[s, s, 0, 3, 0] = f*m*(v - vv)*(-e*m + g*v + g*vv)*(3*e**4*f*h**2*m**2 + 2*e**4*g*h**3*m - 8*e**3*f**2*h*m**2*v + 2*e**3*f**2*h*m**2*vv - 16*e**3*f*g*h**2*m*v + 4*e**3*f*g*h**2*m*vv - 3*e**3*g**2*h**3*v + e**3*g**2*h**3*vv + 5*e**2*f**3*m**2*v**2 - 3*e**2*f**3*m**2*v*vv + 27*e**2*f**2*g*h*m*v**2 - 12*e**2*f**2*g*h*m*v*vv - 3*e**2*f**2*g*h*m*vv**2 + 15*e**2*f*g**2*h**2*v**2 - 8*e**2*f*g**2*h**2*v*vv - e**2*f*g**2*h**2*vv**2 - 10*e*f**3*g*m*v**3 + 3*e*f**3*g*m*v**2*vv + 10*e*f**3*g*m*v*vv**2 - 3*e*f**3*g*m*vv**3 - 15*e*f**2*g**2*h*v**3 + 5*e*f**2*g**2*h*v**2*vv + 15*e*f**2*g**2*h*v*vv**2 - 5*e*f**2*g**2*h*vv**3 + 5*f**3*g**2*v**4 - 10*f**3*g**2*v**2*vv**2 + 5*f**3*g**2*vv**4)/2
     c[s, t, 0, 3, 0] = g*m*(v - vv)*(-e*m + g*v + g*vv)*(3*e**4*f*h**2*m**2 + 2*e**4*g*h**3*m - 8*e**3*f**2*h*m**2*v + 2*e**3*f**2*h*m**2*vv - 16*e**3*f*g*h**2*m*v + 4*e**3*f*g*h**2*m*vv - 3*e**3*g**2*h**3*v + e**3*g**2*h**3*vv + 5*e**2*f**3*m**2*v**2 - 3*e**2*f**3*m**2*v*vv + 27*e**2*f**2*g*h*m*v**2 - 12*e**2*f**2*g*h*m*v*vv - 3*e**2*f**2*g*h*m*vv**2 + 15*e**2*f*g**2*h**2*v**2 - 8*e**2*f*g**2*h**2*v*vv - e**2*f*g**2*h**2*vv**2 - 10*e*f**3*g*m*v**3 + 3*e*f**3*g*m*v**2*vv + 10*e*f**3*g*m*v*vv**2 - 3*e*f**3*g*m*vv**3 - 15*e*f**2*g**2*h*v**3 + 5*e*f**2*g**2*h*v**2*vv + 15*e*f**2*g**2*h*v*vv**2 - 5*e*f**2*g**2*h*vv**3 + 5*f**3*g**2*v**4 - 10*f**3*g**2*v**2*vv**2 + 5*f**3*g**2*vv**4)/2
-    if kmax <= 3:
+    if k == 3:
         return
 
 
 def aberration_extrinsic(c, r, d, k):
 
-    if k == 0:
+    if False:
+        pass
+
+    elif k == 0:
         d[t, s, 0, 0, 0] = 0
         d[t, t, 0, 0, 0] = 0
         d[s, s, 0, 0, 0] = 0
         d[s, t, 0, 0, 0] = 0
-        return
-
-    if k == 1:
+    elif k == 1:
         d[t, s, 1, 0, 0] = 0
         d[t, t, 1, 0, 0] = 0
         d[s, s, 1, 0, 0] = 0
@@ -118,9 +119,7 @@ def aberration_extrinsic(c, r, d, k):
         d[t, t, 0, 1, 0] = 0
         d[s, s, 0, 1, 0] = 0
         d[s, t, 0, 1, 0] = 0
-        return
-
-    if k == 2:
+    elif k == 2:
         d[t, s, 2, 0, 0] = c[t, s, 0, 1, 0]*r[t, s, 1, 0, 0] + 3*c[t, s, 1, 0, 0]*r[s, s, 1, 0, 0] + c[t, t, 1, 0, 0]*r[t, s, 1, 0, 0]
         d[t, t, 2, 0, 0] = c[t, s, 1, 0, 0]*r[s, t, 1, 0, 0] + c[t, t, 0, 1, 0]*r[t, s, 1, 0, 0] + 2*c[t, t, 1, 0, 0]*r[s, s, 1, 0, 0] + c[t, t, 1, 0, 0]*r[t, t, 1, 0, 0]
         d[s, s, 2, 0, 0] = c[s, s, 0, 1, 0]*r[t, s, 1, 0, 0] + 3*c[s, s, 1, 0, 0]*r[s, s, 1, 0, 0] + c[s, t, 1, 0, 0]*r[t, s, 1, 0, 0]
@@ -145,9 +144,7 @@ def aberration_extrinsic(c, r, d, k):
         d[t, t, 0, 2, 0] = c[t, s, 0, 1, 0]*r[s, t, 0, 1, 0] + 2*c[t, t, 0, 0, 1]*r[t, s, 0, 1, 0] + c[t, t, 0, 1, 0]*r[s, s, 0, 1, 0] + 2*c[t, t, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[t, t, 1, 0, 0]*r[s, t, 0, 1, 0]
         d[s, s, 0, 2, 0] = 2*c[s, s, 0, 0, 1]*r[t, s, 0, 1, 0] + 2*c[s, s, 0, 1, 0]*r[s, s, 0, 1, 0] + c[s, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, s, 1, 0, 0]*r[s, t, 0, 1, 0] + c[s, t, 0, 1, 0]*r[t, s, 0, 1, 0]
         d[s, t, 0, 2, 0] = c[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + 2*c[s, t, 0, 0, 1]*r[t, s, 0, 1, 0] + c[s, t, 0, 1, 0]*r[s, s, 0, 1, 0] + 2*c[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, t, 0, 1, 0]
-        return
-
-    if k == 3:
+    elif k == 3:
         d[t, s, 3, 0, 0] = c[t, s, 0, 0, 1]*r[t, s, 1, 0, 0]**2 + 2*c[t, s, 0, 1, 0]*r[s, s, 1, 0, 0]*r[t, s, 1, 0, 0] + c[t, s, 0, 1, 0]*r[t, s, 2, 0, 0] + 3*c[t, s, 1, 0, 0]*r[s, s, 1, 0, 0]**2 + 3*c[t, s, 1, 0, 0]*r[s, s, 2, 0, 0] + c[t, s, 1, 1, 0]*r[t, s, 1, 0, 0] + 5*c[t, s, 2, 0, 0]*r[s, s, 1, 0, 0] + c[t, t, 0, 1, 0]*r[t, s, 1, 0, 0]**2 + 2*c[t, t, 1, 0, 0]*r[s, s, 1, 0, 0]*r[t, s, 1, 0, 0] + c[t, t, 1, 0, 0]*r[t, s, 2, 0, 0] + c[t, t, 2, 0, 0]*r[t, s, 1, 0, 0]
         d[t, t, 3, 0, 0] = c[t, s, 0, 1, 0]*r[s, t, 1, 0, 0]*r[t, s, 1, 0, 0] + 2*c[t, s, 1, 0, 0]*r[s, s, 1, 0, 0]*r[s, t, 1, 0, 0] + c[t, s, 1, 0, 0]*r[s, t, 2, 0, 0] + c[t, s, 2, 0, 0]*r[s, t, 1, 0, 0] + c[t, t, 0, 0, 1]*r[t, s, 1, 0, 0]**2 + c[t, t, 0, 1, 0]*r[s, s, 1, 0, 0]*r[t, s, 1, 0, 0] + c[t, t, 0, 1, 0]*r[t, s, 1, 0, 0]*r[t, t, 1, 0, 0] + c[t, t, 0, 1, 0]*r[t, s, 2, 0, 0] + c[t, t, 1, 0, 0]*r[s, s, 1, 0, 0]**2 + 2*c[t, t, 1, 0, 0]*r[s, s, 1, 0, 0]*r[t, t, 1, 0, 0] + 2*c[t, t, 1, 0, 0]*r[s, s, 2, 0, 0] + c[t, t, 1, 0, 0]*r[t, t, 2, 0, 0] + c[t, t, 1, 1, 0]*r[t, s, 1, 0, 0] + 4*c[t, t, 2, 0, 0]*r[s, s, 1, 0, 0] + c[t, t, 2, 0, 0]*r[t, t, 1, 0, 0]
         d[s, s, 3, 0, 0] = c[s, s, 0, 0, 1]*r[t, s, 1, 0, 0]**2 + 2*c[s, s, 0, 1, 0]*r[s, s, 1, 0, 0]*r[t, s, 1, 0, 0] + c[s, s, 0, 1, 0]*r[t, s, 2, 0, 0] + 3*c[s, s, 1, 0, 0]*r[s, s, 1, 0, 0]**2 + 3*c[s, s, 1, 0, 0]*r[s, s, 2, 0, 0] + c[s, s, 1, 1, 0]*r[t, s, 1, 0, 0] + 5*c[s, s, 2, 0, 0]*r[s, s, 1, 0, 0] + c[s, t, 0, 1, 0]*r[t, s, 1, 0, 0]**2 + 2*c[s, t, 1, 0, 0]*r[s, s, 1, 0, 0]*r[t, s, 1, 0, 0] + c[s, t, 1, 0, 0]*r[t, s, 2, 0, 0] + c[s, t, 2, 0, 0]*r[t, s, 1, 0, 0]
@@ -188,10 +185,8 @@ def aberration_extrinsic(c, r, d, k):
         d[t, t, 0, 3, 0] = 2*c[t, s, 0, 0, 1]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[t, s, 0, 1, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + c[t, s, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + c[t, s, 0, 1, 0]*r[s, t, 0, 2, 0] + c[t, s, 0, 2, 0]*r[s, t, 0, 1, 0] + 2*c[t, s, 1, 0, 0]*r[s, t, 0, 1, 0]**2 + 4*c[t, t, 0, 0, 1]*r[t, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[t, t, 0, 0, 1]*r[t, s, 0, 2, 0] + 2*c[t, t, 0, 1, 0]*r[s, s, 0, 1, 0]*r[t, t, 0, 1, 0] + c[t, t, 0, 1, 0]*r[s, s, 0, 2, 0] + c[t, t, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[t, t, 0, 1, 0]*r[t, t, 0, 1, 0]**2 + 2*c[t, t, 0, 1, 0]*r[t, t, 0, 2, 0] + 2*c[t, t, 0, 1, 1]*r[t, s, 0, 1, 0] + 2*c[t, t, 0, 2, 0]*r[s, s, 0, 1, 0] + 3*c[t, t, 0, 2, 0]*r[t, t, 0, 1, 0] + 2*c[t, t, 1, 0, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + 2*c[t, t, 1, 0, 0]*r[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[t, t, 1, 0, 0]*r[s, t, 0, 2, 0] + 2*c[t, t, 1, 1, 0]*r[s, t, 0, 1, 0]
         d[s, s, 0, 3, 0] = 2*c[s, s, 0, 0, 1]*r[s, s, 0, 1, 0]*r[t, s, 0, 1, 0] + 2*c[s, s, 0, 0, 1]*r[t, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, s, 0, 0, 1]*r[t, s, 0, 2, 0] + c[s, s, 0, 1, 0]*r[s, s, 0, 1, 0]**2 + 2*c[s, s, 0, 1, 0]*r[s, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, s, 0, 1, 0]*r[s, s, 0, 2, 0] + c[s, s, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[s, s, 0, 1, 0]*r[t, t, 0, 2, 0] + 2*c[s, s, 0, 1, 1]*r[t, s, 0, 1, 0] + 3*c[s, s, 0, 2, 0]*r[s, s, 0, 1, 0] + 2*c[s, s, 0, 2, 0]*r[t, t, 0, 1, 0] + 4*c[s, s, 1, 0, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + 2*c[s, s, 1, 0, 0]*r[s, t, 0, 2, 0] + 2*c[s, s, 1, 1, 0]*r[s, t, 0, 1, 0] + 2*c[s, t, 0, 0, 1]*r[t, s, 0, 1, 0]**2 + c[s, t, 0, 1, 0]*r[s, s, 0, 1, 0]*r[t, s, 0, 1, 0] + c[s, t, 0, 1, 0]*r[t, s, 0, 1, 0]*r[t, t, 0, 1, 0] + c[s, t, 0, 1, 0]*r[t, s, 0, 2, 0] + c[s, t, 0, 2, 0]*r[t, s, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0]
         d[s, t, 0, 3, 0] = 2*c[s, s, 0, 0, 1]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[s, s, 0, 1, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + c[s, s, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + c[s, s, 0, 1, 0]*r[s, t, 0, 2, 0] + c[s, s, 0, 2, 0]*r[s, t, 0, 1, 0] + 2*c[s, s, 1, 0, 0]*r[s, t, 0, 1, 0]**2 + 4*c[s, t, 0, 0, 1]*r[t, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, t, 0, 0, 1]*r[t, s, 0, 2, 0] + 2*c[s, t, 0, 1, 0]*r[s, s, 0, 1, 0]*r[t, t, 0, 1, 0] + c[s, t, 0, 1, 0]*r[s, s, 0, 2, 0] + c[s, t, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[s, t, 0, 1, 0]*r[t, t, 0, 1, 0]**2 + 2*c[s, t, 0, 1, 0]*r[t, t, 0, 2, 0] + 2*c[s, t, 0, 1, 1]*r[t, s, 0, 1, 0] + 2*c[s, t, 0, 2, 0]*r[s, s, 0, 1, 0] + 3*c[s, t, 0, 2, 0]*r[t, t, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, t, 0, 2, 0] + 2*c[s, t, 1, 1, 0]*r[s, t, 0, 1, 0]
-        return
 
-
-def aberration(y, n, p, e, st, kmax=4):
+def aberration(y, n, p, e, st, a, kmax=4):
     l = len(e)
     c = np.zeros((l, 2, 2, kmax, kmax, kmax))
     d = np.zeros((l, 2, 2, kmax, kmax, kmax))
@@ -201,16 +196,15 @@ def aberration(y, n, p, e, st, kmax=4):
         v, vv = 1/n[i-1], 1/n[i]
         u, w = p[i-1]
         f, g = (e[i]*h + u)/v, (e[i]*m + w)/v
-        aberration_intrinsic(e[i], f, g, h, m, v, vv, c[i], kmax-1)
-    for ki in range(kmax):
+        aberration_intrinsic(e[i], f, g, h, m, v, vv, c[i], kmax - 1)
+    for ki in range(2, kmax):
         k = ki - 1
         for j in range(k + 1):
             for i in range(k - j + 1):
                 b = c[:, :, :, k - j - i, j, i] + d[:, :, :, k - j - i, j, i]
-                bt = np.cumsum(b[:, t], axis=0)
-                r[:, t, :, k - j - i, j, i] = bt
-                bs = np.cumsum(b[:, s], axis=0)
-                r[:, s, :, k - j - i, j, i] = bs - bs[st, None]
+                b = np.cumsum(b, axis=0)/a
+                r[:, t, :, k - j - i, j, i] = b[:, t]
+                r[:, s, :, k - j - i, j, i] = b[:, s] - b[(st,), s]
         for i in range(l):
             aberration_extrinsic(c[i], r[i], d[i], ki)
     return c, d
@@ -218,5 +212,5 @@ def aberration(y, n, p, e, st, kmax=4):
 def aberration_trace(trace, kmax=4):
     e = np.array([el.curvature for el in trace.system.elements])
     return aberration(trace.y[0], trace.n[:, 0], trace.u[0], e,
-        trace.system.aperture_index, kmax)
+        trace.system.aperture_index, trace.lagrange, kmax)
 
