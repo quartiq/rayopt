@@ -1,6 +1,9 @@
 ./*.egg-info
 ./dist
 ./build
+./examples/*.ipynb
+*.zmx
+*.ZMX
 debian/*.debhelper
 debian/compat
 debian/*.log
