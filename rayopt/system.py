@@ -17,126 +17,136 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
-from traits.api import (HasTraits, Str, Array, Float, Instance, List,
-        Property)
 
-from .elements import Element, Object, Image
+from .elements import Object, Image, Aperture
 
-class System(HasTraits):
-    name = Str
-    temperature = Float(21.)
-    scale = Float(1e-3)
-    elements = List(Element)
-    object = Property()
-    image = Property()
-    aperture = Property()
-    aperture_index = Property()
+
+class System(list):
+    def __init__(self, elements=None, description=""):
+        if elements is None:
+            elements = [Object(), Aperture(), Image()]
+        super(System, self).__init__(elements)
+        self.description = description
+
+    @property
+    def object(self):
+        assert isinstance(self[0], Object)
+        return self[0]
+
+    @object.setter
+    def object(self, value):
+        assert isinstance(value, Object)
+        if isinstance(self[0], Object):
+            self[0] = value
+        else:
+            self.insert(0, value)
+
+    @property
+    def aperture(self):
+        for el in self:
+            if isinstance(el, Aperture):
+                return el
+
+    @property
+    def aperture_index(self):
+        return self.index(self.aperture)
+
+    @property
+    def image(self):
+        assert isinstance(self[-1], Image)
+        return self[-1]
+
+    @image.setter
+    def image(self, value):
+        assert isinstance(value, Image)
+        if isinstance(self[-1], Image):
+            self[-1] = value
+        else:
+            self.append(value)
 
     def reverse(self):
-        # reverse surface order
-        self.elements[1:-1] = self.elements[-2:0:-1]
+        o, i = self.object, self.image
         # swap i/o radii
-        self.object.radius, self.image.radius = (
-                self.image.radius, self.object.radius)
-        # image origin is old first surface origin
-        d, self.image.origin = (
-                self.image.origin, self.elements[-2].origin)
-        # object material is old last surface material
-        m, self.object.material = (
-                self.object.material, self.elements[1].material)
-        for e in self.elements[1:-1]:
+        o.radius, i.radius = i.radius, o.radius
+        # reverse surface order
+        self[1:-1] = self[-2:0:-1]
+        # shift thicknesses forward
+        for e in self:
             e.reverse()
-            # origin is old preceeding origin
-            d, e.origin = e.origin, d
-            # material is old preceeding material
-            m, e.material = e.material, m
-
-    def _get_aperture(self):
-        for e in self.elements:
-            if e.typestr == "A":
-                return e
-
-    def _get_aperture_index(self):
-        for i, e in enumerate(self.elements):
-            if e.typestr == "A":
-                return i
-        raise KeyError
-
-    def _get_object(self):
-        e = self.elements[0]
-        assert e.typestr == "O"
-        return e
-
-    def _set_object(self, e):
-        assert e.typestr == "O"
-        if self.elements and self.elements[0].typestr == "O":
-            del self.elements[0]
-        self.elements.insert(0, e)
-
-    def _get_image(self):
-        e = self.elements[-1]
-        assert e.typestr == "I"
-        return e
-
-    def _set_image(self, e):
-        assert e.typestr == "I"
-        if self.elements and self.elements[-1].typestr == "I":
-            del self.elements[-1]
-        self.elements.append(e)
+        d = i.thickness
+        for e in self[1:]:
+            d, e.thickness = e.thickness, d
+        # shft materials backwards
+        m = o.material
+        for e in self[-2::-1]:
+            if hasattr(e, "material"):
+                # material is old preceeding material
+                m, e.material = e.material, m
 
     def __str__(self):
         return "\n".join(self.text())
 
     def text(self):
-        yield "System: %s" % self.name
-        yield "Scale: %g m" % self.scale
-        yield "Temperature: %g C" % self.temperature
+        yield "System: %s" % self.description
         yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.object.wavelengths)
         yield "Surfaces:"
-        yield "%2s %1s %12s %12s %10s %15s %5s %5s" % (
-                "#", "T", "Distance", "ROC", "Diameter", 
-                "Material", "N", "V")
-        for i,e in enumerate(self.elements):
+        yield "%2s %1s %10s %10s %10s %10s %5s %5s" % (
+                "#", "T", "Dist (to)", "Curv Rad", "Diam", 
+                "Mat", "n", "V")
+        for i,e in enumerate(self):
             curv = getattr(e, "curvature", 0)
             roc = curv == 0 and np.inf or 1/curv
             mat = getattr(e, "material", None)
             n = getattr(mat, "nd", np.nan)
             v = getattr(mat, "vd", np.nan)
-            yield "%2i %1s %12.7g %12.6g %10.5g %15s %5.3f %5.2f" % (
-                    i, e.typestr, e.origin[2], roc,
+            yield "%2i %1s %10.5g %10.4g %10.5g %10s %5.3f %5.2f" % (
+                    i, e.typ, e.thickness, roc,
                     e.radius*2, mat or "", n, v)
 
-    def surfaces(self, axis, n=20):
-        p = [0, 0, 0]
-        l = None
-        for e in self.elements:
-            xi, zi = e.surface(axis, n)
-            xi += p[axis]
-            zi += p[2]
-            p += e.origin
-            if l is not None:
-                if xi[0] < l[0, 0]:
-                    cl = ([xi[0]], [l[1, 0]])
-                else:
-                    cl = ([l[0, 0]], [zi[0]])
-                if xi[-1] > l[0, -1]:
-                    cu = ([xi[-1]], [l[1, -1]])
-                else:
-                    cu = ([l[0, -1]], [zi[-1]])
-                yield np.c_[l[:, (0,)], cl, (xi, zi), cu, l[:, ::-1]]
+    def surfaces_cut(self, axis, points):
+        oz = 0
+        pending = None
+        for e in self:
+            x, z = e.transform_from(e.surface_cut(axis, points))
+            z, oz = z + oz, oz + e.thickness
+            if pending:
+                px, pz = pending
+                if x[0] < px[0]: # lower right
+                    cl = x[0], pz[0]
+                else: # lower left
+                    cl = px[0], z[0]
+                if x[-1] > px[-1]: # upper right
+                    cu = x[-1], pz[-1]
+                else: # upper left
+                    cu = px[-1], z[-1]
+                yield np.c_[(px, pz), cu, (x[::-1], z[::-1]), cl,
+                        (px[0], pz[0])]
             elif not e.material.solid:
-                yield xi, zi
+                yield x, z
             if e.material.solid:
-                l = np.array([xi, zi])
+                l = xi, zi
             else:
                 l = None
 
-    def paraxial_matrices(self, l):
-        n0 = self.object.material.refractive_index(l)
-        for e in self.elements:
+    def plot(self, ax, axis=0, npoints=21, **kwargs):
+        kwargs.setdefault("linestyle", "-")
+        kwargs.setdefault("color", "black")
+        # ax.set_aspect("equal")
+        for x, z in self.surfaces_cut(axis, npoints):
+            ax.plot(x, z, **kwargs)
+
+    def paraxial_matrices(self, l, start=0, stop=None):
+        n0 = 1.
+        for e in self[start:stop or len(self)]:
             n0, m = e.paraxial_matrix(l, n0)
             yield m
+
+    def paraxial_matrix(self, l, start=0, stop=None):
+        m = np.identity(2)
+        for mi in self.paraxial_matrices(l, start, stop):
+            m = np.dot(mi, m)
+        return m
 
     def optimize(self, rays, parameters, demerits, constraints=(),
             method="ralg"):

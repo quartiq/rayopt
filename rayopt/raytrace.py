@@ -24,16 +24,10 @@ with some improvements
 import itertools
 
 import numpy as np
-from scipy.optimize import (newton, fsolve)
 import matplotlib.pyplot as plt
 
-from traits.api import (HasTraits, Float, Array, Property,
-    cached_property, Instance, Int, Enum)
-
-from .material import lambda_d
-from .system import System
-from .special_sums import polar_sum
-from .aberration_orders import aberration_trace
+# from .special_sums import polar_sum
+# from .aberration_orders import aberration_trace
 
 
 def dir_to_angles(x,y,z):
@@ -41,70 +35,45 @@ def dir_to_angles(x,y,z):
     return r/np.linalg.norm(r)
 
 def tanarcsin(u):
-    return u/np.sqrt(1-u**2)
+    return u/np.sqrt(1 - u**2)
 
 def sinarctan(u):
-    return u/np.sqrt(1+u**2)
+    return u/np.sqrt(1 + u**2)
 
 
-class Trace(HasTraits):
-    length = Int()
-    nrays = Int()
-    l = Array(dtype=np.float64, shape=(None)) # wavelength
-    n = Array(dtype=np.float64, shape=(None, None)) # refractive index
-    y = Array(dtype=np.float64, shape=(3, None, None)) # height
-    u = Array(dtype=np.float64, shape=(3, None, None)) # angle
+class ParaxialTrace(object):
+    def __init__(self, system, kmax=4):
+        self.system = system
+        n = len(system)
+        self.y = np.empty(n, 2)
+        self.u = np.empty(n, 2)
+        self.z = np.empty(n)
+        self.v = np.empty(n)
+        self.n = np.empty(n)
+        self.c = np.empty((n, 2, 2, kmax, kmax, kmax))
+        self.d = np.empty_like(self.c)
+        self.find_rays()
+        self.propagate()
 
-    def allocate(self):
-        self.l = np.zeros((self.nrays,), dtype=np.float64)
-        self.n = np.zeros((self.length, self.nrays), dtype=np.float64)
-        self.y = np.zeros((3, self.length, self.nrays), dtype=np.float64)
-        self.u = np.zeros((3, self.length, self.nrays), dtype=np.float64)
+    def find_rays(self):
+        c = self.system.object.radius
+        u, y = self.u, self.y
+        if self.system.object.infinity:
+            u, y = y, u
+        eps = 1e-2
+        a[0, 0], b[0, 0] = (eps, 0), (0, eps)
+        r, h, k = self.to_aperture()
+        a[0, 0], b[0, 0] = (r*eps/h[0], -c*h[1]/h[0]), (0, c)
 
-    def __init__(self, **kw):
-        super(Trace, self).__init__(**kw)
-        self.length = len(self.system.elements)
-
-
-class ParaxialTrace(Trace):
-    system = Instance(System)
-    
-    # marginal/axial, principal/chief
-    nrays = 2
-
-    v = Array(dtype=np.float64, shape=(None, None)) # dispersion
-    l1 = Array(dtype=np.float64, shape=(None)) # min l
-    l2 = Array(dtype=np.float64, shape=(None)) # max l
-    aberration_c = Array(dtype=np.float64, shape=(None, 2, 2, 4, 4, 4))
-    aberration_d = Array(dtype=np.float64, shape=(None, 2, 2, 4, 4, 4))
-
-    def allocate(self):
-        super(ParaxialTrace, self).allocate()
-        self.v = np.zeros((self.length, self.nrays), dtype=np.float64)
-        self.l1 = np.zeros((self.nrays,), dtype=np.float64)
-        self.l2 = np.zeros((self.nrays,), dtype=np.float64)
-        self.aberration_c = np.zeros((self.length, 2, 2, 4, 4, 4), dtype=np.float64)
-        self.aberration_d = np.zeros((self.length, 2, 2, 4, 4, 4), dtype=np.float64)
-
-    lagrange = Property
-    height = Property
-    focal_length = Property
-    focal_distance = Property
-    pupil_height = Property
-    pupil_position = Property
-    f_number = Property
-    numerical_aperture = Property
-    airy_radius = Property
-    magnification = Property
-
-    def __init__(self, **k):
-        super(ParaxialTrace, self).__init__(**k)
-        self.allocate()
-        self.l[:] = self.system.object.wavelengths[0]
-        self.l1[:] = min(self.system.object.wavelengths)
-        self.l2[:] = max(self.system.object.wavelengths)
-        self.n[0] = map(self.system.object.material.refractive_index,
-                self.l)
+    def propagate(self, start=1, stop=None):
+        l = [self.system.object.wavelengths[0],
+            min(self.system.object.wavelengths),
+            max(self.system.object.wavelengths)]
+        for i in range(start, stop or len(self.system)):
+            el = self.system[i]
+            self.y[i], self.u[i], self.n[i], self.v[i] = el.propagate_paraxial(
+                    self.y[i - 1], self.u[i - 1], self.n[i - 1], l)
+            self.z = el.thickness
 
     def __str__(self):
         t = itertools.chain(
@@ -115,16 +84,6 @@ class ParaxialTrace(Trace):
                 self.print_c5(),
                 )
         return "\n".join(t)
-
-    def find_rays(self):
-        c = self.system.object.radius
-        a, b = self.u, self.y
-        if self.system.object.infinity:
-            a, b = b, a
-        eps = 1e-2
-        a[0, 0], b[0, 0] = (eps, 0), (0, eps)
-        r, h, k = self.to_aperture()
-        a[0, 0], b[0, 0] = (r*eps/h[0], -c*h[1]/h[0]), (0, c)
 
     # TODO introduce aperture at argmax(abs(y_marginal)/radius)
     # or at argmin(abs(u_marginal))
