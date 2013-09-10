@@ -92,8 +92,8 @@ class System(list):
                     for w in self.object.wavelengths)
         yield "Surfaces:"
         yield "%2s %1s %10s %10s %10s %10s %5s %5s" % (
-                "#", "T", "Dist (to)", "Curv Rad", "Diam", 
-                "Mat", "n", "V")
+                "#", "T", "Thickness", "Rad Curv", "Diameter", 
+                "Material", "n", "V")
         for i,e in enumerate(self):
             curv = getattr(e, "curvature", 0)
             roc = curv == 0 and np.inf or 1/curv
@@ -136,15 +136,14 @@ class System(list):
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(x, z, **kwargs)
 
-    def paraxial_matrices(self, l, start=0, stop=None):
-        n0 = 1.
+    def paraxial_matrices(self, l, start=0, stop=None, n=None):
         for e in self[start:stop or len(self)]:
-            n0, m = e.paraxial_matrix(n0, l)
-            yield m
+            n, m = e.paraxial_matrix(n, l)
+            yield n, m
 
-    def paraxial_matrix(self, l, start=0, stop=None):
-        m = np.identity(2)
-        for mi in self.paraxial_matrices(l, start, stop):
+    def paraxial_matrix(self, l, start=0, stop=None, n0=None):
+        m = np.eye(2)
+        for n, mi in self.paraxial_matrices(l, start, stop):
             m = np.dot(mi, m)
         return m
 

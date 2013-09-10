@@ -97,15 +97,15 @@ class Primitive(NameMixin, TransformMixin):
         u1[:, 2] = np.where(r2 > self.radius**2, np.nan, u[:, 2])
         return u1
 
-    def propagate_paraxial(self, y0, u0, n0, l):
-        v = np.zeros_like(n0)
-        z = self.thickness
-        y = y0 + z*u0
-        return y, u0, n0, v
+    def propagate_paraxial(self, yu0, n0, l):
+        n, m = self.paraxial_matrix(n0, l)
+        yu0 = np.atleast_2d(yu0)
+        yu = np.dot(m, yu0.T).T
+        return yu, n
 
     def paraxial_matrix(self, n0, l):
         d = self.thickness
-        return n0, np.matrix([[1, d], [0, 1]])
+        return n0, np.array([[1., d], [0, 1]])
 
     def propagate(self, y0, u0, n0, l, clip=True):
         # length up to surface
@@ -128,7 +128,10 @@ class Primitive(NameMixin, TransformMixin):
         z = np.zeros(points)
         return t, z
 
-    def aberration(self, y, yb, u, ub, n0, l, kmax):
+    def aberration(self, *args):
+        return 0
+
+    def dispersion(self, *args):
         return 0
 
 
@@ -139,20 +142,11 @@ class Element(Primitive):
         super(Element, self).__init__(**kwargs)
         self.material = material
 
-    def propagate_paraxial(self, y0, u0, n0, l):
-        y, u, n, v = super(Element, self).propagate_paraxial(y0,
-                u0, n0, l)
-        if self.material is not None:
-            n = self.material.refractive_index(l[0])
-            v = self.material.delta_n(min(l), max(l))
-        return y, u, n, v
-
     def paraxial_matrix(self, n0, l):
-        d = self.thickness
-        n = n0
+        n, m = super(Element, self).paraxial_matrix(n0, l)
         if self.material is not None:
             n = self.material.refractive_index(l[0])
-        return n, np.matrix([[1, d], [0, n0/n]])
+        return n, m
 
     def refract(self, y, u0, mu):
         return u0
@@ -164,6 +158,12 @@ class Element(Primitive):
             n = self.material.refractive_index(l)
             u = self.refract(y, u, n0/n)
         return y, u, n, t
+
+    def dispersion(self, l):
+        v = 0
+        if self.material is not None:
+            v = self.material.delta_n(min(l), max(l))
+        return v
 
 
 class Interface(Element):
@@ -177,7 +177,7 @@ class Interface(Element):
 
     def intercept(self, y, u):
         s = np.zeros(y.shape[0])
-        s0 = super(Element, self).intercept(y, u)
+        s0 = super(Interface, self).intercept(y, u)
         for i in range(y.shape[0]):
             yi, ui, s0i = y[i], u[i], s0[i]
             func = lambda si: self.shape_func(yi + si*ui),
@@ -213,7 +213,7 @@ class Interface(Element):
         raise NotImplementedError
 
     def surface_cut(self, axis, points):
-        x, z = super(Element, self).surface_cut(axis, points)
+        x, z = super(Interface, self).surface_cut(axis, points)
         z -= self.shape_func(xyz)
         return x, z
 
@@ -222,7 +222,7 @@ class Spheroid(Interface):
     typ = "S"
 
     def __init__(self, curvature=0., conic=1., aspherics=[], **kwargs):
-        super(Interface, self).__init__(**kwargs)
+        super(Spheroid, self).__init__(**kwargs)
         self.curvature = curvature
         self.conic = conic
         self.aspherics = np.array(aspherics)
@@ -264,29 +264,25 @@ class Spheroid(Interface):
             s = super(Spheroid, self).intercept(y, u)
         return s #np.where(s*np.sign(self.thickness)>=0, s, np.nan)
 
-    def propagate_paraxial(self, y0, u0, n0, l):
-        y, u, n, v = super(Spheroid, self).propagate_paraxial(
-                y0, u0, n0, l)
+    def paraxial_matrix(self, n0, l):
+        # [y', u'] = M * [y, u]
         c = self.curvature
         if len(self.aspherics) > 0:
             c += 2*self.aspherics[0]
-        mu = n0/n
-        u = mu*u0 + c*(mu - 1.)*y # refract
-        return y, u, n, v
-
-    def paraxial_matrix(self, n0, l):
-        # [y', u'] = M * [y, u]
         n = self.material.refractive_index(l[0])
+        mu = n0/n
         d = self.thickness
-        p = (n - n0)*self.curvature/n
-        return n, np.matrix([[1, d], [-p, n0/n - d*p]])
+        p = c*(mu - 1)
+        return n, np.array([[1, d], [p, d*p + mu]])
    
     def reverse(self):
         super(Spheroid, self).reverse()
         self.curvature *= -1
         self.aspherics *= -1
 
-    def aberration(self, y, yb, u, ub, n0, n, kmax):
+    def aberration(self, y, u, n0, n, kmax):
+        y, yb = y
+        u, ub = u
         f, g = (self.curvature*y + u)*n0, (self.curvature*yb + ub)*n0
         c = np.zeros((2, 2, kmax, kmax, kmax))
         aberration_intrinsic(self.curvature, f, g, y, yb, 1/n0, 1/n,
@@ -303,12 +299,11 @@ class Object(Element):
 
     @property
     def finite(self):
-        return np.isfinite(self.thickness)
+        return self.thickness != 0
 
-    def propagate_paraxial(self, y0, u0, n0, l):
+    def paraxial_matrix(self, n0, l):
         n = self.material.refractive_index(l[0])
-        v = self.material.delta_n(min(l), max(l))
-        return y0, u0, n, v
+        return n, np.eye(2)
     
     def propagate(self, y0, u0, n0, l, clip=True):
         n = self.material.refractive_index(l)

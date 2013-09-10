@@ -41,15 +41,24 @@ def sinarctan(u):
     return u/np.sqrt(1 + u**2)
 
 
-class ParaxialTrace(object):
-    def __init__(self, system, aberration_orders=4):
+class Trace(object):
+    def __init__(self, system):
         self.system = system
-        self.allocate(aberration_orders)
+
+
+class ParaxialTrace(Trace):
+    def __init__(self, system, aberration_orders=4):
+        super(ParaxialTrace, self).__init__(system)
+        self.allocate(system, aberration_orders)
         self.find_rays()
         self.propagate()
 
-    def allocate(self, k):
-        n = len(self.system)
+    def allocate(self, system, k):
+        self.system = system
+        n = len(system)
+        self.l = np.array([system.object.wavelengths[0],
+            min(system.object.wavelengths),
+            max(system.object.wavelengths)])
         self.y = np.empty((n, 2))
         self.u = np.empty((n, 2))
         self.z = np.empty(n)
@@ -59,45 +68,40 @@ class ParaxialTrace(object):
         self.d = np.empty_like(self.c)
 
     def find_rays(self):
-        c = self.system.object.radius
         y, u = self.y, self.u
         l = self.system.object.wavelengths
-        if self.system.object.finite:
-            y, u = u, y
-        #eps = 1e-2
-        #u[0], y[0] = (eps, 0), (0, eps)
-        #r, h, k = self.to_aperture()
-        #u[0], y[0] = (r*eps/h[0], -c*h[1]/h[0]), (0, c)
         ai = self.system.aperture_index
-        m = self.system.paraxial_matrix(l, start=0, stop=ai + 1)
+        m = self.system.paraxial_matrix(l, stop=ai + 1)
         mi = np.linalg.inv(m)
         r = self.system[ai].radius
-        y[0, 0], u[0, 0] = r*mi[0, 0], r*mi[1, 0]
-        y[0, 1], u[0, 1] = c/m[1, 1]*mi[0, 1], c
+        c = self.system.object.radius
+        if self.system.object.finite:
+            y, u, m = u, y, mi[::-1]
+        y[0, 0], u[0, 0] = r*mi[0, 0] - r*mi[0, 1]*mi[1, 0]/mi[1, 1], 0
+        y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
     def propagate(self, start=0, stop=None):
-        l = [self.system.object.wavelengths[0],
-            min(self.system.object.wavelengths),
-            max(self.system.object.wavelengths)]
-        self.l = np.array(l)
-        y0, u0, n0, z0 = self.y[0], self.u[0], 1., 0
+        yu0 = np.array((self.y[0], self.u[0])).T
+        n0, z = None, 0
         for i in range(start, stop or len(self.system)):
             el = self.system[i]
-            z0 += el.thickness
-            self.z[i] = z0
-            y, u, n, v = el.propagate_paraxial(y0, u0, n0, l)
-            self.y[i], self.u[i], self.n[i], self.v[i] = y, u, n, v
-            self.c[i] = el.aberration(y[0], y[1], u0[0], u0[1], n0, n,
-                    self.c.shape[-1])
-            y0, u0, n0 = y, u, n
+            if i > 0:
+                z += el.thickness
+            yu, n = el.propagate_paraxial(yu0, n0, self.l)
+            self.y[i], self.u[i] = yu.T
+            self.n[i], self.z[i] = n, z
+            self.c[i] = el.aberration(yu[:, 0], yu0[:, 1],
+                    n0, n, self.c.shape[-1])
+            self.v[i] = el.dispersion(self.l)
+            yu0, n0 = yu, n
 
     def __str__(self):
         t = itertools.chain(
                 self.print_params(), ("",),
                 self.print_trace(), ("",),
-                #self.print_c3(), ("",),
+                self.print_c3(), ("",),
                 #self.print_h3(), ("",),
-                #self.print_c5(),
+                self.print_c5(),
                 )
         return "\n".join(t)
 
@@ -121,16 +125,17 @@ class ParaxialTrace(object):
     def focal_plane_solve(self):
         self.system.image.thickness -= self.y[-1, 0]/self.u[-1, 0]
 
-    def print_coeffs(self, coeff, labels):
+    def print_coeffs(self, coeff, labels, sum=True):
         yield ("%2s %1s" + "% 10s" * len(labels)) % (
                 ("#", "T") + tuple(labels))
         fmt = "%2s %1s" + "% 10.4g" * len(labels)
         for i, a in enumerate(coeff):
             yield fmt % ((i, self.system[i].typ) + tuple(a))
-        yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
+        if sum:
+            yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
 
     def print_c3(self):
-        c = self.aberration_c
+        c = self.c
         c = np.array([
                 -2*c[:, 0, 1, 1, 0, 0],
                 -c[:, 0, 1, 0, 1, 0],
@@ -148,17 +153,17 @@ class ParaxialTrace(object):
                 "PLC PTC".split())
 
     def print_c5(self):
-        c = self.aberration_c + self.aberration_d
+        c = self.c + self.d
         c = np.array([
-                -2*c[:, 0, 1, 2, 0, 0], # SA5
-                -1*c[:, 0, 1, 1, 1, 0], # CMA5
-                -2*c[:, 0, 0, 1, 1, 0]-2*c[:, 0, 1, 1, 0, 1]+2*c[:, 0, 1, 0, 2, 0], # TOBSA5
-                2*c[:, 0, 1, 1, 0, 1], # SOBSA5
-                -2*c[:, 0, 0, 1, 0, 1]-2*c[:, 0, 0, 0, 2, 0]-2*c[:, 0, 1, 0, 1, 1], # TECMA5
-                -1*c[:, 0, 1, 0, 1, 1], # SECMA5
-                -c[:, 0, 0, 0, 1, 1]/2, # AST5
-                -2*c[:, 0, 1, 0, 0, 2]+c[:, 0, 0, 0, 1, 1]/2, # PTZ5
-                -2*c[:, 0, 0, 0, 0, 2], # DIS5
+                -2*c[:, 0, 1, 2, 0, 0],
+                -1*c[:, 0, 1, 1, 1, 0],
+                -2*c[:, 0, 0, 1, 1, 0]-2*c[:, 0, 1, 1, 0, 1]+2*c[:, 0, 1, 0, 2, 0],
+                2*c[:, 0, 1, 1, 0, 1],
+                -2*c[:, 0, 0, 1, 0, 1]-2*c[:, 0, 0, 0, 2, 0]-2*c[:, 0, 1, 0, 1, 1],
+                -1*c[:, 0, 1, 0, 1, 1],
+                -c[:, 0, 0, 0, 1, 1]/2,
+                -2*c[:, 0, 1, 0, 0, 2]+c[:, 0, 0, 0, 1, 1]/2,
+                -2*c[:, 0, 0, 0, 0, 2],
                 ])
         # transverse image seidel (like oslo)
         return self.print_coeffs(c.T*self.height[1]/2/self.lagrange,
@@ -177,12 +182,9 @@ class ParaxialTrace(object):
         yield "transverse, angular magnification: %.5g, %.5g" % self.magnification
 
     def print_trace(self):
-        # TODO: would like surface incidence angles
-        yield "%2s %1s% 10s% 10s% 10s% 10s" % (
-                "#", "T", "marg h", "marg a", "chief h", "chief a")
-        for i, ((hm, hc), (am, ac)) in enumerate(zip(self.y, self.u)):
-            yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                    i, self.system[i].typ, hm, am, hc, ac)
+        c = np.c_[self.y[:, 0], self.u[:, 0], self.y[:, 1], self.u[:, 1]]
+        return self.print_coeffs(c,
+                "marg y/marg u/chief y/chief u".split("/"), sum=False)
 
     @property
     def lagrange(self):
@@ -196,21 +198,24 @@ class ParaxialTrace(object):
 
     @property
     def height(self):
-        return self.y[0, 1], self.lagrange/(self.n[-2]*self.u[-2,0])
+        "object and image ray height"
+        return self.y[0, 1], self.y[-1, 1] #self.lagrange/(self.n[-2]*self.u[-2,0])
  
     @property
     def focal_distance(self):
+        "FFL and BFL from first/last surfaces"
         return -self.y[1,0]/self.u[0,0], -self.y[-2,0]/self.u[-2,0]
        
     @property
     def numerical_aperture(self):
-        return (abs(self.n[0]*self.u[0,0]),
-                abs(self.n[-2]*self.u[-2,0]))
+        return (abs(self.n[0]*sinarctan(self.u[0,0])),
+                abs(self.n[-2]*sinarctan(self.u[-2,0])))
 
     @property
     def pupil_position(self):
-        return (self.z[0]-self.y[0,1]/self.u[0,1],
-                self.z[-1]-self.y[-1,1]/self.u[-1,1])
+        "relative to object plane"
+        return (self.z[0] - self.y[0,1]/self.u[0,1],
+                self.z[-1] - self.y[-1,1]/self.u[-1,1])
 
     @property
     def pupil_height(self):
@@ -219,13 +224,13 @@ class ParaxialTrace(object):
 
     @property
     def f_number(self):
-        return (1/(2*self.numerical_aperture[0]),
-                1/(2*self.numerical_aperture[1]))
+        na0, na1 = self.numerical_aperture
+        return 1/(2*na0), 1/(2*na1)
 
     @property
     def airy_radius(self):
-        return (1.22*self.l[0]/(2*self.numerical_aperture[0]),
-                1.22*self.l[0]/(2*self.numerical_aperture[1]))
+        na0, na1 = self.numerical_aperture
+        return 1.22*self.l[0]/(2*na0), 1.22*self.l[0]/(2*na1)
 
     @property
     def magnification(self):
