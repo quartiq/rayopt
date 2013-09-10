@@ -34,7 +34,7 @@ class TransformMixin(object):
     def update(self):
         self.rotation = euler_matrix(axes="rzxz", *self.angles)
         self.inverse_rotation = np.linalg.inv(self.rotation)
-        translation = translation_matrix(self.origin)
+        translation = translation_matrix(self.offset)
         self.transformation = concatenate_transforms(translation,
                 self.rotation)
         self.inverse_transformation = np.linalg.inv(self.transformation)
@@ -62,7 +62,7 @@ class TransformMixin(object):
         else:
             y = np.dot(y, self.rotation.T[:3, :3])
             if not angle:
-                y += self.origin
+                y += self.offset
         return y
 
     def transformed_yu(self, fun, y0, u0, *args, **kwargs):
@@ -98,7 +98,7 @@ class Primitive(NameMixin, TransformMixin):
         return u1
 
     def propagate_paraxial(self, y0, u0, n0, l):
-        v = np.zeros_like(v)
+        v = np.zeros_like(n0)
         z = self.thickness
         y = y0 + z*u0
         return y, u0, n0, v
@@ -120,14 +120,15 @@ class Primitive(NameMixin, TransformMixin):
         return y, u, n0, t
 
     def reverse(self):
-        pass
+        self.offset[2] *= -1
+        self.update()
 
     def surface_cut(self, axis, points):
         t = np.linspace(-self.radius, self.radius, points)
         z = np.zeros(points)
         return t, z
 
-    def aberration(y, yb, u, ub, n0, l, kmax):
+    def aberration(self, y, yb, u, ub, n0, l, kmax):
         return 0
 
 
@@ -220,12 +221,13 @@ class Interface(Element):
 class Spheroid(Interface):
     typ = "S"
 
-    def __init__(self, curvature=0, conic=1, aspherics=[], **kwargs):
+    def __init__(self, curvature=0., conic=1., aspherics=[], **kwargs):
         super(Interface, self).__init__(**kwargs)
         self.curvature = curvature
         self.conic = conic
         self.aspherics = np.array(aspherics)
-        assert self.radius**2 < 1/(self.conic*self.curvature**2)
+        if self.curvature:
+            assert self.radius**2 < 1/(self.conic*self.curvature**2)
 
     def shape_func(self, p):
         x, y, z = p.T
@@ -260,10 +262,10 @@ class Spheroid(Interface):
                 s = (-d - np.sign(u[:, 2])*np.sqrt(d**2 - e*f))/e
         else:
             s = super(Spheroid, self).intercept(y, u)
-        return s #np.where(s*np.sign(self.origin[2])>=0, s, np.nan)
+        return s #np.where(s*np.sign(self.thickness)>=0, s, np.nan)
 
     def propagate_paraxial(self, y0, u0, n0, l):
-        y, u, n, v = super(Spheroid, self).proparate_paraxial(
+        y, u, n, v = super(Spheroid, self).propagate_paraxial(
                 y0, u0, n0, l)
         c = self.curvature
         if len(self.aspherics) > 0:
@@ -280,10 +282,11 @@ class Spheroid(Interface):
         return n, np.matrix([[1, d], [-p, n0/n - d*p]])
    
     def reverse(self):
+        super(Spheroid, self).reverse()
         self.curvature *= -1
         self.aspherics *= -1
 
-    def aberration(y, yb, u, ub, n0, n, kmax):
+    def aberration(self, y, yb, u, ub, n0, n, kmax):
         f, g = (self.curvature*y + u)*n0, (self.curvature*yb + ub)*n0
         c = np.zeros((2, 2, kmax, kmax, kmax))
         aberration_intrinsic(self.curvature, f, g, y, yb, 1/n0, 1/n,
@@ -291,7 +294,7 @@ class Spheroid(Interface):
         return c
 
 
-class Object(Primitive):
+class Object(Element):
     typ = "O"
 
     def __init__(self, wavelengths=[588e-9], **kwargs):
@@ -300,7 +303,7 @@ class Object(Primitive):
 
     @property
     def finite(self):
-        return np.isfinite(self.origin[2])
+        return np.isfinite(self.thickness)
 
     def propagate_paraxial(self, y0, u0, n0, l):
         n = self.material.refractive_index(l[0])

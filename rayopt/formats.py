@@ -20,34 +20,47 @@ from .system import System
 from .elements import Spheroid, Aperture, Image, Object
 from .material import air, misc, all_materials, FictionalMaterial
 
-def system_from_array(data, material_map={}, **kwargs):
-    # data is a list of (typ, radius of curvature,
-    # offset from previous, clear radius, material after)
+def system_from_array(data,
+        columns="type roc thickness diameter material".split(),
+        material_map={}, **kwargs):
     element_map = {"O": Object, "S": Spheroid, "A": Aperture, "I": Image}
     s = System(**kwargs)
     for line in data:
-        typ, mat = line[0], line[4]
-        roc, off, rad = map(float, line[1:4])
-        extra = line[5:]
-        e = element_map[typ](*extra)
-        e.radius = rad
-        e.origin = (0, 0, off)
-        e.curvature = roc and 1/roc or 0.
-        mat = material_map.get(mat, mat)
-        if mat in all_materials.db:
-            m = all_materials.db[mat]
+        if "type" in columns:
+            typ = line[columns.index("type")]
         else:
-            try:
-                m = FictionalMaterial(nd=float(mat))
-            except ValueError:
-                m = air
-        e.material = m
-        s.elements.append(e)
+            typ = "S"
+        extra = line[len(columns):]
+        el = element_map[typ](*extra)
+        if hasattr(el, "curvature"):
+            if "roc" in columns:
+                el.curvature = 1/float(line[columns.index("roc")])
+            elif "curvature" in columns:
+                curv = float(line[columns.index("curvature")])
+        if "thickness" in columns:
+            el.thickness = float(line[columns.index("thickness")])
+        if "radius" in columns:
+            el.radius = float(line[columns.index("radius")])
+        elif "diameter" in columns:
+            el.radius = float(line[columns.index("diameter")])/2
+        if hasattr(el, "material"):
+            if "material" in columns:
+                mat = line[columns.index("material")]
+                mat = material_map.get(mat, mat)
+                if mat in all_materials.db:
+                    m = all_materials.db[mat]
+                else:
+                    try:
+                        m = FictionalMaterial(nd=float(mat))
+                    except ValueError:
+                        m = air
+                el.material = m
+        s.append(el)
     return s
 
-def system_from_text(data, **kwargs):
+def system_from_text(text, *args, **kwargs):
     return system_from_array(line.split()
-            for line in data.splitlines() if line.strip(), **kwargs)
+            for line in text.splitlines() if line.strip(), *args, **kwargs)
 
 def system_from_table(data, **kwargs):
     s = System(**kwargs)

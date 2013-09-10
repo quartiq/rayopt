@@ -22,7 +22,7 @@ from .elements import Object, Image, Aperture
 
 
 class System(list):
-    def __init__(self, elements=None, description=""):
+    def __init__(self, elements=[], description=""):
         if elements is None:
             elements = [Object(), Aperture(), Image()]
         super(System, self).__init__(elements)
@@ -139,7 +139,7 @@ class System(list):
     def paraxial_matrices(self, l, start=0, stop=None):
         n0 = 1.
         for e in self[start:stop or len(self)]:
-            n0, m = e.paraxial_matrix(l, n0)
+            n0, m = e.paraxial_matrix(n0, l)
             yield m
 
     def paraxial_matrix(self, l, start=0, stop=None):
