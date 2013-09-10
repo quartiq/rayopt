@@ -42,38 +42,49 @@ def sinarctan(u):
 
 
 class ParaxialTrace(object):
-    def __init__(self, system, kmax=4):
+    def __init__(self, system, aberration_orders=4):
         self.system = system
-        n = len(system)
+        self.allocate(aberration_orders)
+        self.find_rays()
+        self.propagate()
+
+    def allocate(self, k):
+        n = len(self.system)
         self.y = np.empty(n, 2)
         self.u = np.empty(n, 2)
         self.z = np.empty(n)
         self.v = np.empty(n)
         self.n = np.empty(n)
-        self.c = np.empty((n, 2, 2, kmax, kmax, kmax))
+        self.c = np.empty((n, 2, 2, k, k, k))
         self.d = np.empty_like(self.c)
-        self.find_rays()
-        self.propagate()
 
     def find_rays(self):
         c = self.system.object.radius
         u, y = self.u, self.y
         if self.system.object.infinity:
             u, y = y, u
-        eps = 1e-2
-        a[0, 0], b[0, 0] = (eps, 0), (0, eps)
-        r, h, k = self.to_aperture()
-        a[0, 0], b[0, 0] = (r*eps/h[0], -c*h[1]/h[0]), (0, c)
+        #eps = 1e-2
+        #u[0], y[0] = (eps, 0), (0, eps)
+        #r, h, k = self.to_aperture()
+        #u[0], y[0] = (r*eps/h[0], -c*h[1]/h[0]), (0, c)
+        ai = self.system.aperture_index
+        m = self.system.paraxial_matrix(start=0, ai + 1)
+        r = self.system[ai].radius
+        u[0], y[0] = (), (0, c)
 
-    def propagate(self, start=1, stop=None):
+    def propagate(self, start=0, stop=None):
         l = [self.system.object.wavelengths[0],
             min(self.system.object.wavelengths),
             max(self.system.object.wavelengths)]
+        y0, u0, n0 = self.y[0], self.u[0], 1.
         for i in range(start, stop or len(self.system)):
             el = self.system[i]
-            self.y[i], self.u[i], self.n[i], self.v[i] = el.propagate_paraxial(
-                    self.y[i - 1], self.u[i - 1], self.n[i - 1], l)
             self.z = el.thickness
+            y, u, n, v = el.propagate_paraxial(y0, u0, n0, l)
+            self.y[i], self.u[i], self.n[i], self.v[i] = y, u, n, v
+            self.c[i] = el.aberration(y[0], y[1], u0[0], u0[1], n0, n,
+                    self.c.shape[-1])
+            y0, u0, n0 = y, u, n
 
     def __str__(self):
         t = itertools.chain(
@@ -89,21 +100,8 @@ class ParaxialTrace(object):
     # or at argmin(abs(u_marginal))
 
     def size_elements(self):
-        for e, y in zip(self.system.elements[1:], self.y[0, 1:]):
+        for e, y in zip(self.system[1:], self.y[1:]):
             e.radius = np.fabs(y).sum() # marginal+chief
-
-    def propagate(self):
-        self.find_rays()
-        for i, e in enumerate(self.system.elements):
-            e.propagate_paraxial(self, i)
-        self.aberration_c, self.aberration_d = aberration_trace(self,
-                kmax=4)
-
-    def to_aperture(self):
-        for i, e in enumerate(self.system.elements):
-            e.propagate_paraxial(self, i)
-            if e.typestr == "A":
-                return e.radius, self.y[0, i], self.u[0, i]
 
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
@@ -177,7 +175,7 @@ class ParaxialTrace(object):
         # TODO: would like surface incidence angles
         yield "%2s %1s% 10s% 10s% 10s% 10s" % (
                 "#", "T", "marg h", "marg a", "chief h", "chief a")
-        for i, ((hm, hc), (am, ac)) in enumerate(zip(self.y[0], self.u[0])):
+        for i, ((hm, hc), (am, ac)) in enumerate(zip(self.y, self.u)):
             yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g" % (
                     i, self.system.elements[i].typestr, hm, am, hc, ac)
 
