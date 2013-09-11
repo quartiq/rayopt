@@ -61,7 +61,6 @@ class ParaxialTrace(Trace):
         super(ParaxialTrace, self).__init__(system)
         self.allocate(aberration_orders)
         self.find_rays()
-        self.propagate()
 
     def allocate(self, k):
         l = self.system.object.wavelengths
@@ -132,6 +131,18 @@ class ParaxialTrace(Trace):
 
     def focal_plane_solve(self):
         self.system.image.thickness -= self.y[-1, 0]/self.u[-1, 0]
+
+    def plot(self, ax, **kwargs):
+        kwargs.setdefault("linestyle", "-")
+        kwargs.setdefault("color", "green")
+        ax.plot(self.z, self.y[:, 0], **kwargs)
+        ax.plot(self.z, self.y[:, 1], **kwargs)
+        p0, p1 = self.pupil_position
+        p0 += self.z[1]
+        p1 += self.z[-2]
+        h0, h1 = self.pupil_height
+        ax.plot([p0, p0], [-h0, h0], **kwargs)
+        ax.plot([p1, p1], [-h1, h1], **kwargs)
 
     def print_c3(self):
         c = self.c
@@ -250,15 +261,24 @@ class FullTrace(Trace):
         self.y = np.empty((self.length, nrays, 3))
         self.u = np.empty_like(self.y)
         self.l = np.empty(nrays)
+        self.z = np.empty(self.length)
         self.n = np.empty((self.length, nrays))
         self.t = np.empty_like(self.n)
 
     def propagate(self, clip=True):
-        y, u, n, l = self.y[0], self.u[0], None, self.l
+        y, u, n, l, z = self.y[0], self.u[0], None, self.l, 0
         for i, e in enumerate(self.system):
-            y, u, n, t = e.propagate(y, u, n, l, clip=True)
-            self.y[i], self.u[i], self.n[i], self.t[i] = (
-                    y, u, n, t)
+            y, u, n, t = e.transformed_yu(e.propagate, y, u, n, l, clip)
+            self.y[i], self.u[i], self.n[i], self.t[i] = (y, u, n, t)
+            self.z[i] = z = z + e.thickness
+
+    def plot(self, ax, axis=0, **kwargs):
+        kwargs.setdefault("linestyle", "-")
+        kwargs.setdefault("color", "green")
+        kwargs.setdefault("alpha", .3)
+        y = self.y[:, :, 0]
+        z = self.y[:, :, 2] + self.z[:, None]
+        ax.plot(z, y, **kwargs)
 
     @classmethod
     def like_paraxial(cls, paraxial):
@@ -280,24 +300,19 @@ class FullTrace(Trace):
         xp, yp = self.get_rays(distribution, nrays)
         hp, rp = paraxial.pupil_position[0], paraxial.pupil_height[0]
         r = self.system.object.radius
-        if self.system.object.infinity:
+        if not self.system.object.finite:
             r = sinarctan(r)
             p, q = height[0]*r, height[1]*r
             a, b = xp*rp-hp*tanarcsin(p), yp*rp-hp*tanarcsin(q)
         else:
             a, b = height[0]*r, height[1]*r
             p, q = sinarctan((xp*rp-a)/hp), sinarctan((yp*rp-b)/hp)
-        self.nrays = xp.shape[0]
-        self.allocate()
+        self.allocate(xp.shape[0])
         self.l[:] = wavelength
         self.n[0] = self.system.object.material.refractive_index(
                 wavelength)
-        self.y[0, 0] = a
-        self.y[1, 0] = b
-        self.y[2, 0] = 0
-        self.u[0, 0] = p
-        self.u[1, 0] = q
-        self.u[2, 0] = np.sqrt(1-p**2-q**2)
+        self.y[0] = np.array((a, b, np.zeros_like(a))).T
+        self.u[0] = np.array((p, q, np.sqrt(1 - p**2 - q**2))).T
 
     def rays_for_object(self, paraxial, wavelength, nrays, eps=1e-6):
         hp, rp = paraxial.pupil_position[0], paraxial.pupil_height[0]
@@ -497,12 +512,13 @@ class FullTrace(Trace):
 
     def print_trace(self):
         for i in range(self.nrays):
-            yield "ray %i" % i
-            c = np.concatenate((self.y[:, i, :], self.u[:, i, :],
-                self.t[:, i, None]), axis=1)
-            for _ in self.print_coeffs(c, 
-                    "height x/height y/height z/angle x/"
-                    "angle y/angle z/length".split("/"), sum=False):
+            yield "ray %i, %.3g nm" % (i, self.l[i]/1e-9)
+            c = np.concatenate((self.n[:, i, None], self.z[:, None],
+                np.cumsum(self.t[:, i, None], axis=0),
+                self.y[:, i, :], self.u[:, i, :]), axis=1)
+            for _ in self.print_coeffs(c, "n/track z/path len/"
+                    "height x/height y/height z/angle x/angle y/angle z"
+                    .split("/"), sum=False):
                 yield _
             yield ""
 

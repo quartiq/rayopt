@@ -105,11 +105,15 @@ class System(list):
                     e.radius*2, mat or "", n, v)
 
     def surfaces_cut(self, axis, points):
-        oz = 0
+        z0 = 0.
         pending = None
         for e in self:
+            z0 += e.thickness
             x, z = e.transform_from(e.surface_cut(axis, points))
-            z, oz = z + oz, oz + e.thickness
+            z += z0
+            if not hasattr(e, "material"):
+                yield x, z
+                continue
             if pending:
                 px, pz = pending
                 if x[0] < px[0]: # lower right
@@ -125,16 +129,17 @@ class System(list):
             elif not e.material.solid:
                 yield x, z
             if e.material.solid:
-                l = xi, zi
+                pending = x, z
             else:
-                l = None
+                pending = None
 
     def plot(self, ax, axis=0, npoints=21, **kwargs):
         kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "black")
         # ax.set_aspect("equal")
         for x, z in self.surfaces_cut(axis, npoints):
-            ax.plot(x, z, **kwargs)
+            ax.plot(z, x, **kwargs)
+        ax.plot([0, sum(e.thickness for e in self)], [0, 0], **kwargs)
 
     def paraxial_matrices(self, l, start=0, stop=None, n=None):
         for e in self[start:stop or len(self)]:

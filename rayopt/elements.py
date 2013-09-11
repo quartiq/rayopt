@@ -93,9 +93,7 @@ class Primitive(NameMixin, TransformMixin):
 
     def clip(self, y, u):
         r2 = y[:, 0]**2 + y[:, 1]**2
-        u1 = u.copy()
-        u1[:, 2] = np.where(r2 > self.radius**2, np.nan, u[:, 2])
-        return u1
+        u[:, 2] = np.where(r2 > self.radius**2, np.nan, u[:, 2])
 
     def propagate_paraxial(self, yu0, n0, l):
         n, m = self.paraxial_matrix(n0, l)
@@ -116,7 +114,8 @@ class Primitive(NameMixin, TransformMixin):
         y += t[:, None]*u0
         u = u0
         if clip:
-            u = self.clip(u, y)
+            u = u.copy()
+            self.clip(y, u)
         return y, u, n0, t
 
     def reverse(self):
@@ -195,13 +194,13 @@ class Interface(Element):
         # G. H. Spencer and M. V. R. K. Murty
         # JOSA, Vol. 52, Issue 6, pp. 672-676 (1962)
         # doi:10.1364/JOSA.52.000672
-        if np.all(mu == 1):
-            u = u0
+        if np.all(mu == 1): # all/any?
+            return u0
         r = self.shape_func_deriv(y)
         r2 = np.square(r).sum(axis=1)
         a = np.fabs(mu)*(u0*r).sum(axis=1)/r2
         # solve g**2 + 2*a*g + b=0
-        if np.all(mu == -1):
+        if np.all(mu == -1): # all/any?
             u = u0 - 2*a*r # reflection
         else:
             b = (mu**2 - 1)/r2
@@ -214,7 +213,10 @@ class Interface(Element):
 
     def surface_cut(self, axis, points):
         x, z = super(Interface, self).surface_cut(axis, points)
-        z -= self.shape_func(xyz)
+        xyz = np.zeros((3, len(x)))
+        xyz[axis] = x
+        xyz[2] = z
+        z = -self.shape_func(xyz.T)
         return x, z
 
 
