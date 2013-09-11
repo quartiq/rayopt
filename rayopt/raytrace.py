@@ -514,9 +514,9 @@ class FullTrace(Trace):
         for i in range(self.nrays):
             yield "ray %i, %.3g nm" % (i, self.l[i]/1e-9)
             c = np.concatenate((self.n[:, i, None], self.z[:, None],
-                np.cumsum(self.t[:, i, None], axis=0),
+                np.cumsum(self.t[:, i, None], axis=0)-self.z[:, None],
                 self.y[:, i, :], self.u[:, i, :]), axis=1)
-            for _ in self.print_coeffs(c, "n/track z/path len/"
+            for _ in self.print_coeffs(c, "n/track z/rel path/"
                     "height x/height y/height z/angle x/angle y/angle z"
                     .split("/"), sum=False):
                 yield _
