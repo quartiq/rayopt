@@ -69,14 +69,14 @@ class Material(HasTraits):
         return self.name
 
     def refractive_index(self, wavelength):
-        w2 = (wavelength/1e-6)**2
-        c0 = self.sellmeier[:, 0]
-        c1 = self.sellmeier[:, 1]
-        n2 = 1.+(c0*w2/(w2-c1)).sum(-1)
+        w2 = (np.array(wavelength)/1e-6)**2
+        c0 = self.sellmeier[:, 0:1]
+        c1 = self.sellmeier[:, 1:2]
+        n2 = 1. + (c0*w2/(w2 - c1)).sum(0)
         n = np.sqrt(n2)
         if self.mirror:
             n = -n
-        return n
+        return n.reshape(w2.shape)
 
     def _nd_default(self):
         return float(self.refractive_index(lambda_d))
@@ -133,11 +133,11 @@ air_mirror = Material(name="air_mirror", solid=False, sellmeier=[
 
 #@np.vectorize
 def air_refractive_index(wavelength):
-    w2 = (wavelength/1e-6)**2
-    c0 = air.sellmeier[:, 0]
-    c1 = air.sellmeier[:, 1]
-    n  = 1.+(c0/(c1-w2)).sum(-1)
-    return n
+    w2 = (np.array(wavelength)/1e-6)**2
+    c0 = air.sellmeier[:, 0:1]
+    c1 = air.sellmeier[:, 1:2]
+    n  = 1. + (c0/(c1 - w2)).sum(0)
+    return n.reshape(w2.shape)
 
 air.refractive_index = air_refractive_index
 air_mirror.refractive_index = lambda l: -air_refractive_index(l)

@@ -44,21 +44,29 @@ def sinarctan(u):
 class Trace(object):
     def __init__(self, system):
         self.system = system
+        self.length = len(system)
+
+    def print_coeffs(self, coeff, labels, sum=True):
+        yield ("%2s %1s" + "% 10s" * len(labels)) % (
+                ("#", "T") + tuple(labels))
+        fmt = "%2s %1s" + "% 10.4g" * len(labels)
+        for i, a in enumerate(coeff):
+            yield fmt % ((i, self.system[i].typ) + tuple(a))
+        if sum:
+            yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
 
 
 class ParaxialTrace(Trace):
     def __init__(self, system, aberration_orders=4):
         super(ParaxialTrace, self).__init__(system)
-        self.allocate(system, aberration_orders)
+        self.allocate(aberration_orders)
         self.find_rays()
         self.propagate()
 
-    def allocate(self, system, k):
-        self.system = system
-        n = len(system)
-        self.l = np.array([system.object.wavelengths[0],
-            min(system.object.wavelengths),
-            max(system.object.wavelengths)])
+    def allocate(self, k):
+        l = self.system.object.wavelengths
+        n = self.length
+        self.l = np.array([l[0], min(l), max(l)])
         self.y = np.empty((n, 2))
         self.u = np.empty((n, 2))
         self.z = np.empty(n)
@@ -66,6 +74,21 @@ class ParaxialTrace(Trace):
         self.n = np.empty(n)
         self.c = np.empty((n, 2, 2, k, k, k))
         self.d = np.empty_like(self.c)
+
+    def propagate(self, start=0, stop=None):
+        yu0 = np.array((self.y[0], self.u[0])).T
+        n0, z = None, 0
+        for i in range(start, stop or self.length):
+            el = self.system[i]
+            if i > 0:
+                z += el.thickness
+            yu, n = el.propagate_paraxial(yu0, n0, self.l)
+            self.y[i], self.u[i] = yu.T
+            self.n[i], self.z[i] = n, z
+            self.c[i] = el.aberration(yu[:, 0], yu0[:, 1],
+                    n0, n, self.c.shape[-1])
+            self.v[i] = el.dispersion(self.l)
+            yu0, n0 = yu, n
 
     def find_rays(self):
         y, u = self.y, self.u
@@ -79,21 +102,6 @@ class ParaxialTrace(Trace):
             y, u, m = u, y, mi[::-1]
         y[0, 0], u[0, 0] = r*mi[0, 0] - r*mi[0, 1]*mi[1, 0]/mi[1, 1], 0
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
-
-    def propagate(self, start=0, stop=None):
-        yu0 = np.array((self.y[0], self.u[0])).T
-        n0, z = None, 0
-        for i in range(start, stop or len(self.system)):
-            el = self.system[i]
-            if i > 0:
-                z += el.thickness
-            yu, n = el.propagate_paraxial(yu0, n0, self.l)
-            self.y[i], self.u[i] = yu.T
-            self.n[i], self.z[i] = n, z
-            self.c[i] = el.aberration(yu[:, 0], yu0[:, 1],
-                    n0, n, self.c.shape[-1])
-            self.v[i] = el.dispersion(self.l)
-            yu0, n0 = yu, n
 
     def __str__(self):
         t = itertools.chain(
@@ -115,7 +123,7 @@ class ParaxialTrace(Trace):
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
         if i is None:
-            i = len(self.system)-2
+            i = self.length - 2
         y0, y = self.y[(i-1, i), 0]
         u0, u = self.u[i-1, 0], -self.y[0, 0]/f
         n0, n = self.n[(i-1, i), :]
@@ -124,15 +132,6 @@ class ParaxialTrace(Trace):
 
     def focal_plane_solve(self):
         self.system.image.thickness -= self.y[-1, 0]/self.u[-1, 0]
-
-    def print_coeffs(self, coeff, labels, sum=True):
-        yield ("%2s %1s" + "% 10s" * len(labels)) % (
-                ("#", "T") + tuple(labels))
-        fmt = "%2s %1s" + "% 10.4g" * len(labels)
-        for i, a in enumerate(coeff):
-            yield fmt % ((i, self.system[i].typ) + tuple(a))
-        if sum:
-            yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
 
     def print_c3(self):
         c = self.c
@@ -171,6 +170,7 @@ class ParaxialTrace(Trace):
 
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
+        yield "track length: %.5g" % self.track
         yield "focal length: %.5g" % self.focal_length
         yield "object, image height: %.5g, %.5g" % self.height
         yield "front, back focal distance: %.5g, %.5g" % self.focal_distance
@@ -185,6 +185,10 @@ class ParaxialTrace(Trace):
         c = np.c_[self.y[:, 0], self.u[:, 0], self.y[:, 1], self.u[:, 1]]
         return self.print_coeffs(c,
                 "marg y/marg u/chief y/chief u".split("/"), sum=False)
+        
+    @property
+    def track(self):
+        return self.z[-2] - self.z[1]
 
     @property
     def lagrange(self):
@@ -193,7 +197,7 @@ class ParaxialTrace(Trace):
     @property
     def focal_length(self):
         return -self.lagrange/self.n[0]/(
-                self.u[0,0]*self.u[-2,1]-
+                self.u[0,0]*self.u[-2,1] -
                 self.u[0,1]*self.u[-2,0])
 
     @property
@@ -213,14 +217,12 @@ class ParaxialTrace(Trace):
 
     @property
     def pupil_position(self):
-        "relative to object plane"
-        return (self.z[0] - self.y[0,1]/self.u[0,1],
-                self.z[-1] - self.y[-1,1]/self.u[-1,1])
+        return -self.y[1,1]/self.u[0,1], -self.y[-2,1]/self.u[-2,1]
 
     @property
     def pupil_height(self):
-        return (self.y[0,0]+(self.pupil_position[0]-self.z[0])*self.u[0,0],
-                self.y[-1,0]+(self.pupil_position[1]-self.z[-1])*self.u[-1,0])
+        p0, p1 = self.pupil_position
+        return self.y[1,0] + p0*self.u[0,0], self.y[-2,0] + p1*self.u[-2,0]
 
     @property
     def f_number(self):
@@ -238,26 +240,39 @@ class ParaxialTrace(Trace):
                 (self.n[-2]*self.u[-2,1])/(self.n[1]*self.u[0,1]))
 
 
-class FullTrace(object):
-    #o = Array(dtype=np.float64, shape=(None)) # intensity
-    #p = Array(dtype=np.float64, shape=(None, None)) # lengths
+class FullTrace(Trace):
+    def __init__(self, system, nrays):
+        super(FullTrace, self).__init__(system)
+        self.allocate(nrays)
 
-    def allocate(self):
-        super(FullTrace, self).allocate()
-        self.o = np.zeros((self.nrays,), dtype=np.float64)
-        self.p = np.zeros((self.length, self.nrays), dtype=np.float64)
+    def allocate(self, nrays):
+        self.nrays = nrays
+        self.y = np.empty((self.length, nrays, 3))
+        self.u = np.empty_like(self.y)
+        self.l = np.empty(nrays)
+        self.n = np.empty((self.length, nrays))
+        self.t = np.empty_like(self.n)
+
+    def propagate(self, clip=True):
+        y, u, n, l = self.y[0], self.u[0], None, self.l
+        for i, e in enumerate(self.system):
+            y, u, n, t = e.propagate(y, u, n, l, clip=True)
+            self.y[i], self.u[i], self.n[i], self.t[i] = (
+                    y, u, n, t)
+
+    @classmethod
+    def like_paraxial(cls, paraxial):
+        obj = cls(paraxial.system, 2)
+        obj.rays_like_paraxial(paraxial)
+        return obj
 
     def rays_like_paraxial(self, paraxial):
-        self.nrays = 2
-        self.allocate()
-        self.l = paraxial.l
-        self.n[0] = paraxial.n[0]
-        self.y[0, 0] = paraxial.y[0, 0]
-        self.y[1, 0] = 0.
-        self.y[2, 0] = 0.
-        self.u[0, 0] = sinarctan(paraxial.u[0, 0])
-        self.u[1, 0] = 0.
-        self.u[2, 0] = np.sqrt(1-self.u[0, 0]**2)
+        self.l[:] = self.system.object.wavelengths[0]
+        self.y[0, :, :] = 0
+        self.y[0, :, 0] = paraxial.y[0]
+        self.u[0, :, :] = 0
+        self.u[0, :, 0] = sinarctan(paraxial.u[0])
+        self.u[0, :, 2] = np.sqrt(1 - self.u[0, :, 0]**2)
 
     def rays_for_point(self, paraxial, height, wavelength, nrays,
             distribution):
@@ -472,10 +487,6 @@ class FullTrace(object):
                 [np.linspace(-1, 1, 2*n/3), np.zeros((2*n/3,))],
                 [np.zeros((n/3,)), np.linspace(0, 1, n/3)]], axis=1)
 
-    def propagate(self, clip=True):
-        for i, e in enumerate(self.system.elements):
-            e.propagate(self, i, clip)
-
     def __str__(self):
         t = itertools.chain(
                 #self.print_params(),
@@ -485,15 +496,13 @@ class FullTrace(object):
         return "\n".join(t)
 
     def print_trace(self):
-        yield "%2s %1s% 10s% 10s% 10s% 10s% 10s% 10s% 10s" % (
-                "#", "T", "height x", "height y", "height z",
-                "angle x", "angle y", "angle z", "length")
         for i in range(self.nrays):
-            yield ""
             yield "ray %i" % i
-            for j in range(self.length):
-                yield "%2s %1s% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g% 10.4g" % (
-                        j, self.system.elements[j].typestr, 
-                        self.y[0, j, i], self.y[1, j, i], self.y[2, j, i],
-                        self.u[0, j, i], self.u[1, j, i], self.u[2, j, i],
-                        self.p[j, i])
+            c = np.concatenate((self.y[:, i, :], self.u[:, i, :],
+                self.t[:, i, None]), axis=1)
+            for _ in self.print_coeffs(c, 
+                    "height x/height y/height z/angle x/"
+                    "angle y/angle z/length".split("/"), sum=False):
+                yield _
+            yield ""
+

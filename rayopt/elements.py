@@ -206,7 +206,7 @@ class Interface(Element):
         else:
             b = (mu**2 - 1)/r2
             g = -a + np.sign(mu)*np.sqrt(a**2 - b)
-            u = np.fabs(mu)*u + g*r # refraction
+            u = np.fabs(mu)[:, None]*u0 + g[:, None]*r # refraction
         return u
 
     def reverse(self):
