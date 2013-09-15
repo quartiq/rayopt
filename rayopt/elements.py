@@ -144,7 +144,7 @@ class Element(Primitive):
     def paraxial_matrix(self, n0, l):
         n, m = super(Element, self).paraxial_matrix(n0, l)
         if self.material is not None:
-            n = self.material.refractive_index(l[0])
+            n = self.material.refractive_index(l)
         return n, m
 
     def refract(self, y, u0, mu):
@@ -158,10 +158,10 @@ class Element(Primitive):
             u = self.refract(y, u, n0/n)
         return y, u, n, t
 
-    def dispersion(self, l):
+    def dispersion(self, lmin, lmax):
         v = 0
         if self.material is not None:
-            v = self.material.delta_n(min(l), max(l))
+            v = self.material.delta_n(lmin, lmax)
         return v
 
 
@@ -205,11 +205,8 @@ class Interface(Element):
         else:
             b = (mu**2 - 1)/r2
             g = -a + np.sign(mu)*np.sqrt(a**2 - b)
-            u = np.fabs(mu)[:, None]*u0 + g[:, None]*r # refraction
+            u = np.fabs(mu)*u0 + g[:, None]*r # refraction
         return u
-
-    def reverse(self):
-        raise NotImplementedError
 
     def surface_cut(self, axis, points):
         x, z = super(Interface, self).surface_cut(axis, points)
@@ -271,7 +268,7 @@ class Spheroid(Interface):
         c = self.curvature
         if len(self.aspherics) > 0:
             c += 2*self.aspherics[0]
-        n = self.material.refractive_index(l[0])
+        n = self.material.refractive_index(l)
         mu = n0/n
         d = self.thickness
         p = c*(mu - 1)
@@ -295,16 +292,16 @@ class Spheroid(Interface):
 class Object(Element):
     typ = "O"
 
-    def __init__(self, wavelengths=[588e-9], **kwargs):
+    def __init__(self, wavelengths=[588e-9], infinite=None, **kwargs):
         super(Object, self).__init__(**kwargs)
         self.wavelengths = wavelengths
-
-    @property
-    def finite(self):
-        return self.thickness != 0
+        if infinite is None:
+            infinite = self.thickness == 0
+        self.infinite = infinite
+        self.thickness = 0
 
     def paraxial_matrix(self, n0, l):
-        n = self.material.refractive_index(l[0])
+        n = self.material.refractive_index(l)
         return n, np.eye(2)
     
     def propagate(self, y0, u0, n0, l, clip=True):

@@ -73,10 +73,11 @@ class System(list):
         # shift thicknesses forward
         for e in self:
             e.reverse()
+        # shit thicknesses forwards
         d = i.thickness
         for e in self[1:]:
             d, e.thickness = e.thickness, d
-        # shft materials backwards
+        # shift materials backwards
         m = o.material
         for e in self[-2::-1]:
             if hasattr(e, "material"):
@@ -137,9 +138,9 @@ class System(list):
         kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "black")
         # ax.set_aspect("equal")
+        # ax.plot([0, sum(e.thickness for e in self)], [0, 0], **kwargs)
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(z, x, **kwargs)
-        ax.plot([0, sum(e.thickness for e in self)], [0, 0], **kwargs)
 
     def paraxial_matrices(self, l, start=0, stop=None, n=None):
         for e in self[start:stop or len(self)]:

@@ -21,7 +21,7 @@ import numpy as np
 
 from .system import System
 from .elements import Spheroid, Aperture, Image, Object
-from .material import air, misc, all_materials, FictionalMaterial
+from .material import air, all_materials, Material
 
 
 def try_get(line, columns, field, default=None):
@@ -59,12 +59,13 @@ def system_from_array(data,
         if hasattr(el, "material"):
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)
-            if mat in all_materials.db:
-                m = all_materials.db[mat]
-            elif type(mat) is type(1.):
-                m = FictionalMaterial(nd=mat)
+            if type(mat) is type(1.):
+                m = Material(nd=mat)
             else:
-                m = air
+                try:
+                    m = all_materials[mat]
+                except KeyError:
+                    m = air
             el.material = m
         s.append(el)
     return s
@@ -93,7 +94,7 @@ def system_from_table(data, **kwargs):
         else:
             curv = 1/roc
         rad = float(p[-1])/2
-        if p[-2].upper() in all_materials.db:
+        if p[-2].upper() in all_materials:
             mat = all_materials[p[-2].upper()]
         else:
             mat = air
@@ -129,7 +130,7 @@ def system_from_oslo(fil):
         elif cmd == "AP":
             e.radius = float(args[0])
         elif cmd == "GLA":
-            e.material = all_materials.db[args[0]]
+            e.material = all_materials[args[0]]
         elif cmd == "AST":
             s.append(Aperture(radius=e.radius))
         elif cmd == "RD":
@@ -171,14 +172,14 @@ def system_from_zemax(fil):
         elif cmd == "GLAS":
             args = args.split()
             name = args[0]
-            if name in all_materials.db:
-                e.material = all_materials.db[name]
+            if name in all_materials:
+                e.material = all_materials[name]
             else:
                 print "material not found: %s" % name
                 try:
                     nd = float(args[3])
                     vd = float(args[4])
-                    e.material = FictionalMaterial(nd=nd, vd=vd)
+                    e.material = Material(nd=nd, vd=vd)
                 except:
                     e.material = air
         elif cmd == "DIAM":

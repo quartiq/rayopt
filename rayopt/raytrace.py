@@ -24,14 +24,12 @@ with some improvements
 import itertools
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 # from .special_sums import polar_sum
 # from .aberration_orders import aberration_trace
 
 
-def dir_to_angles(x,y,z):
-    r = np.array([x,y,z], dtype=np.float64)
+def dir_to_angles(r):
     return r/np.linalg.norm(r)
 
 def tanarcsin(u):
@@ -44,7 +42,9 @@ def sinarctan(u):
 class Trace(object):
     def __init__(self, system):
         self.system = system
-        self.length = len(system)
+
+    def allocate(self):
+        self.length = len(self.system)
 
     def print_coeffs(self, coeff, labels, sum=True):
         yield ("%2s %1s" + "% 10s" * len(labels)) % (
@@ -63,41 +63,43 @@ class ParaxialTrace(Trace):
         self.find_rays()
 
     def allocate(self, k):
+        super(ParaxialTrace, self).allocate()
         l = self.system.object.wavelengths
         n = self.length
-        self.l = np.array([l[0], min(l), max(l)])
+        self.l = l[0]
+        self.lmin = min(l)
+        self.lmax = max(l)
         self.y = np.empty((n, 2))
         self.u = np.empty((n, 2))
-        self.z = np.empty(n)
         self.v = np.empty(n)
         self.n = np.empty(n)
         self.c = np.empty((n, 2, 2, k, k, k))
         self.d = np.empty_like(self.c)
 
     def propagate(self, start=0, stop=None):
+        self.z = np.cumsum([e.thickness for e in self.system])
         yu0 = np.array((self.y[0], self.u[0])).T
-        n0, z = None, 0
+        n0 = None
         for i in range(start, stop or self.length):
             el = self.system[i]
-            if i > 0:
-                z += el.thickness
             yu, n = el.propagate_paraxial(yu0, n0, self.l)
             self.y[i], self.u[i] = yu.T
-            self.n[i], self.z[i] = n, z
+            self.n[i] = n
             self.c[i] = el.aberration(yu[:, 0], yu0[:, 1],
                     n0, n, self.c.shape[-1])
-            self.v[i] = el.dispersion(self.l)
+            self.v[i] = el.dispersion(self.lmin, self.lmax)
             yu0, n0 = yu, n
+        self.d[:] = 0 # TODO
 
     def find_rays(self):
         y, u = self.y, self.u
-        l = self.system.object.wavelengths
+        l = self.system.object.wavelengths[0]
         ai = self.system.aperture_index
         m = self.system.paraxial_matrix(l, stop=ai + 1)
         mi = np.linalg.inv(m)
         r = self.system[ai].radius
         c = self.system.object.radius
-        if self.system.object.finite:
+        if not self.system.object.infinite:
             y, u, m = u, y, mi[::-1]
         y[0, 0], u[0, 0] = r*mi[0, 0] - r*mi[0, 1]*mi[1, 0]/mi[1, 1], 0
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
@@ -112,12 +114,12 @@ class ParaxialTrace(Trace):
                 )
         return "\n".join(t)
 
-    # TODO introduce aperture at argmax(abs(y_marginal)/radius)
-    # or at argmin(abs(u_marginal))
+    # TODO introduce aperture at argmax(abs(y_axial)/radius)
+    # or at argmin(abs(u_axial))
 
     def size_elements(self):
         for e, y in zip(self.system[1:], self.y[1:]):
-            e.radius = np.fabs(y).sum() # marginal+chief
+            e.radius = np.fabs(y).sum() # axial+chief
 
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
@@ -137,12 +139,13 @@ class ParaxialTrace(Trace):
         kwargs.setdefault("color", "green")
         ax.plot(self.z, self.y[:, 0], **kwargs)
         ax.plot(self.z, self.y[:, 1], **kwargs)
-        p0, p1 = self.pupil_position
+        p0, p1 = self.pupil_distance
         p0 += self.z[1]
         p1 += self.z[-2]
         h0, h1 = self.pupil_height
-        ax.plot([p0, p0], [-h0, h0], **kwargs)
-        ax.plot([p1, p1], [-h1, h1], **kwargs)
+        z = np.ones(5)
+        x = np.array([-1.5, -1, np.nan, 1, 1.5])
+        ax.plot(p0*z, h0*x, p1*z, h1*x,**kwargs)
 
     def print_c3(self):
         c = self.c
@@ -165,15 +168,23 @@ class ParaxialTrace(Trace):
     def print_c5(self):
         c = self.c + self.d
         c = np.array([
-                -2*c[:, 0, 1, 2, 0, 0],
-                -1*c[:, 0, 1, 1, 1, 0],
-                -2*c[:, 0, 0, 1, 1, 0]-2*c[:, 0, 1, 1, 0, 1]+2*c[:, 0, 1, 0, 2, 0],
-                2*c[:, 0, 1, 1, 0, 1],
-                -2*c[:, 0, 0, 1, 0, 1]-2*c[:, 0, 0, 0, 2, 0]-2*c[:, 0, 1, 0, 1, 1],
-                -1*c[:, 0, 1, 0, 1, 1],
-                -c[:, 0, 0, 0, 1, 1]/2,
-                -2*c[:, 0, 1, 0, 0, 2]+c[:, 0, 0, 0, 1, 1]/2,
-                -2*c[:, 0, 0, 0, 0, 2],
+                -2*c[:, 0, 1, 2, 0, 0], # MU1
+                -1*c[:, 0, 1, 1, 1, 0], # MU3
+                -2*c[:, 0, 0, 1, 1, 0] - 2*c[:, 0, 1, 1, 0, 1] # MU5
+                    + 2*c[:, 0, 1, 0, 2, 0], # MU6
+                2*c[:, 0, 1, 1, 0, 1], # MU5
+                # -2*c[:, 0, 0, 1, 0, 1]-c[:, 0, 0, 0, 2, 0]
+                # -c[:, 0, 1, 0, 1, 1], # MU7
+                # -c[:, 0, 1, 0, 1, 1]-c[:, 0, 0, 0, 2, 0], # MU8
+                -2*c[:, 0, 0, 1, 0, 1] - 2*c[:, 0, 0, 0, 2, 0]
+                    - 2*c[:, 0, 1, 0, 1, 1], # MU7+MU8
+                -1*c[:, 0, 1, 0, 1, 1], # MU9
+                -c[:, 0, 0, 0, 1, 1]/2, # (MU10-MU11)/4
+                -2*c[:, 0, 1, 0, 0, 2] + c[:, 0, 0, 0, 1, 1]/2,
+                # (5*MU11-MU10)/4
+                # -2*c[:, 0, 0, 0, 1, 1]-2*c[:, 0, 1, 0, 0, 2], # MU10
+                # -2*c[:, 0, 1, 0, 0, 2], # MU11
+                -2*c[:, 0, 0, 0, 0, 2], # MU12
                 ])
         # transverse image seidel (like oslo)
         return self.print_coeffs(c.T*self.height[1]/2/self.lagrange,
@@ -182,24 +193,42 @@ class ParaxialTrace(Trace):
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
         yield "track length: %.5g" % self.track
-        yield "focal length: %.5g" % self.focal_length
-        yield "object, image height: %.5g, %.5g" % self.height
-        yield "front, back focal distance: %.5g, %.5g" % self.focal_distance
-        yield "entry, exit pupil position: %.5g, %.5g" % self.pupil_position
-        yield "entry, exit pupil height: %.5g, %.5g" % self.pupil_height
-        yield "front, back numerical aperture: %.5g, %.5g" % self.numerical_aperture
-        yield "front, back working f number: %.5g, %.5g" % self.f_number
-        yield "front, back airy radius: %.5g, %.5g" % self.airy_radius
-        yield "transverse, angular magnification: %.5g, %.5g" % self.magnification
+        yield "object, image height: %s" % self.height
+        yield "front, back focal length: %s" % self.focal_length
+        yield "front, back focal distance: %s" % self.focal_distance
+        yield "front, back principal distance: %s" % self.principal_distance
+        yield "front, back nodal distance: %s" % self.nodal_distance
+        yield "entry, exit pupil distance: %s" % self.pupil_distance
+        yield "entry, exit pupil height: %s" % self.pupil_height
+        yield "front, back numerical aperture: %s" % self.numerical_aperture
+        yield "front, back working f number: %s" % self.f_number
+        yield "front, back airy radius: %s" % self.airy_radius
+        yield "transverse, angular magnification: %s" % self.magnification
 
     def print_trace(self):
         c = np.c_[self.y[:, 0], self.u[:, 0], self.y[:, 1], self.u[:, 1]]
         return self.print_coeffs(c,
-                "marg y/marg u/chief y/chief u".split("/"), sum=False)
+                "axial y/axial u/chief y/chief u".split("/"), sum=False)
         
     @property
     def track(self):
         return self.z[-2] - self.z[1]
+
+    @property
+    def height(self):
+        "object and image ray height"
+        return self.y[(0, -1), 1]
+        #self.lagrange/(self.n[-2]*self.u[-2,0])
+
+    @property
+    def pupil_distance(self):
+        "pupil location relative to first/last surface"
+        return -self.y[(1, -2), 1]/self.u[(0, -2), 1]
+
+    @property
+    def pupil_height(self):
+        p = self.pupil_distance
+        return self.y[(1, -2), 0] + p*self.u[(0, -2), 0]
 
     @property
     def lagrange(self):
@@ -207,65 +236,75 @@ class ParaxialTrace(Trace):
 
     @property
     def focal_length(self):
-        return -self.lagrange/self.n[0]/(
-                self.u[0,0]*self.u[-2,1] -
-                self.u[0,1]*self.u[-2,0])
+        """signed distance from principal planes to foci
+        Malacara1989 p27 2.41, 2.42: F-P"""
+        f = self.lagrange/(
+                self.u[0, 1]*self.u[-2, 0] -
+                self.u[0, 0]*self.u[-2, 1])
+        return f/self.n[(0, -2), :]*[-1, 1]
 
-    @property
-    def height(self):
-        "object and image ray height"
-        return self.y[0, 1], self.y[-1, 1] #self.lagrange/(self.n[-2]*self.u[-2,0])
- 
     @property
     def focal_distance(self):
-        "FFL and BFL from first/last surfaces"
-        return -self.y[1,0]/self.u[0,0], -self.y[-2,0]/self.u[-2,0]
-       
+        """ffd bfd relative to first/last surfaces
+        Malacara1989 p27 2.43 2.44, F-V"""
+        c = self.n[(0, -2), :]*self.focal_length/self.lagrange
+        fd = (self.y[(1, -2), 1]*self.u[(-2, 0), 0]
+                - self.y[(1, -2), 0]*self.u[(-2, 0), 1])*c
+        return fd
+
+    @property
+    def principal_distance(self):
+        """distance from first/last surface to principal planes
+        Malacara1989: P-V"""
+        return self.focal_distance - self.focal_length
+
+    @property
+    def nodal_distance(self):
+        """nodal points relative to first/last surfaces
+        Malacara1989, N-V"""
+        return self.focal_length[::-1] + self.focal_distance
+
     @property
     def numerical_aperture(self):
-        return (abs(self.n[0]*sinarctan(self.u[0,0])),
-                abs(self.n[-2]*sinarctan(self.u[-2,0])))
-
-    @property
-    def pupil_position(self):
-        return -self.y[1,1]/self.u[0,1], -self.y[-2,1]/self.u[-2,1]
-
-    @property
-    def pupil_height(self):
-        p0, p1 = self.pupil_position
-        return self.y[1,0] + p0*self.u[0,0], self.y[-2,0] + p1*self.u[-2,0]
+        return np.fabs(self.n[(0, -2), :]*sinarctan(self.u[(0, -2), 0]))
 
     @property
     def f_number(self):
-        na0, na1 = self.numerical_aperture
-        return 1/(2*na0), 1/(2*na1)
+        na = self.numerical_aperture
+        return self.n[(0, -2), :]/(2*na)
 
     @property
     def airy_radius(self):
-        na0, na1 = self.numerical_aperture
-        return 1.22*self.l[0]/(2*na0), 1.22*self.l[0]/(2*na1)
+        na = self.numerical_aperture
+        return 1.22*self.l/(2*na)
 
     @property
     def magnification(self):
-        return ((self.n[0]*self.u[0,0])/(self.n[-2]*self.u[-2,0]),
-                (self.n[-2]*self.u[-2,1])/(self.n[1]*self.u[0,1]))
+        return (self.n[(0, -2), :]*self.u[(0, -2), (0,
+            1)])/(self.n[(-2, 0), :]*self.u[(-2, 0), (0, 1)])
+
+    @property
+    def number_of_points(self):
+        """number of resolvable independent diffraction points
+        (assuming no aberrations)"""
+        return 4*self.lagrange**2/self.l**2
+
+
 
 
 class FullTrace(Trace):
-    def __init__(self, system, nrays):
-        super(FullTrace, self).__init__(system)
-        self.allocate(nrays)
-
     def allocate(self, nrays):
+        super(FullTrace, self).allocate()
         self.nrays = nrays
         self.y = np.empty((self.length, nrays, 3))
         self.u = np.empty_like(self.y)
-        self.l = np.empty(nrays)
+        self.l = 1.
         self.z = np.empty(self.length)
         self.n = np.empty((self.length, nrays))
         self.t = np.empty_like(self.n)
 
     def propagate(self, clip=True):
+        self.z = np.cumsum([e.thickness for e in self.system])
         y, u, n, l, z = self.y[0], self.u[0], None, self.l, 0
         for i, e in enumerate(self.system):
             y, u, n, t = e.transformed_yu(e.propagate, y, u, n, l, clip)
@@ -282,40 +321,52 @@ class FullTrace(Trace):
 
     @classmethod
     def like_paraxial(cls, paraxial):
-        obj = cls(paraxial.system, 2)
+        obj = cls(paraxial.system)
         obj.rays_like_paraxial(paraxial)
         return obj
 
     def rays_like_paraxial(self, paraxial):
-        self.l[:] = self.system.object.wavelengths[0]
+        self.allocate(2)
+        self.l = self.system.object.wavelengths[0]
         self.y[0, :, :] = 0
         self.y[0, :, 0] = paraxial.y[0]
         self.u[0, :, :] = 0
         self.u[0, :, 0] = sinarctan(paraxial.u[0])
         self.u[0, :, 2] = np.sqrt(1 - self.u[0, :, 0]**2)
 
-    def rays_for_point(self, paraxial, height, wavelength, nrays,
-            distribution):
+    @classmethod
+    def for_point(cls, paraxial, height=(1., 0), wavelength=None,
+            **kwargs):
+        obj = cls(paraxial.system)
+        if wavelength is None:
+            wavelength = obj.system.object.wavelengths[0]
+        zp = paraxial.pupil_distance[0] + paraxial.z[1]
+        rp = paraxial.pupil_height[0]
+        obj.rays_for_point(height, zp, rp, wavelength, **kwargs)
+        return obj
+
+    def rays_for_point(self, object_height, pupil_distance,
+            pupil_radius, wavelength, nrays=11,
+            distribution="meridional"):
         # TODO apodization
         xp, yp = self.get_rays(distribution, nrays)
-        hp, rp = paraxial.pupil_position[0], paraxial.pupil_height[0]
-        r = self.system.object.radius
-        if not self.system.object.finite:
-            r = sinarctan(r)
-            p, q = height[0]*r, height[1]*r
-            a, b = xp*rp-hp*tanarcsin(p), yp*rp-hp*tanarcsin(q)
-        else:
-            a, b = height[0]*r, height[1]*r
-            p, q = sinarctan((xp*rp-a)/hp), sinarctan((yp*rp-b)/hp)
         self.allocate(xp.shape[0])
-        self.l[:] = wavelength
-        self.n[0] = self.system.object.material.refractive_index(
-                wavelength)
+        r = self.system.object.radius
+        if self.system.object.infinite:
+            r = sinarctan(r)
+            p, q = object_height[0]*r, object_height[1]*r
+            a = xp*pupil_radius-pupil_distance*tanarcsin(p)
+            b = yp*pupil_radius-pupil_distance*tanarcsin(q)
+        else:
+            a, b = object_height[0]*r, object_height[1]*r
+            p = sinarctan((xp*pupil_radius-a)/pupil_distance)
+            q = sinarctan((yp*pupil_radius-b)/pupil_distance)
+        self.l = wavelength
         self.y[0] = np.array((a, b, np.zeros_like(a))).T
         self.u[0] = np.array((p, q, np.sqrt(1 - p**2 - q**2))).T
 
     def rays_for_object(self, paraxial, wavelength, nrays, eps=1e-6):
-        hp, rp = paraxial.pupil_position[0], paraxial.pupil_height[0]
+        hp, rp = paraxial.pupil_distance[0], paraxial.pupil_height[0]
         r = self.system.object.radius
         if self.system.object.infinity:
             r = sinarctan(r)
@@ -332,7 +383,7 @@ class FullTrace(Trace):
             p, q = sinarctan((xp-a)/hp), sinarctan((yp-b)/hp)
         self.nrays = nrays*3
         self.allocate()
-        self.l[:] = wavelength
+        self.l = wavelength
         self.n[0] = self.system.object.material.refractive_index(
                 wavelength)
         self.y[0, 0] = a
@@ -342,18 +393,23 @@ class FullTrace(Trace):
         self.u[1, 0] = q
         self.u[2, 0] = np.sqrt(1-p**2-q**2)
 
-    def plot_transverse(self, heights, wavelengths, fig=None, paraxial=None,
+    @classmethod
+    def transverse_plot(cls, fig, heights=[(0, 0), (.707, .707), (1., 1.)],
+            wavelengths=None, paraxial=None,
             npoints_spot=100, npoints_line=30):
-        if fig is None:
-            fig = plt.figure(figsize=(10, 8))
-            fig.subplotpars.left = .05
-            fig.subplotpars.bottom = .05
-            fig.subplotpars.right = .95
-            fig.subplotpars.top = .95
-            fig.subplotpars.hspace = .2
-            fig.subplotpars.wspace = .2
+        pass
+
+    def plot_transverse(self, fig, heights=[(0, 0), (.707, .707), (1., 1.)],
+            wavelengths=None, paraxial=None,
+            npoints_spot=100, npoints_line=30):
+        fig.subplotpars.left = .05
+        fig.subplotpars.bottom = .05
+        fig.subplotpars.right = .95
+        fig.subplotpars.top = .95
+        fig.subplotpars.hspace = .2
+        fig.subplotpars.wspace = .2
         if paraxial is None:
-            paraxial = ParaxialTrace(system=self.system)
+            paraxial = ParaxialTrace(self.system)
             paraxial.propagate()
         nh = len(heights)
         ia = self.system.aperture_index
@@ -467,32 +523,25 @@ class FullTrace(Trace):
         return fig
 
     def get_rays(self, distribution, nrays):
+        """returns nrays in normalized aperture coordinates x/meridional
+        and y/sagittal according to distribution, all rays are clipped
+        to unit circle aperture
+        
+        meridional: equal spacing line
+        sagittal: equal spacing line
+        cross: meridional-sagittal cross
+        tee: meridional (+-) and sagittal (+ only) tee
+        random: random within aperture
+        square: regular square grid
+        triangular: regular triangular grid
+        hexapolar: regular hexapolar grid
+        """
         d = distribution
         n = nrays
-        if d == "random":
-            xy = 2*np.random.rand(2, n*4/np.pi)-1
-            return xy[:, (xy**2).sum(0)<=1]
-        elif d == "meridional":
+        if d == "meridional":
             return np.linspace(-1, 1, n), np.zeros((n,))
         elif d == "sagittal":
             return np.zeros((n,)), np.linspace(-1, 1, n)
-        elif d == "square":
-            r = np.around(np.sqrt(n*4/np.pi))
-            x, y = np.mgrid[-1:1:1j*r, -1:1:1j*r]
-            xy = np.array([x.ravel(), y.ravel()])
-            return xy[:, (xy**2).sum(0)<=1]
-        elif d == "triangular":
-            r = np.around(np.sqrt(n*4/np.pi))
-            x, y = np.mgrid[-1:1:1j*r, -1:1:1j*r]
-            xy = np.array([x.ravel(), y.ravel()])
-            return xy[:, (xy**2).sum(0)<=1]
-        elif d == "hexapolar":
-            r = int(np.around(np.sqrt(n/3.-1/12.)-1/2.))
-            l = [[np.array([0]), np.array([0])]]
-            for i in range(1, r+1):
-                a = np.arange(0, 2*np.pi, 2*np.pi/(6*i))
-                l.append([i*np.sin(a)/r, i*np.cos(a)/r])
-            return np.concatenate(l, axis=1)
         elif d == "cross":
             return np.concatenate([
                 [np.linspace(-1, 1, n/2), np.zeros((n/2,))],
@@ -501,6 +550,28 @@ class FullTrace(Trace):
             return np.concatenate([
                 [np.linspace(-1, 1, 2*n/3), np.zeros((2*n/3,))],
                 [np.zeros((n/3,)), np.linspace(0, 1, n/3)]], axis=1)
+        elif d == "random":
+            r, phi = np.random.rand(2, n)
+            xy = np.exp(2j*np.pi*phi)**2
+            return xy.real, xy.imag
+        elif d == "square":
+            r = int(np.sqrt(n*4/np.pi))
+            x, y = np.mgrid[-1:1:1j*r, -1:1:1j*r]
+            xy = np.array([x.ravel(), y.ravel()])
+            return xy[:, (xy**2).sum(0)<=1]
+        elif d == "triangular":
+            r = int(np.sqrt(n*4/np.pi))
+            x, y = np.mgrid[-1:1:1j*r, -1:1:1j*r]
+            x += (np.arange(r) % 2.)/r
+            xy = np.array([x.ravel(), y.ravel()])
+            return xy[:, (xy**2).sum(0)<=1]
+        elif d == "hexapolar":
+            r = int(np.sqrt(n/3.-1/12.)-1/2.)
+            l = [np.zeros(2, 1)]
+            for i in np.arange(1, r+1)/r:
+                a = np.arange(0, 2*np.pi, 2*np.pi/(6*i))
+                l.append([np.sin(a)*i/r, i*np.cos(a)/r])
+            return np.concatenate(l, axis=1)
 
     def __str__(self):
         t = itertools.chain(
@@ -512,7 +583,7 @@ class FullTrace(Trace):
 
     def print_trace(self):
         for i in range(self.nrays):
-            yield "ray %i, %.3g nm" % (i, self.l[i]/1e-9)
+            yield "ray %i" % i
             c = np.concatenate((self.n[:, i, None], self.z[:, None],
                 np.cumsum(self.t[:, i, None], axis=0)-self.z[:, None],
                 self.y[:, i, :], self.u[:, i, :]), axis=1)
