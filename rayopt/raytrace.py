@@ -27,7 +27,7 @@ import numpy as np
 from scipy.optimize import newton
 
 # from .special_sums import polar_sum
-# from .aberration_orders import aberration_trace
+from .aberration_orders import aberration_extrinsic
 
 
 def dir_to_angles(r):
@@ -78,18 +78,38 @@ class ParaxialTrace(Trace):
         self.c = np.empty((n, 2, 2, k, k, k))
         self.d = np.empty_like(self.c)
 
-    def propagate(self, start=0, stop=None):
+    def propagate(self, start=0, stop=None, aberration=True):
         self.z = np.cumsum([e.thickness for e in self.system])
         init = start - 1 if start else 0
-        yu0, n0 = np.array((self.y[init], self.u[init])).T, self.n[init]
-        for i, el in enumerate(self.system[start:stop or self.length]):
-            yu, n = el.propagate_paraxial(yu0, n0, self.l)
+        yu, n = np.array((self.y[init], self.u[init])).T, self.n[init]
+        els = self.system[start:stop or self.length]
+        for i, el in enumerate(els):
+            yu, n = el.propagate_paraxial(yu, n, self.l)
             (self.y[i], self.u[i]), self.n[i] = yu.T, n
-            self.c[i] = el.aberration(yu[:, 0], yu0[:, 1],
-                    n0, n, self.c.shape[-1])
             self.v[i] = el.dispersion(self.lmin, self.lmax)
-            yu0, n0 = yu, n
-        self.d[:] = 0 # TODO
+            if aberration and i > 0:
+                self.c[i] = el.aberration(self.y[i], self.u[i - 1],
+                        self.n[i - 1], self.n[i], self.c.shape[-1])
+        if aberration:
+            self.extrinsic_aberrations()
+
+    def extrinsic_aberrations(self): # FIXME: wrong
+        self.d[:] = 0
+        st = self.system.aperture_index
+        t, s = 0, 1
+        kmax = self.d.shape[-1]
+        r = np.zeros((self.length, 2, 2, kmax, kmax, kmax))
+        for ki in range(2, kmax):
+            k = ki - 1
+            for j in range(k + 1):
+                for i in range(k - j + 1):
+                    b = (self.c[:, :, :, k - j - i, j, i]
+                       + self.d[:, :, :, k - j - i, j, i])
+                    b = np.cumsum(b, axis=0)
+                    r[:, t, :, k - j - i, j, i] = b[:, t]
+                    r[:, s, :, k - j - i, j, i] = b[:, s] - b[(st,), s]
+            for i in range(self.length):
+                aberration_extrinsic(self.c[i], r[i], self.d[i], ki)
 
     def find_rays(self):
         y, u = self.y, self.u
