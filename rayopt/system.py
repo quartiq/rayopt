@@ -134,11 +134,24 @@ class System(list):
             else:
                 pending = None
 
-    def plot(self, ax, axis=0, npoints=21, **kwargs):
+    def plot(self, ax, axis=0, npoints=21, setup=True, **kwargs):
         kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "black")
-        # ax.set_aspect("equal")
-        # ax.plot([0, sum(e.thickness for e in self)], [0, 0], **kwargs)
+        if setup:
+            ax.set_aspect("equal")
+            ax.spines["right"].set_color("none")
+            ax.spines["top"].set_color("none")
+            ax.spines["left"].set_color("none")
+            ax.spines["bottom"].set_position("zero")
+            ax.spines["bottom"].set_smart_bounds(True)
+            #ax.xaxis.set_ticks_position("bottom")
+            ax.set_xticks(())
+            ax.set_yticks(())
+            #t = ax.get_xticks()
+            #ax.set_xticks((t[0], t[-1]))
+            #t = ax.get_yticks()
+            #ax.set_yticks((t[0], t[-1]))
+            #ax.plot([0, sum(e.thickness for e in self)], [0, 0], **kwargs)
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(z, x, **kwargs)
 
