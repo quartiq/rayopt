@@ -58,7 +58,7 @@ class Trace(object):
 
 
 class ParaxialTrace(Trace):
-    def __init__(self, system, aberration_orders=4):
+    def __init__(self, system, aberration_orders=3):
         super(ParaxialTrace, self).__init__(system)
         self.allocate(aberration_orders)
         self.find_rays()
@@ -345,7 +345,7 @@ class FullTrace(Trace):
         self.u[0, :, :u.shape[1]] = u
         self.u[0, :, 2] = np.sqrt(1 - np.square(self.u[0, :, :2]).sum(1))
 
-    def rays_like_paraxial(self, paraxial):
+    def rays_paraxial(self, paraxial):
         y = paraxial.y[0, :, None]
         u = paraxial.u[0, :, None]
         self.rays_given(y, sinarctan(u))

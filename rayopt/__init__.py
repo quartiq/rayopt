@@ -19,6 +19,8 @@
 from .elements import Spheroid, Object, Aperture, Image
 from .system import System
 from .raytrace import FullTrace, ParaxialTrace
+from .formats import system_from_text
+from .material import fraunhofer
 from .optimize import (Parameter, MaterialThickness, 
     demerit_rms_position, demerit_rms_angle, demerit_mean_angle,
     demerit_aberration3)
