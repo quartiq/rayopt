@@ -65,10 +65,10 @@ class ParaxialTrace(Trace):
     def allocate(self, k):
         super(ParaxialTrace, self).allocate()
         l = self.system.object.wavelengths
-        n = self.length
         self.l = l[0]
         self.lmin = min(l)
         self.lmax = max(l)
+        n = self.length
         self.y = np.empty((n, 2))
         self.u = np.empty((n, 2))
         self.v = np.empty(n)
@@ -78,13 +78,11 @@ class ParaxialTrace(Trace):
 
     def propagate(self, start=0, stop=None):
         self.z = np.cumsum([e.thickness for e in self.system])
-        yu0 = np.array((self.y[0], self.u[0])).T
-        n0 = None
-        for i in range(start, stop or self.length):
-            el = self.system[i]
+        init = start - 1 if start else 0
+        yu0, n0 = np.array((self.y[init], self.u[init])).T, self.n[init]
+        for i, el in enumerate(self.system[start:stop or self.length]):
             yu, n = el.propagate_paraxial(yu0, n0, self.l)
-            self.y[i], self.u[i] = yu.T
-            self.n[i] = n
+            (self.y[i], self.u[i]), self.n[i] = yu.T, n
             self.c[i] = el.aberration(yu[:, 0], yu0[:, 1],
                     n0, n, self.c.shape[-1])
             self.v[i] = el.dispersion(self.lmin, self.lmax)
@@ -303,13 +301,13 @@ class FullTrace(Trace):
         self.n = np.empty((self.length, nrays))
         self.t = np.empty_like(self.n)
 
-    def propagate(self, clip=True):
+    def propagate(self, start=0, stop=None, clip=True):
         self.z = np.cumsum([e.thickness for e in self.system])
-        y, u, n, l, z = self.y[0], self.u[0], None, self.l, 0
-        for i, e in enumerate(self.system):
+        init = start - 1 if start else 0
+        y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
+        for i, e in enumerate(self.system[start:stop or self.length]):
             y, u, n, t = e.transformed_yu(e.propagate, y, u, n, l, clip)
-            self.y[i], self.u[i], self.n[i], self.t[i] = (y, u, n, t)
-            self.z[i] = z = z + e.thickness
+            self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
 
     def plot(self, ax, axis=0, **kwargs):
         kwargs.setdefault("linestyle", "-")
