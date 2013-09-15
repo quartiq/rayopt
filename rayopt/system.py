@@ -105,6 +105,26 @@ class System(list):
                     i, e.typ, e.thickness, roc,
                     e.radius*2, mat or "", n, v)
 
+    def size_convex(self):
+        """ensure convex surfaces are at least as large as their
+        corresponding closing surface"""
+        pending = None
+        c0 = None
+        for el in self[1:-1]:
+            if not hasattr(el, "material"):
+                continue
+            c = getattr(el, "curvature", 0)
+            if pending is not None:
+                if c < 0:
+                    el.radius = max(el.radius, pending.radius)
+                if c0 > 0:
+                    pending.radius = max(pending.radius, el.radius)
+                pending = None
+                if el.material.solid:
+                    pending = el
+            if el.material.solid:
+                pending, c0 = el, c
+
     def surfaces_cut(self, axis, points):
         z0 = 0.
         pending = None

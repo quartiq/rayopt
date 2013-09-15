@@ -140,6 +140,7 @@ class ParaxialTrace(Trace):
     def size_elements(self):
         for e, y in zip(self.system[1:], self.y[1:]):
             e.radius = np.fabs(y).sum() # axial+chief
+        self.system.size_convex()
 
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
@@ -344,6 +345,7 @@ class FullTrace(Trace):
     def size_elements(self, fn=lambda a, b: a, axis=0):
         for e, y in zip(self.system[1:], self.y[1:, :, axis]):
             e.radius = fn(np.fabs(y).max(), e.radius)
+        self.system.size_convex()
 
     def plot(self, ax, axis=0, **kwargs):
         kwargs.setdefault("linestyle", "-")
