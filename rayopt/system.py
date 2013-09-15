@@ -134,10 +134,10 @@ class System(list):
             else:
                 pending = None
 
-    def plot(self, ax, axis=0, npoints=21, setup=True, **kwargs):
+    def plot(self, ax, axis=0, npoints=31, adjust=True, **kwargs):
         kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "black")
-        if setup:
+        if adjust:
             ax.set_aspect("equal")
             ax.spines["right"].set_color("none")
             ax.spines["top"].set_color("none")

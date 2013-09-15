@@ -120,7 +120,7 @@ class ParaxialTrace(Trace):
         r = self.system[ai].radius
         c = self.system.object.radius
         if not self.system.object.infinite:
-            y, u, m = u, y, mi[::-1]
+            y, u, mi, c, r = u, y, -mi[::-1], -c, -r
         y[0, 0], u[0, 0] = r*mi[0, 0] - r*mi[0, 1]*mi[1, 0]/mi[1, 1], 0
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
@@ -357,7 +357,7 @@ class FullTrace(Trace):
         y, u = np.atleast_2d(y, u)
         if l is None:
             l = self.system.object.wavelengths[0]
-        self.allocate(y.shape[0])
+        self.allocate(max(y.shape[0], u.shape[0]))
         self.l = l
         self.y[0, :, :] = 0
         self.y[0, :, :y.shape[1]] = y
@@ -441,7 +441,7 @@ class FullTrace(Trace):
             b = yp*pupil_radius-pupil_distance*tanarcsin(q)
             pq, ab = np.array([[p, q]]), np.c_[a, b]
         else:
-            a, b = object_height[0]*r, object_height[1]*r
+            a, b = -object_height[0]*r, -object_height[1]*r
             p = sinarctan((xp*pupil_radius-a)/pupil_distance)
             q = sinarctan((yp*pupil_radius-b)/pupil_distance)
             ab, pq = np.array([[a, b]]), np.c_[p, q]
@@ -475,94 +475,112 @@ class FullTrace(Trace):
         self.u[1, 0] = q
         self.u[2, 0] = np.sqrt(1-p**2-q**2)
 
-    @classmethod
-    def transverse_plot(cls, fig, heights=[(0, 0), (.707, .707), (1., 1.)],
-            wavelengths=None, paraxial=None,
-            npoints_spot=100, npoints_line=30):
-        pass
-
-    def plot_transverse(self, fig, heights=[(0, 0), (.707, .707), (1., 1.)],
-            wavelengths=None, paraxial=None,
-            npoints_spot=100, npoints_line=30):
-        fig.subplotpars.left = .05
-        fig.subplotpars.bottom = .05
-        fig.subplotpars.right = .95
-        fig.subplotpars.top = .95
-        fig.subplotpars.hspace = .2
-        fig.subplotpars.wspace = .2
-        if paraxial is None:
-            paraxial = ParaxialTrace(self.system)
-            paraxial.propagate()
-        nh = len(heights)
-        ia = self.system.aperture_index
-        n = npoints_line
-        gs = plt.GridSpec(nh, 6)
+    def setup_fanplot(self, fig, n, adjust=True):
+        from matplotlib import gridspec
+        if adjust:
+            fig.subplotpars.left = .05
+            fig.subplotpars.bottom = .05
+            fig.subplotpars.right = .95
+            fig.subplotpars.top = .95
+            fig.subplotpars.hspace = .2
+            fig.subplotpars.wspace = .2
+        gs = gridspec.GridSpec(n, 6)
         axm0, axs0, axl0, axc0 = None, None, None, None
-        for i, hi in enumerate(heights):
+        ax = []
+        for i in range(n):
             axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2),
                     sharex=axm0, sharey=axm0)
             if axm0 is None: axm0 = axm
             #axm.set_title("meridional h=%s, %s" % hi)
-            #axm.set_xlabel("Y")
-            #axm.set_ylabel("tanU")
+            axm.set_xlabel("Y")
+            axm.set_ylabel("tanU")
             axs = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1),
                     sharex=axs0, sharey=axs0)
             if axs0 is None: axs0 = axs
             #axs.set_title("sagittal h=%s, %s" % hi)
-            #axs.set_xlabel("X")
-            #axs.set_ylabel("tanV")
+            axs.set_xlabel("X")
+            axs.set_ylabel("tanV")
             axl = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
                     sharex=axl0, sharey=axl0)
             if axl0 is None: axl0 = axl
             #axl.set_title("longitudinal h=%s, %s" % hi)
-            #axl.set_xlabel("Z")
-            #axl.set_ylabel("H")
+            axl.set_xlabel("Z")
+            axl.set_ylabel("H")
             axp = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
                     aspect="equal", sharex=axs0, sharey=axm0)
             #axp.set_title("rays h=%s, %s" % hi)
-            #axp.set_ylabel("X")
-            #axp.set_ylabel("Y")
+            axp.set_ylabel("X")
+            axp.set_ylabel("Y")
             axc = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
                     sharex=axc0, sharey=axc0)
             if axc0 is None: axc0 = axc
             #axc.set_title("encircled h=%s, %s" % hi)
-            #axc.set_ylabel("R")
-            #axc.set_ylabel("E")
-            for j, wi in enumerate(wavelengths):
-                self.rays_for_point(paraxial, hi, wi, npoints_line, "tee")
-                self.propagate()
+            axc.set_ylabel("R")
+            axc.set_ylabel("E")
+            ax.append((axm, axs, axl, axp, axc))
+        return ax
+
+    def tweak_fanplots(self, ax):
+        for axj in ax:
+            for axi in axj:
+                axi.spines["right"].set_color("none")
+                axi.spines["top"].set_color("none")
+                axi.spines["left"].set_position("zero")
+                axi.spines["bottom"].set_position("zero")
+                axi.spines["left"].set_smart_bounds(True)
+                axi.spines["bottom"].set_smart_bounds(True)
+                axi.xaxis.set_ticks_position("bottom")
+                axi.yaxis.set_ticks_position("left")
+                axi.relim()
+                axi.autoscale_view(True, True, True)
+                t = axi.get_xticks()
+                axi.set_xticks((min(t), max(t)))
+                t = axi.get_yticks()
+                axi.set_yticks((min(t), max(t)))
+
+    def plot_transverse(self, fig, paraxial=None,
+            heights=[(1., 1.), (.707, .707), (0., 0.)],
+            wavelengths=None, nrays_spot=100, nrays_line=30, adjust=True):
+        if paraxial is None:
+            paraxial = ParaxialTrace(self.system)
+        if wavelengths is None:
+            wavelengths = self.system.object.wavelengths
+        nh = len(heights)
+        n = nrays_line
+        ia = self.system.aperture_index
+        ax = self.setup_fanplot(fig, nh, adjust)
+        for hi, axi in zip(heights, ax):
+            axm, axs, axl, axp, axc = axi
+            for wi in wavelengths:
+                self.rays_paraxial_point(paraxial, hi, wi, nrays=n,
+                        distribution="tee")
                 # top rays (small tanU) are right/top
-                axm.plot(-tanarcsin(self.u[0, -1, :2*n/3])
-                        +tanarcsin(paraxial.u[0, -1, 1])*hi[0],
-                        self.y[0, -1, :2*n/3]-paraxial.y[0, -1, 1]*hi[0],
+                um, us, ul = self.u[-2, n/3:, 0], self.u[-2, :n/3, 1], self.u[-2, n/3:, 2]
+                ym, ys = self.y[-1, n/3:, 0], self.y[-1, :n/3, 1]
+                axm.plot(-tanarcsin(um)+paraxial.u[-2, 1]*hi[0],
+                        ym-paraxial.y[-1, 1]*hi[0],
                         "-", label="%s" % wi)
-                axs.plot(self.y[1, -1, 2*n/3:],
-                        -tanarcsin(self.u[1, -1, 2*n/3:]),
+                axs.plot(ys, -tanarcsin(us), "-", label="%s" % wi)
+                axl.plot(-(ym-paraxial.y[-1, 1]*hi[0])*ul/um,
+                        self.y[ia, n/3:, 0],
                         "-", label="%s" % wi)
-                axl.plot(-(self.y[0, -1, :2*n/3]-paraxial.y[0, -1, 1]*hi[0])*
-                        self.u[2, -1, :2*n/3]/self.u[0, -1, :2*n/3],
-                        self.y[0, ia, :2*n/3],
-                        "-", label="%s" % wi)
-                self.rays_for_point(paraxial, hi, wi, npoints_spot,
-                        "random")
-                self.propagate()
-                axp.plot(self.y[1, -1]-paraxial.y[0, -1, 1]*hi[1],
-                        self.y[0, -1]-paraxial.y[0, -1, 1]*hi[0],
-                        ".", markersize=3, markeredgewidth=0,
-                        label="%s" % wi)
-                xy = self.y[(0, 1), -1]
-                xy = xy[:, np.all(np.isfinite(xy), 0)]
-                xym = xy.mean(axis=1)
-                r = ((xy-xym[:, None])**2).sum(axis=0)**.5
+                self.rays_paraxial_point(paraxial, hi, wi, nrays=nrays_spot,
+                        distribution="triangular")
+                x, y = self.y[-1, :, :2].T
+                axp.plot(y-paraxial.y[-1, 1]*hi[1], x-paraxial.y[-1, 1]*hi[0],
+                        ".", markersize=3, markeredgewidth=0, label="%s" % wi)
+                xy = self.y[-1, :, (0, 1)]
+                xy = xy[np.all(np.isfinite(xy), axis=1), :]
+                if not xy.shape[0]:
+                    continue
+                xym = xy.mean(axis=0)
+                r = ((xy-xym[None, :])**2).sum(axis=1)**.5
                 rb = np.bincount(
-                        (r*(npoints_line/r.max())).astype(np.int),
-                        minlength=npoints_line+1).cumsum()
-                axc.plot(np.linspace(0, r.max(), npoints_line+1),
+                        (r*(n/r.max())).astype(np.int),
+                        minlength=n+1).cumsum()
+                axc.plot(np.linspace(0, r.max(), n+1),
                         rb.astype(np.float)/self.y.shape[2])
-            for ax in axs0, axm0, axc0:
-                ax.relim()
-                ax.autoscale_view(True, True, True)
-        return fig
+        self.tweak_fanplots(ax)
 
     def plot_longitudinal(self, wavelengths, fig=None, paraxial=None,
             npoints=20):

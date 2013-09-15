@@ -295,10 +295,7 @@ class Object(Element):
     def __init__(self, wavelengths=[588e-9], infinite=None, **kwargs):
         super(Object, self).__init__(**kwargs)
         self.wavelengths = wavelengths
-        if infinite is None:
-            infinite = self.thickness == 0
         self.infinite = infinite
-        self.thickness = 0
 
     def paraxial_matrix(self, n0, l):
         n = self.material.refractive_index(l)
