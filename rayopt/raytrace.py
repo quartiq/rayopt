@@ -349,7 +349,7 @@ class FullTrace(Trace):
         kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "green")
         kwargs.setdefault("alpha", .3)
-        y = self.y[:, :, 0]
+        y = self.y[:, :, axis]
         z = self.y[:, :, 2] + self.z[:, None]
         ax.plot(z, y, **kwargs)
 
@@ -373,7 +373,7 @@ class FullTrace(Trace):
 
     def aim(self, index=0, axis=0, tol=1e-2, maxiter=10):
         """aims ray by index at aperture center
-        angle (in case of finite object) or
+        changing angle (in case of finite object) or
         position in case of infinite object"""
         var = self.y if self.system.object.infinite else self.u
         stop = self.system.aperture_index
@@ -405,31 +405,31 @@ class FullTrace(Trace):
             var[0, index, axis] = v0
             raise
 
-    def aim_given(self, y, u, l=None, aim=None, **kwargs):
+    def aim_given(self, y, u, l=None, aim=None, axis=0, **kwargs):
         if aim is not None:
             self.allocate(1)
-            ya = y[None, aim] if y.shape[0] > 1 else y
-            ua = u[None, aim] if u.shape[0] > 1 else u
+            ya = y[(aim,), :] if y.shape[0] > 1 else y
+            ua = u[(aim,), :] if u.shape[0] > 1 else u
             self.rays_given(ya, ua, l)
             try:
-                corr = self.aim(0, **kwargs)
+                corr = self.aim(index=0, axis=axis, **kwargs)
             except RuntimeError:
                 corr = 0.
             if self.system.object.infinite:
-                y += corr
+                y[:, axis] += corr
             else:
-                u += corr
+                u[:, axis] += corr
         self.rays_given(y, u, l)
        
-    def rays_paraxial_point(self, paraxial, height=(1., 0), wavelength=None,
-            **kwargs):
+    def rays_paraxial_point(self, paraxial, height=(1., 0.),
+            wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
         rp = paraxial.pupil_height[0]
         self.rays_point(height, zp, rp, wavelength, **kwargs)
 
-    def rays_point(self, object_height, pupil_distance,
-            pupil_radius, wavelength, nrays=11,
-            distribution="meridional", aim=True):
+    def rays_point(self, object_height, pupil_distance, pupil_radius,
+            wavelength, nrays=11, distribution="meridional",
+            clip=True, aim=True):
         # TODO apodization
         icenter, (xp, yp) = self.pupil_distribution(distribution, nrays)
         self.allocate(xp.shape[0])
@@ -446,7 +446,7 @@ class FullTrace(Trace):
             q = sinarctan((yp*pupil_radius-b)/pupil_distance)
             ab, pq = np.array([[a, b]]), np.c_[p, q]
         self.aim_given(ab, pq, wavelength, aim=icenter if aim else None)
-        self.propagate()
+        self.propagate(clip=clip)
 
     def rays_for_object(self, paraxial, wavelength, nrays, eps=1e-6):
         hp, rp = paraxial.pupil_distance[0], paraxial.pupil_height[0]

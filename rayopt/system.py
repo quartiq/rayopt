@@ -144,14 +144,9 @@ class System(list):
             ax.spines["left"].set_color("none")
             ax.spines["bottom"].set_position("zero")
             ax.spines["bottom"].set_smart_bounds(True)
-            #ax.xaxis.set_ticks_position("bottom")
-            ax.set_xticks(())
+            ax.xaxis.set_ticks_position("bottom")
+            ax.set_xticklabels(())
             ax.set_yticks(())
-            #t = ax.get_xticks()
-            #ax.set_xticks((t[0], t[-1]))
-            #t = ax.get_yticks()
-            #ax.set_yticks((t[0], t[-1]))
-            #ax.plot([0, sum(e.thickness for e in self)], [0, 0], **kwargs)
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(z, x, **kwargs)
 
