@@ -53,9 +53,9 @@ def system_from_array(data,
                 curv = 1./roc
         if hasattr(el, "curvature"):
             el.curvature = curv
-        el.thickness = try_get(line, columns, "thickness", 0)
-        el.radius = (try_get(line, columns, "radius", 0) or
-                try_get(line, columns, "diameter", 0)/2)
+        el.thickness = try_get(line, columns, "thickness", 0.)
+        el.radius = (try_get(line, columns, "radius", 0.) or
+                try_get(line, columns, "diameter", 0.)/2.)
         if hasattr(el, "material"):
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)

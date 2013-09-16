@@ -125,18 +125,57 @@ class ParaxialTrace(Trace):
                 aberration_extrinsic(self.c[i], r[i], self.d[i], ki)
 
     @property
+    def seidel3(self):
+        c = self.c
+        c = np.array([
+                -2*c[:, 0, 1, 1, 0, 0], # SA3
+                -c[:, 0, 1, 0, 1, 0], # CMA3
+                -c[:, 0, 0, 0, 1, 0], # AST3
+                c[:, 0, 0, 0, 1, 0] - 2*c[:, 0, 1, 0, 0, 1], # PTZ3
+                -2*c[:, 0, 0, 0, 0, 1], # DIS3
+                ])
+        # transverse image seidel (like oslo)
+        return c.T*self.height[1]/2/self.lagrange
+
+    @property
+    def seidel5(self):
+        c = self.c + self.d
+        c = np.array([
+                -2*c[:, 0, 1, 2, 0, 0], # MU1
+                -1*c[:, 0, 1, 1, 1, 0], # MU3
+                -2*c[:, 0, 0, 1, 1, 0] - 2*c[:, 0, 1, 1, 0, 1] # MU5
+                    + 2*c[:, 0, 1, 0, 2, 0], # MU6
+                2*c[:, 0, 1, 1, 0, 1], # MU5
+                # -2*c[:, 0, 0, 1, 0, 1]-c[:, 0, 0, 0, 2, 0]
+                # -c[:, 0, 1, 0, 1, 1], # MU7
+                # -c[:, 0, 1, 0, 1, 1]-c[:, 0, 0, 0, 2, 0], # MU8
+                -2*c[:, 0, 0, 1, 0, 1] - 2*c[:, 0, 0, 0, 2, 0]
+                    - 2*c[:, 0, 1, 0, 1, 1], # MU7+MU8
+                -1*c[:, 0, 1, 0, 1, 1], # MU9
+                -c[:, 0, 0, 0, 1, 1]/2, # (MU10-MU11)/4
+                -2*c[:, 0, 1, 0, 0, 2] + c[:, 0, 0, 0, 1, 1]/2,
+                # (5*MU11-MU10)/4
+                # -2*c[:, 0, 0, 0, 1, 1]-2*c[:, 0, 1, 0, 0, 2], # MU10
+                # -2*c[:, 0, 1, 0, 0, 2], # MU11
+                -2*c[:, 0, 0, 0, 0, 2], # MU12
+                ])
+        # transverse image seidel (like oslo)
+        return c.T*self.height[1]/2/self.lagrange
+
+    @property
     def track(self):
+        """distance from first to last surface"""
         return self.z[-2] - self.z[1]
 
     @property
     def height(self):
-        "object and image ray height"
+        """object and image ray height"""
         return self.y[(0, -1), 1]
         #self.lagrange/(self.n[-2]*self.u[-2,0])
 
     @property
     def pupil_distance(self):
-        "pupil location relative to first/last surface"
+        """pupil location relative to first/last surface"""
         return -self.y[(1, -2), 1]/self.u[(0, -2), 1]
 
     @property
@@ -146,12 +185,13 @@ class ParaxialTrace(Trace):
 
     @property
     def lagrange(self):
-        return self.n[0]*(self.u[0,0]*self.y[0,1] - self.u[0,1]*self.y[0,0])
+        return self.n[0]*(self.u[0, 0]*self.y[0, 1]
+                - self.u[0, 1]*self.y[0, 0])
 
     @property
     def focal_length(self):
-        """signed distance from principal planes to foci
-        Malacara1989 p27 2.41, 2.42: F-P"""
+        """signed distance from principal planes to foci (infinite
+        conjugates), Malacara1989 p27 2.41, 2.42: F-P"""
         f = self.lagrange/(
                 self.u[0, 1]*self.u[-2, 0] -
                 self.u[0, 0]*self.u[-2, 1])
@@ -159,7 +199,7 @@ class ParaxialTrace(Trace):
 
     @property
     def focal_distance(self):
-        """ffd bfd relative to first/last surfaces
+        """front/back focal distance relative to first/last surface
         Malacara1989 p27 2.43 2.44, F-V"""
         c = self.n[(0, -2), :]*self.focal_length/self.lagrange
         fd = (self.y[(1, -2), 1]*self.u[(-2, 0), 0]
@@ -204,46 +244,16 @@ class ParaxialTrace(Trace):
         return 4*self.lagrange**2/self.l**2
 
     def print_c3(self):
-        c = self.c
-        c = np.array([
-                -2*c[:, 0, 1, 1, 0, 0],
-                -c[:, 0, 1, 0, 1, 0],
-                -c[:, 0, 0, 0, 1, 0],
-                c[:, 0, 0, 0, 1, 0] - 2*c[:, 0, 1, 0, 0, 1],
-                -2*c[:, 0, 0, 0, 0, 1],
-                ])
-        # transverse image seidel (like oslo)
-        return self.print_coeffs(c.T*self.height[1]/2/self.lagrange,
+        return self.print_coeffs(self.seidel3,
                 "SA3 CMA3 AST3 PTZ3 DIS3".split())
 
-    def print_h3(self):
+    def print_h3(self): # TODO
         c3a = self.aberration3*8 # chromatic
         return self.print_coeffs(c3a[(6, 12), :].T, 
                 "PLC PTC".split())
 
     def print_c5(self):
-        c = self.c + self.d
-        c = np.array([
-                -2*c[:, 0, 1, 2, 0, 0], # MU1
-                -1*c[:, 0, 1, 1, 1, 0], # MU3
-                -2*c[:, 0, 0, 1, 1, 0] - 2*c[:, 0, 1, 1, 0, 1] # MU5
-                    + 2*c[:, 0, 1, 0, 2, 0], # MU6
-                2*c[:, 0, 1, 1, 0, 1], # MU5
-                # -2*c[:, 0, 0, 1, 0, 1]-c[:, 0, 0, 0, 2, 0]
-                # -c[:, 0, 1, 0, 1, 1], # MU7
-                # -c[:, 0, 1, 0, 1, 1]-c[:, 0, 0, 0, 2, 0], # MU8
-                -2*c[:, 0, 0, 1, 0, 1] - 2*c[:, 0, 0, 0, 2, 0]
-                    - 2*c[:, 0, 1, 0, 1, 1], # MU7+MU8
-                -1*c[:, 0, 1, 0, 1, 1], # MU9
-                -c[:, 0, 0, 0, 1, 1]/2, # (MU10-MU11)/4
-                -2*c[:, 0, 1, 0, 0, 2] + c[:, 0, 0, 0, 1, 1]/2,
-                # (5*MU11-MU10)/4
-                # -2*c[:, 0, 0, 0, 1, 1]-2*c[:, 0, 1, 0, 0, 2], # MU10
-                # -2*c[:, 0, 1, 0, 0, 2], # MU11
-                -2*c[:, 0, 0, 0, 0, 2], # MU12
-                ])
-        # transverse image seidel (like oslo)
-        return self.print_coeffs(c.T*self.height[1]/2/self.lagrange,
+        return self.print_coeffs(self.seidel5,
                 "SA5 CMA5 TOBSA5 SOBSA5 TECMA5 SECMA5 AST5 PTZ5 DIS5".split())
 
     def print_params(self):
@@ -499,7 +509,11 @@ class FullTrace(Trace):
         rp = paraxial.pupil_height[0]
         return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
-    def rays_line(self, paraxial, wavelength, nrays, eps=1e-6):
+    def rays_line(self, wavelength, pupil_distance, pupil_height,
+            aim=True):
+        pass
+
+    def rays_paraxial_line(self, paraxial, wavelength, nrays, eps=1e-6):
         hp, rp = paraxial.pupil_distance[0], paraxial.pupil_height[0]
         r = self.system.object.radius
         if self.system.object.infinite:
@@ -539,15 +553,30 @@ class FullTrace(Trace):
         z = self.y[:, :, 2] + self.z[:, None]
         ax.plot(z, y, **kwargs)
 
-    def pre_setup_fanplot(self, fig, n, adjust=True):
+    def setup_axes(self, ax, xlabel=None, ylabel=None, title=None):
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["left"].set_position("zero")
+        ax.spines["bottom"].set_position("zero")
+        ax.tick_params(bottom=True, top=False,
+                left=True, right=False,
+                labeltop=False, labelright=False,
+                labelleft=True, labelbottom=True,
+                direction="out", axis="both")
+        ax.xaxis.set_smart_bounds(True)
+        ax.yaxis.set_smart_bounds(True)
+        kw = dict(rotation="horizontal",
+                horizontalalignment="left",
+                verticalalignment="bottom")
+        if xlabel:
+            ax.set_xlabel(xlabel, **kw)
+        if ylabel:
+            ax.set_ylabel(ylabel, **kw)
+        if title:
+            ax.set_title(title)
+
+    def pre_setup_fanplot(self, fig, n):
         from matplotlib import gridspec
-        if adjust:
-            fig.subplotpars.left = .05
-            fig.subplotpars.bottom = .05
-            fig.subplotpars.right = .95
-            fig.subplotpars.top = .95
-            fig.subplotpars.hspace = .2
-            fig.subplotpars.wspace = .2
         gs = gridspec.GridSpec(n, 5)
         axpx0, axpy0, axex0, axey0, axpx1 = None, None, None, None, None
         ax = []
@@ -565,29 +594,13 @@ class FullTrace(Trace):
                     sharex=axex0, sharey=axpx1)
             axpx1 = axpx1 or axss
             ax.append((axp, axm, axsm, axss))
-            kw = dict(rotation="horizontal",
-                    horizontalalignment="left",
-                    verticalalignment="bottom")
             for axi, xl, yl in [
                     (axp, "EX", "EY"),
                     (axm, "PY", "EY"),
                     (axsm, "PX", "EY"),
                     (axss, "EX", "PX"),
                     ]:
-                axi.spines["right"].set_visible(False)
-                axi.spines["top"].set_visible(False)
-                axi.spines["left"].set_position("zero")
-                axi.spines["bottom"].set_position("zero")
-                axi.tick_params(bottom=True, top=False,
-                        left=True, right=False,
-                        labeltop=False, labelright=False,
-                        labelleft=True, labelbottom=True,
-                        direction="out", axis="both")
-                axi.xaxis.set_smart_bounds(True)
-                axi.yaxis.set_smart_bounds(True)
-                #axi.set_title("h=%s, %s" % hi)
-                axi.set_xlabel(xl, **kw)
-                axi.set_ylabel(yl, **kw)
+                self.setup_axes(axi, xl, yl)
             axp.spines["left"].set_visible(False)
             axp.spines["bottom"].set_visible(False)
             axp.tick_params(bottom=False, left=False,
@@ -611,18 +624,21 @@ class FullTrace(Trace):
                 axi.yaxis.set_label_coords(.02*(xu - xl), yu,
                         transform=axi.transData)
 
-    def plot_transverse(self, fig, paraxial=None,
+    def plot_transverse(self, fig=None, paraxial=None,
             heights=[(1., 0.), (.707, .0), (0., 0.)],
             wavelengths=None, nrays_spot=100, nrays_line=23,
-            adjust=True, colors="gbrcmyk"):
+            colors="gbrcmyk"):
         import matplotlib.patches as patches
+        import matplotlib.pyplot as plt
+        if fig is None:
+            fig = plt.figure()
         if paraxial is None:
             paraxial = ParaxialTrace(self.system)
         if wavelengths is None:
             wavelengths = self.system.object.wavelengths
         nh = len(heights)
         ia = self.system.aperture_index
-        ax = self.pre_setup_fanplot(fig, nh, adjust)
+        ax = self.pre_setup_fanplot(fig, nh)
         p = paraxial.pupil_distance[0]
         r = paraxial.airy_radius[1]
         for hi, axi in zip(heights, ax):
@@ -648,33 +664,24 @@ class FullTrace(Trace):
                 axsm.plot(pxy[ref:, 1], exy[ref:, 0], "-%s" % ci, label="%s" % wi)
                 axss.plot(exy[ref:, 1], pxy[ref:, 1], "-%s" % ci, label="%s" % wi)
         self.post_setup_fanplot(ax)
+        return fig
 
-    def plot_longitudinal(self, wavelengths, fig=None, paraxial=None,
-            npoints=20):
+    def plot_longitudinal(self, fig=None, paraxial=None,
+            wavelengths=None, nrays=11, colors="gbrcmyk"):
+        import matplotlib.pyplot as plt
         if fig is None:
-            fig = plt.figure(figsize=(6, 4))
-            fig.subplotpars.left = .05
-            fig.subplotpars.bottom = .05
-            fig.subplotpars.right = .95
-            fig.subplotpars.top = .95
-            fig.subplotpars.hspace = .2
-            fig.subplotpars.wspace = .2
+            fig = plt.figure()
         if paraxial is None:
-            paraxial = ParaxialTrace(system=self.system)
-            paraxial.propagate()
-        n = npoints
+            paraxial = ParaxialTrace(self.system)
+        if wavelengths is None:
+            wavelengths = self.system.object.wavelengths
         gs = plt.GridSpec(1, 2)
-        axl = fig.add_subplot(gs.new_subplotspec((0, 0), 1, 1))
-        #axl.set_title("distortion")
-        #axl.set_xlabel("D")
-        #axl.set_ylabel("Y")
-        axc = fig.add_subplot(gs.new_subplotspec((0, 1), 1, 1))
-        #axl.set_title("field curvature")
-        #axl.set_xlabel("Z")
-        #axl.set_ylabel("Y")
-        for i, (wi, ci) in enumerate(zip(wavelengths, "bgrcmyk")):
-            self.rays_for_object(paraxial, wi, npoints)
-            self.propagate()
+        axl = fig.add_subplot(1, 2, 1)
+        self.setup_axes(axl, "OY", "D", "distortion")
+        axl = fig.add_subplot(1, 2, 2)
+        self.setup_axes(axl, "OY", "EZ", "field curvature")
+        for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
+            self.rays_paraxial_line(paraxial, wi, nrays)
             axl.plot(self.y[0, -1, :npoints]-np.linspace(0, paraxial.height[1], npoints),
                 self.y[0, -1, :npoints], ci+"-", label="d")
             # tangential field curvature
