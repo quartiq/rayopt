@@ -476,8 +476,8 @@ class FullTrace(Trace):
         elif d == "hexapolar":
             r = int(np.sqrt(n/3.-1/12.)-1/2.)
             l = [np.zeros((2, 1))]
-            for i in np.arange(1, r + 1)/r:
-                a = np.arange(0, 2*np.pi, 2*np.pi/(6*i))
+            for i in np.arange(1, r + 1.):
+                a = np.linspace(0, 2*np.pi, 6*i, endpoint=False)
                 l.append([np.sin(a)*i/r, np.cos(a)*i/r])
             return 0, np.concatenate(l, axis=1)
      
@@ -511,7 +511,7 @@ class FullTrace(Trace):
         return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
     def rays_line(self, pupil_distance, pupil_height, wavelength=None,
-            nrays=11, aim=True, eps=1e-3, clip=False):
+            nrays=21, aim=True, eps=1e-3, clip=False):
         r = self.system.object.radius
         if self.system.object.infinite:
             r = sinarctan(r)
@@ -625,7 +625,7 @@ class FullTrace(Trace):
 
     def plot_transverse(self, fig=None, paraxial=None,
             heights=[1., .707, 0.],
-            wavelengths=None, nrays_spot=100, nrays_line=23,
+            wavelengths=None, nrays_spot=100, nrays_line=32,
             colors="gbrcmyk"):
         import matplotlib.patches as patches
         import matplotlib.pyplot as plt
@@ -649,7 +649,7 @@ class FullTrace(Trace):
                     verticalalignment="center")
             for wi, ci in zip(wavelengths, colors):
                 ref = self.rays_paraxial_point(paraxial, hi, wi,
-                        nrays=nrays_spot, distribution="triangular")
+                        nrays=nrays_spot, distribution="hexapolar")
                 exy = self.y[-1, :, :2]
                 exy = exy - exy[ref]
                 axp.plot(exy[:, 1], exy[:, 0],
@@ -682,7 +682,7 @@ class FullTrace(Trace):
         axl = fig.add_subplot(1, 2, 1)
         self.setup_axes(axl, "OY", "D", "distortion")
         axc = fig.add_subplot(1, 2, 2)
-        self.setup_axes(axc, "OY", "EZ", "field curvature")
+        self.setup_axes(axc, "OY", "EZ", "field")
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
             self.rays_paraxial_line(paraxial, wi, nrays=nrays)
             a, b, c = np.split(self.y[-1].T, (nrays, 2*nrays), axis=1)
@@ -695,8 +695,8 @@ class FullTrace(Trace):
             # -(real_x-parax_x)/(tanarcsin(real_v)-tanarcsin(parax_v))
             xs = -(c[1]-a[1])/(tanarcsin(r[1])-tanarcsin(p[1]))
             axl.plot(a[0], xd, ci+"-")
-            axc.plot(a[0], xt, ci+"--", label="EZt")
-            axc.plot(a[0], xs, ci+"-", label="EZs")
+            axc.plot(a[0], xt, ci+"-", label="EZt")
+            axc.plot(a[0], xs, ci+"--", label="EZs")
         self.post_setup_axes(axl)
         self.post_setup_axes(axc)
         return fig
