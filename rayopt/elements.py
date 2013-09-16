@@ -107,8 +107,7 @@ class Primitive(NameMixin, TransformMixin):
 
     def propagate(self, y0, u0, n0, l, clip=True):
         # length up to surface
-        y = y0.copy()
-        y[:, 2] -= self.thickness
+        y = y0 - [[0, 0, self.thickness]]
         t = self.intercept(y, u0)
         # new transverse position
         y += t[:, None]*u0
@@ -116,7 +115,7 @@ class Primitive(NameMixin, TransformMixin):
         if clip:
             u = u.copy()
             self.clip(y, u)
-        return y, u, n0, t
+        return y, u, n0, t*n0
 
     def reverse(self):
         self.offset[2] *= -1
@@ -156,7 +155,7 @@ class Element(Primitive):
         if self.material is not None:
             n = self.material.refractive_index(l)
             u = self.refract(y, u, n0/n)
-        return y, u, n, t
+        return y, u, n, t*n0
 
     def dispersion(self, lmin, lmax):
         v = 0
@@ -225,8 +224,8 @@ class Spheroid(Interface):
         self.curvature = curvature
         self.conic = conic
         self.aspherics = np.array(aspherics)
-        if self.curvature:
-            assert self.radius**2 < 1/(self.conic*self.curvature**2)
+        #if self.curvature and self.radius:
+        #    assert self.radius**2 < 1/(self.conic*self.curvature**2)
 
     def shape_func(self, p):
         x, y, z = p.T

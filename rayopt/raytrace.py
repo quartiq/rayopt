@@ -28,6 +28,7 @@ from scipy.optimize import newton
 
 # from .special_sums import polar_sum
 from .aberration_orders import aberration_extrinsic
+from .elements import Spheroid
 
 
 def dir_to_angles(r):
@@ -364,6 +365,22 @@ class FullTrace(Trace):
             y, u, n, t = e.transformed_yu(e.propagate, y, u, n, l, clip)
             self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
 
+    def opd(self, chief=0, radius=None):
+        ri = self.system.image.thickness
+        if radius is None:
+            radius = ri
+        y = self.y[-2]
+        y = y - self.y[-1, chief, None] # center sphere on chief image
+        y = y - [[0, 0, ri - radius]]
+        # u = self.u[-2]
+        # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
+        # replace u with direction from y to chief image
+        u = [[0, 0, radius]] - y
+        u /= np.sqrt(np.square(u).sum(axis=1))[:, None]
+        t = Spheroid(curvature=1./radius).intercept(y, u)
+        t = t*self.n[-2] + self.t[:-1].sum(axis=0)
+        return t - t[chief, None]
+
     def rays_paraxial(self, paraxial):
         y = paraxial.y[0, :, None]
         u = paraxial.u[0, :, None]
@@ -592,13 +609,14 @@ class FullTrace(Trace):
 
     def pre_setup_fanplot(self, fig, n):
         from matplotlib import gridspec
-        gs = gridspec.GridSpec(n, 5)
-        axpx0, axpy0, axex0, axey0, axpx1 = None, None, None, None, None
+        gs = gridspec.GridSpec(n, 6)
+        axpx0, axpy0, axex0, axey0 = None, None, None, None
         ax = []
         for i in range(n):
             axp = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 1),
                     aspect="equal", sharex=axex0, sharey=axey0)
-            axex0, axey0 = axex0 or axp, axey0 or axp
+            axex0 = axex0 or axp
+            axey0 = axey0 or axp
             axm = fig.add_subplot(gs.new_subplotspec((i, 1), 1, 2),
                     sharex=axpy0, sharey=axey0)
             axpy0 = axpy0 or axm
@@ -606,21 +624,24 @@ class FullTrace(Trace):
                     sharex=axpx0, sharey=axey0)
             axpx0 = axpx0 or axsm
             axss = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
-                    sharex=axex0, sharey=axpx1)
-            axpx1 = axpx1 or axss
-            ax.append((axp, axm, axsm, axss))
+                    sharex=axpx0, sharey=axex0)
+            axo = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
+                    aspect="equal") #, sharex=axpy0, sharey=axpx0)
+            ax.append((axp, axm, axsm, axss, axo))
             for axi, xl, yl in [
                     (axp, "EX", "EY"),
                     (axm, "PY", "EY"),
                     (axsm, "PX", "EY"),
-                    (axss, "EX", "PX"),
+                    (axss, "PX", "EX"),
+                    (axo, "PX", "PY"),
                     ]:
                 self.setup_axes(axi, xl, yl)
-            axp.spines["left"].set_visible(False)
-            axp.spines["bottom"].set_visible(False)
-            axp.tick_params(bottom=False, left=False,
-                    labelbottom=False, labelleft=False)
-            axp.set_aspect("equal")
+            for axi in axp, axo:
+                axi.spines["left"].set_visible(False)
+                axi.spines["bottom"].set_visible(False)
+                axi.tick_params(bottom=False, left=False,
+                        labelbottom=False, labelleft=False)
+                axi.set_aspect("equal")
         return ax
 
     def plot_transverse(self, fig=None, paraxial=None,
@@ -629,6 +650,7 @@ class FullTrace(Trace):
             colors="gbrcmyk"):
         import matplotlib.patches as patches
         import matplotlib.pyplot as plt
+        from matplotlib.mlab import griddata
         if fig is None:
             fig = plt.figure()
         if paraxial is None:
@@ -641,19 +663,35 @@ class FullTrace(Trace):
         p = paraxial.pupil_distance[0]
         r = paraxial.airy_radius[1]
         for hi, axi in zip(heights, ax):
-            axp, axm, axsm, axss = axi
+            axp, axm, axsm, axss, axo = axi
             axp.add_patch(patches.Circle((0, 0), r, edgecolor="black",
                 facecolor="none"))
             axp.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
                     transform=axp.transAxes,
                     verticalalignment="center")
-            for wi, ci in zip(wavelengths, colors):
+            for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
                 ref = self.rays_paraxial_point(paraxial, hi, wi,
                         nrays=nrays_spot, distribution="hexapolar")
-                exy = self.y[-1, :, :2]
+                y, u = self.y, self.u
+                exy = y[-1, :, :2]
                 exy = exy - exy[ref]
                 axp.plot(exy[:, 1], exy[:, 0],
                         ".%s" % ci, markersize=3, markeredgewidth=0, label="%s" % wi)
+                if i == 0:
+                    y, x = (y[1, :, :2] + p*u[0, :, :2]/u[0, :, 2:]).T
+                    o = self.opd()
+                    # griddata barfs on nans
+                    xyo = np.array([x, y, o])
+                    x, y, o = xyo[:, np.all(~np.isnan(xyo), axis=0)]
+                    n = int(nrays_spot)**.5
+                    rp = paraxial.pupil_height[0]
+                    xs, ys = np.mgrid[-rp:rp:1j*n, -rp:rp:1j*n]
+                    os = griddata(x, y, o, xs, ys)
+                    mm = np.fabs(os).max()
+                    v = np.linspace(-mm, mm, 21)
+                    axo.contour(xs, ys, os, v, cmap=plt.cm.RdBu_r)
+                    #axo.set_title("max=%.2g" % mm)
+                    # TODO normalize opd across heights
                 ref = self.rays_paraxial_point(paraxial, hi, wi,
                         nrays=nrays_line, distribution="tee")
                 y, u = self.y, self.u
@@ -663,7 +701,7 @@ class FullTrace(Trace):
                 pxy = pxy - pxy[ref]
                 axm.plot(pxy[:ref, 0], exy[:ref, 0], "-%s" % ci, label="%s" % wi)
                 axsm.plot(pxy[ref:, 1], exy[ref:, 0], "-%s" % ci, label="%s" % wi)
-                axss.plot(exy[ref:, 1], pxy[ref:, 1], "-%s" % ci, label="%s" % wi)
+                axss.plot(pxy[ref:, 1], exy[ref:, 1], "-%s" % ci, label="%s" % wi)
         for axi in ax:
             for axii in axi:
                 self.post_setup_axes(axii)

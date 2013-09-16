@@ -74,7 +74,7 @@ class System(list):
         # shift thicknesses forward
         for e in self:
             e.reverse()
-        # shit thicknesses forwards
+        # shift thicknesses forwards
         d = i.thickness
         for e in self[1:]:
             d, e.thickness = e.thickness, d
