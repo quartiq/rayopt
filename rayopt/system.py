@@ -22,11 +22,12 @@ from .elements import Object, Image, Aperture
 
 
 class System(list):
-    def __init__(self, elements=[], description=""):
+    def __init__(self, elements=[], description="", scale=1e-3):
         if elements is None:
             elements = [Object(), Aperture(), Image()]
         super(System, self).__init__(elements)
         self.description = description
+        self.scale = scale
 
     @property
     def object(self):
@@ -89,6 +90,7 @@ class System(list):
 
     def text(self):
         yield "System: %s" % self.description
+        yield "Scale: %s mm" % (self.scale/1e-3)
         yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.object.wavelengths)
         yield "Surfaces:"
@@ -126,6 +128,7 @@ class System(list):
                 pending, c0 = el, c
 
     def surfaces_cut(self, axis, points):
+        """yields cut outlines of surfaces. solids are closed"""
         z0 = 0.
         pending = None
         for e in self:

@@ -140,6 +140,7 @@ class ParaxialTrace(Trace):
     def size_elements(self):
         for e, y in zip(self.system[1:], self.y[1:]):
             e.radius = np.fabs(y).sum() # axial+chief
+        self.system.image.radius = abs(self.height[1])
         self.system.size_convex()
 
     def focal_length_solve(self, f, i=None):
@@ -308,7 +309,7 @@ class ParaxialTrace(Trace):
     @property
     def airy_radius(self):
         na = self.numerical_aperture
-        return 1.22*self.l/(2*na)
+        return 1.22*self.l/(2*na)/self.system.scale
 
     @property
     def magnification(self):
@@ -427,7 +428,7 @@ class FullTrace(Trace):
             wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
         rp = paraxial.pupil_height[0]
-        self.rays_point(height, zp, rp, wavelength, **kwargs)
+        return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
     def rays_point(self, object_height, pupil_distance, pupil_radius,
             wavelength, nrays=11, distribution="meridional",
@@ -449,8 +450,9 @@ class FullTrace(Trace):
             ab, pq = np.array([[a, b]]), np.c_[p, q]
         self.aim_given(ab, pq, wavelength, aim=icenter if aim else None)
         self.propagate(clip=clip)
+        return icenter
 
-    def rays_for_object(self, paraxial, wavelength, nrays, eps=1e-6):
+    def rays_line(self, paraxial, wavelength, nrays, eps=1e-6):
         hp, rp = paraxial.pupil_distance[0], paraxial.pupil_height[0]
         r = self.system.object.radius
         if self.system.object.infinity:
@@ -486,102 +488,105 @@ class FullTrace(Trace):
             fig.subplotpars.top = .95
             fig.subplotpars.hspace = .2
             fig.subplotpars.wspace = .2
-        gs = gridspec.GridSpec(n, 6)
-        axm0, axs0, axl0, axc0 = None, None, None, None
+        gs = gridspec.GridSpec(n, 5)
+        axpx0, axpy0, axex0, axey0, axpx1 = None, None, None, None, None
         ax = []
         for i in range(n):
-            axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2),
-                    sharex=axm0, sharey=axm0)
-            if axm0 is None: axm0 = axm
-            #axm.set_title("meridional h=%s, %s" % hi)
-            axm.set_xlabel("Y")
-            axm.set_ylabel("tanU")
-            axs = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1),
-                    sharex=axs0, sharey=axs0)
-            if axs0 is None: axs0 = axs
-            #axs.set_title("sagittal h=%s, %s" % hi)
-            axs.set_xlabel("X")
-            axs.set_ylabel("tanV")
-            axl = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
-                    sharex=axl0, sharey=axl0)
-            if axl0 is None: axl0 = axl
-            #axl.set_title("longitudinal h=%s, %s" % hi)
-            axl.set_xlabel("Z")
-            axl.set_ylabel("H")
-            axp = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
-                    aspect="equal", sharex=axs0, sharey=axm0)
-            #axp.set_title("rays h=%s, %s" % hi)
-            axp.set_ylabel("X")
-            axp.set_ylabel("Y")
-            axc = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
-                    sharex=axc0, sharey=axc0)
-            if axc0 is None: axc0 = axc
-            #axc.set_title("encircled h=%s, %s" % hi)
-            axc.set_ylabel("R")
-            axc.set_ylabel("E")
-            ax.append((axm, axs, axl, axp, axc))
+            axp = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 1),
+                    aspect="equal", sharex=axex0, sharey=axey0)
+            axex0, axey0 = axex0 or axp, axey0 or axp
+            axm = fig.add_subplot(gs.new_subplotspec((i, 1), 1, 2),
+                    sharex=axpy0, sharey=axey0)
+            axpy0 = axpy0 or axm
+            axsm = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
+                    sharex=axpx0, sharey=axey0)
+            axpx0 = axpx0 or axsm
+            axss = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
+                    sharex=axex0, sharey=axpx1)
+            axpx1 = axpx1 or axss
+            ax.append((axp, axm, axsm, axss))
+            kw = dict(rotation="horizontal",
+                    horizontalalignment="left",
+                    verticalalignment="bottom")
+            for axi, xl, yl in [
+                    (axp, "EX", "EY"),
+                    (axm, "PY", "EY"),
+                    (axsm, "PX", "EY"),
+                    (axss, "EX", "PX"),
+                    ]:
+                axi.spines["right"].set_visible(False)
+                axi.spines["top"].set_visible(False)
+                axi.spines["left"].set_position("zero")
+                axi.spines["bottom"].set_position("zero")
+                axi.tick_params(bottom=True, top=False,
+                        left=True, right=False,
+                        labeltop=False, labelright=False,
+                        labelleft=True, labelbottom=True,
+                        direction="out", axis="both")
+                axi.xaxis.set_smart_bounds(True)
+                axi.yaxis.set_smart_bounds(True)
+                #axi.set_title("h=%s, %s" % hi)
+                axi.set_xlabel(xl, **kw)
+                axi.set_ylabel(yl, **kw)
+            axp.spines["left"].set_visible(False)
+            axp.spines["bottom"].set_visible(False)
+            axp.tick_params(bottom=False, left=False,
+                    labelbottom=False, labelleft=False)
+            axp.set_aspect("equal")
         return ax
 
     def tweak_fanplots(self, ax):
-        for axj in ax:
-            for axi in axj:
-                axi.spines["right"].set_color("none")
-                axi.spines["top"].set_color("none")
-                axi.spines["left"].set_position("zero")
-                axi.spines["bottom"].set_position("zero")
-                axi.spines["left"].set_smart_bounds(True)
-                axi.spines["bottom"].set_smart_bounds(True)
-                axi.xaxis.set_ticks_position("bottom")
-                axi.yaxis.set_ticks_position("left")
+        for axp, axm, axsm, axss in ax:
+            for axi in axm, axsm, axss, axp:
                 axi.relim()
-                axi.autoscale_view(True, True, True)
+                #axi.autoscale_view(True, True, True)
                 t = axi.get_xticks()
-                axi.set_xticks((min(t), max(t)))
+                axi.set_xticks((t[0], t[-1]))
                 t = axi.get_yticks()
-                axi.set_yticks((min(t), max(t)))
+                axi.set_yticks((t[0], t[-1]))
+                xl, xu = axi.get_xlim()
+                yl, yu = axi.get_ylim()
+                axi.xaxis.set_label_coords(xu, .02*(yu - yl),
+                        transform=axi.transData)
+                axi.yaxis.set_label_coords(.02*(xu - xl), yu,
+                        transform=axi.transData)
 
     def plot_transverse(self, fig, paraxial=None,
-            heights=[(1., 1.), (.707, .707), (0., 0.)],
-            wavelengths=None, nrays_spot=100, nrays_line=30, adjust=True):
+            heights=[(1., 0.), (.707, .0), (0., 0.)],
+            wavelengths=None, nrays_spot=100, nrays_line=23,
+            adjust=True, colors="gbrcmyk"):
+        import matplotlib.patches as patches
         if paraxial is None:
             paraxial = ParaxialTrace(self.system)
         if wavelengths is None:
             wavelengths = self.system.object.wavelengths
         nh = len(heights)
-        n = nrays_line
         ia = self.system.aperture_index
         ax = self.setup_fanplot(fig, nh, adjust)
+        p = paraxial.pupil_distance[0]
+        r = paraxial.airy_radius[1]
         for hi, axi in zip(heights, ax):
-            axm, axs, axl, axp, axc = axi
-            for wi in wavelengths:
-                self.rays_paraxial_point(paraxial, hi, wi, nrays=n,
-                        distribution="tee")
-                # top rays (small tanU) are right/top
-                um, us, ul = self.u[-2, n/3:, 0], self.u[-2, :n/3, 1], self.u[-2, n/3:, 2]
-                ym, ys = self.y[-1, n/3:, 0], self.y[-1, :n/3, 1]
-                axm.plot(-tanarcsin(um)+paraxial.u[-2, 1]*hi[0],
-                        ym-paraxial.y[-1, 1]*hi[0],
-                        "-", label="%s" % wi)
-                axs.plot(ys, -tanarcsin(us), "-", label="%s" % wi)
-                axl.plot(-(ym-paraxial.y[-1, 1]*hi[0])*ul/um,
-                        self.y[ia, n/3:, 0],
-                        "-", label="%s" % wi)
-                self.rays_paraxial_point(paraxial, hi, wi, nrays=nrays_spot,
-                        distribution="triangular")
-                x, y = self.y[-1, :, :2].T
-                axp.plot(y-paraxial.y[-1, 1]*hi[1], x-paraxial.y[-1, 1]*hi[0],
-                        ".", markersize=3, markeredgewidth=0, label="%s" % wi)
-                xy = self.y[-1, :, (0, 1)]
-                xy = xy[np.all(np.isfinite(xy), axis=1), :]
-                if not xy.shape[0]:
-                    continue
-                xym = xy.mean(axis=0)
-                r = ((xy-xym[None, :])**2).sum(axis=1)**.5
-                rb = np.bincount(
-                        (r*(n/r.max())).astype(np.int),
-                        minlength=n+1).cumsum()
-                axc.plot(np.linspace(0, r.max(), n+1),
-                        rb.astype(np.float)/self.y.shape[2])
+            axp, axm, axsm, axss = axi
+            axp.add_patch(patches.Circle((0, 0), r, edgecolor="black",
+                facecolor="none"))
+            axp.set_title("OY,OX=%s,%s" % hi)
+            for wi, ci in zip(wavelengths, colors):
+                ref = self.rays_paraxial_point(paraxial, hi, wi,
+                        nrays=nrays_spot, distribution="triangular")
+                exy = self.y[-1, :, :2]
+                exy = exy - exy[ref]
+                axp.plot(exy[:, 1], exy[:, 0],
+                        ".%s" % ci, markersize=3, markeredgewidth=0, label="%s" % wi)
+                ref = self.rays_paraxial_point(paraxial, hi, wi,
+                        nrays=nrays_line, distribution="tee")
+                y, u = self.y, self.u
+                exy = y[-1, :, :2]
+                exy = exy - exy[ref]
+                pxy = y[1, :, :2] + p*u[0, :, :2]/u[0, :, 2:]
+                pxy = pxy - pxy[ref]
+                axm.plot(pxy[:ref, 0], exy[:ref, 0], "-%s" % ci, label="%s" % wi)
+                axsm.plot(pxy[ref:, 1], exy[ref:, 0], "-%s" % ci, label="%s" % wi)
+                axss.plot(exy[ref:, 1], pxy[ref:, 1], "-%s" % ci, label="%s" % wi)
         self.tweak_fanplots(ax)
 
     def plot_longitudinal(self, wavelengths, fig=None, paraxial=None,
@@ -644,39 +649,45 @@ class FullTrace(Trace):
         if n == 1:
             return 0, np.zeros(2, n)
         elif d == "meridional":
-            return n/2, (np.linspace(-1, 1, n), np.zeros(n))
+            n -= n % 2
+            return n/2, (np.linspace(-1, 1, n + 1), np.zeros(n + 1))
         elif d == "sagittal":
-            return n/2, (np.zeros(n), np.linspace(-1, 1, n))
+            n -= n % 2
+            return n/2, (np.zeros(n + 1), np.linspace(-1, 1, n + 1))
         elif d == "cross":
-            return n/2, np.concatenate([
-                [np.linspace(-1, 1, n/2), np.zeros(n/2)],
-                [np.zeros(n/2), np.linspace(-1, 1, n/2)]], axis=1)
+            n -= n % 4
+            return n/4, np.concatenate([
+                [np.linspace(-1, 1, n/2 + 1), np.zeros(n/2 + 1)],
+                [np.zeros(n/2 + 1), np.linspace(-1, 1, n/2 + 1)]], axis=1)
         elif d == "tee":
-            return 0, np.concatenate([
-                [np.zeros(n/3), np.linspace(0, 1, n/3)],
-                [np.linspace(-1, 1, 2*n/3), np.zeros(2*n/3)]], axis=1)
+            n = (n - 2)/3
+            return 2*n + 1, np.concatenate([
+                [np.linspace(-1, 1, 2*n + 1), np.zeros(2*n + 1)],
+                [np.zeros(n + 1), np.linspace(0, 1, n + 1)],
+                ], axis=1)
         elif d == "random":
             r, phi = np.random.rand(2, n)
             xy = np.exp(2j*np.pi*phi)**2
-            return 0, np.concatenate([
-                np.zeros((2, 1)), np.array((xy.real, xy.imag))], axis=1)
+            xy = [xy.real, xy.imag]
+            return 0, np.concatenate([np.zeros((2, 1)), xy], axis=1)
         elif d == "square":
             r = int(np.sqrt(n*4/np.pi))
-            x, y = np.mgrid[-1:1:1j*r, -1:1:1j*r]
-            xy = np.array([x.ravel(), y.ravel()])
-            return n/2, xy[:, (xy**2).sum(0)<=1]
+            xy = np.mgrid[-1:1:1j*r, -1:1:1j*r].reshape(2, -1)
+            xy = xy[:, (xy**2).sum(0)<=1]
+            return 0, np.concatenate([np.zeros((2, 1)), xy], axis=1)
         elif d == "triangular":
             r = int(np.sqrt(n*4/np.pi))
-            x, y = np.mgrid[-1:1:1j*r, -1:1:1j*r]
-            x += (np.arange(r) % 2.)/r
-            xy = np.array([x.ravel(), y.ravel()])
-            return n/2, xy[:, (xy**2).sum(0)<=1]
+            xy = np.mgrid[-1:1:1j*r, -1:1:1j*r]
+            xy[0] += (np.arange(r) % 2.)*(2./r)
+            xy = xy.reshape(2, -1)
+            xy = xy[:, (xy**2).sum(0)<=1]
+            return 0, np.concatenate([np.zeros((2, 1)), xy], axis=1)
         elif d == "hexapolar":
             r = int(np.sqrt(n/3.-1/12.)-1/2.)
             l = [np.zeros((2, 1))]
-            for i in np.arange(1, r+1)/r:
+            for i in np.arange(1, r + 1)/r:
                 a = np.arange(0, 2*np.pi, 2*np.pi/(6*i))
-                l.append([np.sin(a)*i/r, i*np.cos(a)/r])
+                l.append([np.sin(a)*i/r, np.cos(a)*i/r])
             return 0, np.concatenate(l, axis=1)
 
     def __str__(self):
