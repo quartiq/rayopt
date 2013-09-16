@@ -482,7 +482,7 @@ class FullTrace(Trace):
             return 0, np.concatenate(l, axis=1)
      
     def rays_point(self, object_height, pupil_distance, pupil_radius,
-            wavelength, nrays=11, distribution="meridional",
+            wavelength=None, nrays=11, distribution="meridional",
             clip=True, aim=True):
         # TODO apodization
         icenter, (xp, yp) = self.pupil_distribution(distribution, nrays)
@@ -490,55 +490,56 @@ class FullTrace(Trace):
         r = self.system.object.radius
         if self.system.object.infinite:
             r = sinarctan(r)
-            p, q = object_height[0]*r, object_height[1]*r
+            p, q = object_height*r, 0.
             a = xp*pupil_radius-pupil_distance*tanarcsin(p)
             b = yp*pupil_radius-pupil_distance*tanarcsin(q)
             pq, ab = np.array([[p, q]]), np.c_[a, b]
         else:
-            a, b = -object_height[0]*r, -object_height[1]*r
+            a, b = -object_height*r, 0.
             p = sinarctan((xp*pupil_radius-a)/pupil_distance)
             q = sinarctan((yp*pupil_radius-b)/pupil_distance)
             ab, pq = np.array([[a, b]]), np.c_[p, q]
-        self.aim_given(ab, pq, wavelength, aim=icenter if aim else None)
+        self.aim_given(ab, pq, wavelength, aim=icenter if aim else None,
+                axis=0)
         self.propagate(clip=clip)
         return icenter
 
-    def rays_paraxial_point(self, paraxial, height=(1., 0.),
+    def rays_paraxial_point(self, paraxial, height=1.,
             wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
         rp = paraxial.pupil_height[0]
         return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
-    def rays_line(self, wavelength, pupil_distance, pupil_height,
-            aim=True):
-        pass
-
-    def rays_paraxial_line(self, paraxial, wavelength, nrays, eps=1e-6):
-        hp, rp = paraxial.pupil_distance[0], paraxial.pupil_height[0]
+    def rays_line(self, pupil_distance, pupil_height, wavelength=None,
+            nrays=11, aim=True, eps=1e-3, clip=False):
         r = self.system.object.radius
         if self.system.object.infinite:
             r = sinarctan(r)
-        xi, yi = np.tile([np.linspace(0, r, nrays), np.zeros(nrays)], 3)
-        xp, yp = np.zeros_like(xi), np.zeros_like(yi)
-        xp[nrays:2*nrays] = eps*rp
-        yp[2*nrays:] = eps*rp
-        if self.system.object.infinity:
-            p, q = xi, yi
-            a, b = xp-hp*tanarcsin(p), yp-hp*tanarcsin(q)
+        yo, xo = np.linspace(0, r, nrays), np.zeros(nrays)
+        yi, xi = np.tile([yo, xo], 3) # object
+        yp, xp = np.zeros((2, 3*nrays)) # pupil
+        yp[nrays:2*nrays] = eps*pupil_height # meridional
+        xp[2*nrays:] = eps*pupil_height # sagittal
+        if self.system.object.infinite:
+            p, q = yi, xi
+            a, b = yp-pupil_distance*tanarcsin(p), xp-pupil_distance*tanarcsin(q)
         else:
-            a, b = xi, yi
-            p, q = sinarctan((xp-a)/hp), sinarctan((yp-b)/hp)
-        self.nrays = nrays*3
-        self.allocate()
-        self.l = wavelength
-        self.n[0] = self.system.object.material.refractive_index(
-                wavelength)
-        self.y[0, 0] = a
-        self.y[1, 0] = b
-        self.y[2, 0] = 0
-        self.u[0, 0] = p
-        self.u[1, 0] = q
-        self.u[2, 0] = np.sqrt(1-p**2-q**2)
+            a, b = yi, xi
+            p, q = sinarctan((yp-a)/pupil_distance), sinarctan((xp-b)/pupil_distance)
+        y, u = np.array([a, b]).T, np.array([p, q]).T
+        if aim:
+            for i in range(nrays):
+                ii = i, i+nrays, i+2*nrays
+                self.aim_given(y[ii, :], u[ii, :], wavelength, aim=0, axis=0)
+                y[ii, :] = self.y[0, :, :2]
+                u[ii, :] = self.u[0, :, :2]
+        self.rays_given(y, u, wavelength)
+        self.propagate(clip=clip)
+
+    def rays_paraxial_line(self, paraxial, wavelength=None, **kwargs):
+        zp = paraxial.pupil_distance[0] + paraxial.z[1]
+        rp = paraxial.pupil_height[0]
+        return self.rays_line(zp, rp, wavelength, **kwargs)
 
     def size_elements(self, fn=lambda a, b: a, axis=0):
         for e, y in zip(self.system[1:], self.y[1:, :, axis]):
@@ -574,6 +575,20 @@ class FullTrace(Trace):
             ax.set_ylabel(ylabel, **kw)
         if title:
             ax.set_title(title)
+            
+    def post_setup_axes(self, axi):
+        axi.relim()
+        #axi.autoscale_view(True, True, True)
+        t = axi.get_xticks()
+        axi.set_xticks((t[0], t[-1]))
+        t = axi.get_yticks()
+        axi.set_yticks((t[0], t[-1]))
+        xl, xu = axi.get_xlim()
+        yl, yu = axi.get_ylim()
+        axi.xaxis.set_label_coords(xu, .02*(yu - yl),
+                transform=axi.transData)
+        axi.yaxis.set_label_coords(.02*(xu - xl), yu,
+                transform=axi.transData)
 
     def pre_setup_fanplot(self, fig, n):
         from matplotlib import gridspec
@@ -608,24 +623,8 @@ class FullTrace(Trace):
             axp.set_aspect("equal")
         return ax
 
-    def post_setup_fanplot(self, ax):
-        for axp, axm, axsm, axss in ax:
-            for axi in axm, axsm, axss, axp:
-                axi.relim()
-                #axi.autoscale_view(True, True, True)
-                t = axi.get_xticks()
-                axi.set_xticks((t[0], t[-1]))
-                t = axi.get_yticks()
-                axi.set_yticks((t[0], t[-1]))
-                xl, xu = axi.get_xlim()
-                yl, yu = axi.get_ylim()
-                axi.xaxis.set_label_coords(xu, .02*(yu - yl),
-                        transform=axi.transData)
-                axi.yaxis.set_label_coords(.02*(xu - xl), yu,
-                        transform=axi.transData)
-
     def plot_transverse(self, fig=None, paraxial=None,
-            heights=[(1., 0.), (.707, .0), (0., 0.)],
+            heights=[1., .707, 0.],
             wavelengths=None, nrays_spot=100, nrays_line=23,
             colors="gbrcmyk"):
         import matplotlib.patches as patches
@@ -645,7 +644,9 @@ class FullTrace(Trace):
             axp, axm, axsm, axss = axi
             axp.add_patch(patches.Circle((0, 0), r, edgecolor="black",
                 facecolor="none"))
-            axp.set_title("OY,OX=%s,%s" % hi)
+            axp.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
+                    transform=axp.transAxes,
+                    verticalalignment="center")
             for wi, ci in zip(wavelengths, colors):
                 ref = self.rays_paraxial_point(paraxial, hi, wi,
                         nrays=nrays_spot, distribution="triangular")
@@ -663,7 +664,9 @@ class FullTrace(Trace):
                 axm.plot(pxy[:ref, 0], exy[:ref, 0], "-%s" % ci, label="%s" % wi)
                 axsm.plot(pxy[ref:, 1], exy[ref:, 0], "-%s" % ci, label="%s" % wi)
                 axss.plot(exy[ref:, 1], pxy[ref:, 1], "-%s" % ci, label="%s" % wi)
-        self.post_setup_fanplot(ax)
+        for axi in ax:
+            for axii in axi:
+                self.post_setup_axes(axii)
         return fig
 
     def plot_longitudinal(self, fig=None, paraxial=None,
@@ -678,22 +681,24 @@ class FullTrace(Trace):
         gs = plt.GridSpec(1, 2)
         axl = fig.add_subplot(1, 2, 1)
         self.setup_axes(axl, "OY", "D", "distortion")
-        axl = fig.add_subplot(1, 2, 2)
-        self.setup_axes(axl, "OY", "EZ", "field curvature")
+        axc = fig.add_subplot(1, 2, 2)
+        self.setup_axes(axc, "OY", "EZ", "field curvature")
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
-            self.rays_paraxial_line(paraxial, wi, nrays)
-            axl.plot(self.y[0, -1, :npoints]-np.linspace(0, paraxial.height[1], npoints),
-                self.y[0, -1, :npoints], ci+"-", label="d")
+            self.rays_paraxial_line(paraxial, wi, nrays=nrays)
+            a, b, c = np.split(self.y[-1].T, (nrays, 2*nrays), axis=1)
+            p, q, r = np.split(self.u[-2].T, (nrays, 2*nrays), axis=1)
+            xd = a[0] - np.linspace(0, paraxial.height[1], nrays)
             # tangential field curvature
             # -(real_y-parax_y)/(tanarcsin(real_u)-tanarcsin(parax_u))
-            xt = -(self.y[0, -1, npoints:2*npoints]-self.y[0, -1, :npoints])/(
-                  tanarcsin(self.u[0, -1, npoints:2*npoints])-tanarcsin(self.u[0, -1, :npoints]))
+            xt = -(b[0]-a[0])/(tanarcsin(q[0])-tanarcsin(p[0]))
             # sagittal field curvature
             # -(real_x-parax_x)/(tanarcsin(real_v)-tanarcsin(parax_v))
-            xs = -(self.y[1, -1, 2*npoints:]-self.y[1, -1, :npoints])/(
-                  tanarcsin(self.u[1, -1, 2*npoints:])-tanarcsin(self.u[1, -1, :npoints]))
-            axc.plot(xt, self.y[0, -1, :npoints], ci+"--", label="zt")
-            axc.plot(xs, self.y[0, -1, :npoints], ci+"-", label="zs")
+            xs = -(c[1]-a[1])/(tanarcsin(r[1])-tanarcsin(p[1]))
+            axl.plot(a[0], xd, ci+"-")
+            axc.plot(a[0], xt, ci+"--", label="EZt")
+            axc.plot(a[0], xs, ci+"-", label="EZs")
+        self.post_setup_axes(axl)
+        self.post_setup_axes(axc)
         return fig
 
     def print_trace(self):
