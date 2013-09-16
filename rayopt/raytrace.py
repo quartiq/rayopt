@@ -732,7 +732,7 @@ class FullTrace(Trace):
             # sagittal field curvature
             # -(real_x-parax_x)/(tanarcsin(real_v)-tanarcsin(parax_v))
             xs = -(c[1]-a[1])/(tanarcsin(r[1])-tanarcsin(p[1]))
-            axl.plot(a[0], xd, ci+"-")
+            axl.plot(a[0], xd, ci+"-", label="D")
             axc.plot(a[0], xt, ci+"-", label="EZt")
             axc.plot(a[0], xs, ci+"--", label="EZs")
         self.post_setup_axes(axl)
