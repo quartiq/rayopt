@@ -201,7 +201,7 @@ class Interface(Element):
         a = np.fabs(mu)*(u0*r).sum(axis=1)/r2
         # solve g**2 + 2*a*g + b=0
         if np.all(mu == -1): # all/any?
-            u = u0 - 2*a*r # reflection
+            u = u0 - 2*a[:, None]*r # reflection
         else:
             b = (mu**2 - 1)/r2
             g = -a + np.sign(mu)*np.sqrt(a**2 - b)
