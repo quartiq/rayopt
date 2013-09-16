@@ -13,3 +13,4 @@ debian/*.substvars
 debian/*-stampdir
 ./glass
 ./debian/tmp
+examples/.ipynb_checkpoints
