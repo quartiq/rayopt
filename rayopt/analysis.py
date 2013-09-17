@@ -28,7 +28,7 @@ from .raytrace import ParaxialTrace, FullTrace, tanarcsin, sinarctan
 class Analysis(object):
     figwidth = 12.
     resize = True
-    focus = True
+    refocus = True
     print_system = True
     print_paraxial = True
     print_paraxial_full = False
@@ -51,11 +51,11 @@ class Analysis(object):
 
     def run(self):
         self.paraxial = ParaxialTrace(self.system)
-        if self.focus:
+        if self.refocus:
             self.paraxial.focal_plane_solve()
         if self.resize:
             self.paraxial.size_elements()
-            self.system.image.radius = abs(self.paraxial.height[1])
+        self.system.image.radius = abs(self.paraxial.height[1])
         if self.print_system:
             self.text.append(str(self.system))
         if self.print_paraxial:

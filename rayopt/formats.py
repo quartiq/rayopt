@@ -60,7 +60,7 @@ def system_from_array(data,
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)
             if type(mat) is type(1.):
-                m = Material(nd=mat)
+                m = Material(name="%.5g" % mat, nd=mat)
             else:
                 try:
                     m = all_materials[mat]

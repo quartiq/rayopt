@@ -51,7 +51,7 @@ lambda_C = fraunhofer["C"]
 def simple_cache(f):
     cache = {}
     def wrapper(self, *args):
-        key = self.name, args
+        key = self, args
         if key not in cache:
             cache[key] = f(self, *args)
         return cache[key]
