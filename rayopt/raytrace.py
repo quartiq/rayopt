@@ -531,8 +531,8 @@ class FullTrace(Trace):
             nrays=21, aim=True, eps=1e-3, clip=False):
         r = self.system.object.radius
         if self.system.object.infinite:
-            r = sinarctan(r)
-        yo, xo = np.linspace(0, r, nrays), np.zeros(nrays)
+            r = -sinarctan(r)
+        yo, xo = np.linspace(0, -r, nrays), np.zeros(nrays)
         yi, xi = np.tile([yo, xo], 3) # object
         yp, xp = np.zeros((2, 3*nrays)) # pupil
         yp[nrays:2*nrays] = eps*pupil_height # meridional
@@ -718,9 +718,9 @@ class FullTrace(Trace):
             wavelengths = self.system.object.wavelengths
         gs = plt.GridSpec(1, 2)
         axl = fig.add_subplot(1, 2, 1)
-        self.setup_axes(axl, "OY", "D", "distortion")
+        self.setup_axes(axl, "EY", "DEY") #, "distortion")
         axc = fig.add_subplot(1, 2, 2)
-        self.setup_axes(axc, "OY", "EZ", "field")
+        self.setup_axes(axc, "EY", "EZ") #, "field")
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
             self.rays_paraxial_line(paraxial, wi, nrays=nrays)
             a, b, c = np.split(self.y[-1].T, (nrays, 2*nrays), axis=1)
@@ -732,7 +732,7 @@ class FullTrace(Trace):
             # sagittal field curvature
             # -(real_x-parax_x)/(tanarcsin(real_v)-tanarcsin(parax_v))
             xs = -(c[1]-a[1])/(tanarcsin(r[1])-tanarcsin(p[1]))
-            axl.plot(a[0], xd, ci+"-", label="D")
+            axl.plot(a[0], xd, ci+"-", label="DEY")
             axc.plot(a[0], xt, ci+"-", label="EZt")
             axc.plot(a[0], xs, ci+"--", label="EZs")
         self.post_setup_axes(axl)

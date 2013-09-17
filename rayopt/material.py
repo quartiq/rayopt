@@ -189,16 +189,25 @@ def load_catalog_zemax(fil, name=None):
 
 
 def load_catalogs(all, catalogs):
-    all = shelve.open(all, "c", protocol=pickle.HIGHEST_PROTOCOL,
-            writeback=False)
-    if not all.keys():
+    try:
+        db = shelve.open(all, "r", protocol=pickle.HIGHEST_PROTOCOL,
+                writeback=False)
+        if not db.keys():
+            db.close()
+            raise
+    except:
+        db = shelve.open(all, "c", protocol=pickle.HIGHEST_PROTOCOL,
+                writeback=False)
         for f in catalogs:
             _, name = os.path.split(f)
             name, _ = os.path.splitext(name)
             cf = load_catalog_zemax(f, name)
-            all.update(cf)
-        all.update(basics)
-    return all
+            db.update(cf)
+        db.update(basics)
+        db.close()
+        db = shelve.open(all, "r", protocol=pickle.HIGHEST_PROTOCOL,
+                writeback=False)
+    return db
 
 
 catpath = "/home/rj/work/nist/pyrayopt/glass/"
