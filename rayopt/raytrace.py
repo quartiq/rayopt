@@ -291,8 +291,7 @@ class ParaxialTrace(Trace):
             nodals=False, **kwargs):
         kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "green")
-        ax.plot(self.z, self.y[:, 0], **kwargs)
-        ax.plot(self.z, self.y[:, 1], **kwargs)
+        ax.plot(self.z, self.y, **kwargs)
         for p, flag in [
                 (self.principal_distance, principals),
                 (self.focal_distance, focals),
@@ -370,7 +369,7 @@ class FullTrace(Trace):
         if radius is None:
             radius = ri
         y = self.y[-2]
-        y = y - self.y[-1, chief, None] # center sphere on chief image
+        y = y - self.y[-1, chief] # center sphere on chief image
         y = y - [[0, 0, ri - radius]]
         # u = self.u[-2]
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
@@ -379,27 +378,31 @@ class FullTrace(Trace):
         u /= np.sqrt(np.square(u).sum(axis=1))[:, None]
         t = Spheroid(curvature=1./radius).intercept(y, u)
         t = t*self.n[-2] + self.t[:-1].sum(axis=0)
-        return t - t[chief, None]
+        return t - t[chief]
 
     def rays_paraxial(self, paraxial):
-        y = paraxial.y[0, :, None]
-        u = paraxial.u[0, :, None]
-        self.rays_given(y, sinarctan(u))
+        y = np.zeros((2, 2))
+        y[:, 1] = paraxial.y[0]
+        u = np.zeros((2, 2))
+        u[:, 1] = sinarctan(paraxial.u[0])
+        self.rays_given(y, u)
         self.propagate(clip=False)
 
-    def aim(self, index=0, axis=0, tol=1e-2, maxiter=10):
+    def aim(self, index=0, axis=1, target=0., tol=1e-2, maxiter=10,
+            stop=None):
         """aims ray by index at aperture center
         changing angle (in case of finite object) or
         position in case of infinite object"""
         var = self.y if self.system.object.infinite else self.u
-        stop = self.system.aperture_index
+        if stop is None:
+            stop = self.system.aperture_index
         v0 = var[0, index, axis].copy()
 
         def distance(a):
             var[0, index, axis] = a*v0
             self.propagate(stop=stop + 1, clip=False)
             res = self.y[stop, index, axis]
-            return res
+            return res - target
 
         def find_start(fun, a0):
             f0 = fun(a0)
@@ -414,28 +417,28 @@ class FullTrace(Trace):
 
         try:
             a0, f0 = find_start(distance, 1.)
-            if abs(f0) > tol:
+            if abs(f0 - target) > tol:
                 a0 = newton(distance, a0, tol=tol, maxiter=maxiter)
             return (a0 - 1)*v0
         except RuntimeError:
             var[0, index, axis] = v0
             raise
 
-    def aim_given(self, y, u, l=None, aim=None, axis=0, **kwargs):
-        if aim is not None:
-            self.allocate(1)
-            ya = y[(aim,), :] if y.shape[0] > 1 else y
-            ua = u[(aim,), :] if u.shape[0] > 1 else u
-            self.rays_given(ya, ua, l)
-            try:
-                corr = self.aim(index=0, axis=axis, **kwargs)
-            except RuntimeError:
-                corr = 0.
-            if self.system.object.infinite:
-                y[:, axis] += corr
-            else:
-                u[:, axis] += corr
-        self.rays_given(y, u, l)
+    def aim_given(self, y, u, l=None, aim=0, axis=1, **kwargs):
+        self.allocate(1)
+        y, u = np.atleast_2d(y, u)
+        ya = y[aim] if y.shape[0] > 1 else y
+        ua = u[aim] if u.shape[0] > 1 else u
+        self.rays_given(ya, ua, l)
+        try:
+            corr = self.aim(index=0, axis=axis, **kwargs)
+        except RuntimeError:
+            corr = 0.
+        if self.system.object.infinite:
+            y[:, axis] += corr
+        else:
+            u[:, axis] += corr
+        return y, u
 
     def pupil_distribution(self, distribution, nrays):
         """returns nrays in normalized aperture coordinates x/meridional
@@ -455,69 +458,66 @@ class FullTrace(Trace):
         d = distribution
         n = nrays
         if n == 1:
-            return 0, np.zeros(2, n)
+            return 0, np.zeros((n, 2))
         elif d == "meridional":
             n -= n % 2
-            return n/2, (np.linspace(-1, 1, n + 1), np.zeros(n + 1))
+            return n/2, np.c_[np.zeros(n + 1), np.linspace(-1, 1, n + 1)]
         elif d == "sagittal":
             n -= n % 2
-            return n/2, (np.zeros(n + 1), np.linspace(-1, 1, n + 1))
+            return n/2, np.c_[np.linspace(-1, 1, n + 1), np.zeros(n + 1)]
         elif d == "cross":
             n -= n % 4
             return n/4, np.concatenate([
-                [np.linspace(-1, 1, n/2 + 1), np.zeros(n/2 + 1)],
-                [np.zeros(n/2 + 1), np.linspace(-1, 1, n/2 + 1)]], axis=1)
+                np.c_[np.zeros(n/2 + 1), np.linspace(-1, 1, n/2 + 1)],
+                np.c_[np.linspace(-1, 1, n/2 + 1), np.zeros(n/2 + 1)],
+                ])
         elif d == "tee":
             n = (n - 2)/3
             return 2*n + 1, np.concatenate([
-                [np.linspace(-1, 1, 2*n + 1), np.zeros(2*n + 1)],
-                [np.zeros(n + 1), np.linspace(0, 1, n + 1)],
-                ], axis=1)
+                np.c_[np.zeros(2*n + 1), np.linspace(-1, 1, 2*n + 1)],
+                np.c_[np.linspace(0, 1, n + 1), np.zeros(n + 1)],
+                ])
         elif d == "random":
             r, phi = np.random.rand(2, n)
-            xy = np.exp(2j*np.pi*phi)**2
-            xy = [xy.real, xy.imag]
-            return 0, np.concatenate([np.zeros((2, 1)), xy], axis=1)
+            xy = np.exp(2j*np.pi*phi)*np.sqrt(r)
+            xy = np.c_[xy.real, xy.imag]
+            return 0, np.concatenate([[[0, 0]], xy])
         elif d == "square":
-            r = int(np.sqrt(n*4/np.pi))
-            xy = np.mgrid[-1:1:1j*r, -1:1:1j*r].reshape(2, -1)
-            xy = xy[:, (xy**2).sum(0)<=1]
-            return 0, np.concatenate([np.zeros((2, 1)), xy], axis=1)
+            n = int(np.sqrt(n*4/np.pi))
+            xy = np.mgrid[-1:1:1j*n, -1:1:1j*n].reshape(2, -1)
+            xy = xy[:, (xy**2).sum(0)<=1].T
+            return 0, np.concatenate([[[0, 0]], xy])
         elif d == "triangular":
-            r = int(np.sqrt(n*4/np.pi))
-            xy = np.mgrid[-1:1:1j*r, -1:1:1j*r]
-            xy[0] += (np.arange(r) % 2.)*(2./r)
+            n = int(np.sqrt(n*4/np.pi))
+            xy = np.mgrid[-1:1:1j*n, -1:1:1j*n]
+            xy[0] += (np.arange(n) % 2.)*(2./n)
             xy = xy.reshape(2, -1)
-            xy = xy[:, (xy**2).sum(0)<=1]
-            return 0, np.concatenate([np.zeros((2, 1)), xy], axis=1)
+            xy = xy[:, (xy**2).sum(0)<=1].T
+            return 0, np.concatenate([[[0, 0]], xy])
         elif d == "hexapolar":
-            r = int(np.sqrt(n/3.-1/12.)-1/2.)
+            n = int(np.sqrt(n/3.-1/12.)-1/2.)
             l = [np.zeros((2, 1))]
-            for i in np.arange(1, r + 1.):
+            for i in np.arange(1, n + 1.):
                 a = np.linspace(0, 2*np.pi, 6*i, endpoint=False)
-                l.append([np.sin(a)*i/r, np.cos(a)*i/r])
-            return 0, np.concatenate(l, axis=1)
+                l.append([np.sin(a)*i/n, np.cos(a)*i/n])
+            return 0, np.concatenate(l, axis=1).T
      
-    def rays_point(self, object_height, pupil_distance, pupil_radius,
+    def rays_point(self, height, pupil_distance, pupil_radius,
             wavelength=None, nrays=11, distribution="meridional",
             clip=True, aim=True):
         # TODO apodization
-        icenter, (xp, yp) = self.pupil_distribution(distribution, nrays)
-        self.allocate(xp.shape[0])
+        icenter, yp = self.pupil_distribution(distribution, nrays)
+        self.allocate(yp.shape[0])
         r = self.system.object.radius
         if self.system.object.infinite:
-            r = sinarctan(r)
-            p, q = object_height*r, 0.
-            a = xp*pupil_radius-pupil_distance*tanarcsin(p)
-            b = yp*pupil_radius-pupil_distance*tanarcsin(q)
-            pq, ab = np.array([[p, q]]), np.c_[a, b]
+            u = np.array([[0, height*sinarctan(r)]])
+            y = yp*pupil_radius - pupil_distance*tanarcsin(u)
         else:
-            a, b = -object_height*r, 0.
-            p = sinarctan((xp*pupil_radius-a)/pupil_distance)
-            q = sinarctan((yp*pupil_radius-b)/pupil_distance)
-            ab, pq = np.array([[a, b]]), np.c_[p, q]
-        self.aim_given(ab, pq, wavelength, aim=icenter if aim else None,
-                axis=0)
+            y = np.array([[0, -height*r]])
+            u = sinarctan((yp*pupil_radius - y)/pupil_distance)
+        if aim:
+            y, u = self.aim_given(y, u, wavelength, aim=icenter, axis=1)
+        self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
         return icenter
 
@@ -529,27 +529,27 @@ class FullTrace(Trace):
 
     def rays_line(self, pupil_distance, pupil_height, wavelength=None,
             nrays=21, aim=True, eps=1e-3, clip=False):
-        r = self.system.object.radius
         if self.system.object.infinite:
-            r = -sinarctan(r)
-        yo, xo = np.linspace(0, -r, nrays), np.zeros(nrays)
-        yi, xi = np.tile([yo, xo], 3) # object
-        yp, xp = np.zeros((2, 3*nrays)) # pupil
-        yp[nrays:2*nrays] = eps*pupil_height # meridional
-        xp[2*nrays:] = eps*pupil_height # sagittal
-        if self.system.object.infinite:
-            p, q = yi, xi
-            a, b = yp-pupil_distance*tanarcsin(p), xp-pupil_distance*tanarcsin(q)
+            r = sinarctan(self.system.object.radius)
         else:
-            a, b = yi, xi
-            p, q = sinarctan((yp-a)/pupil_distance), sinarctan((xp-b)/pupil_distance)
-        y, u = np.array([a, b]).T, np.array([p, q]).T
+            r = -self.system.object.radius
+        yo = np.c_[np.zeros(nrays), np.linspace(0, r, nrays)]
+        yi = np.tile(yo, (3, 1)) # object
+        yp = np.zeros((3, 2)) # pupil
+        yp[(1, 2), (1, 0)] = eps*pupil_height # meridional, sagittal
+        yp = np.repeat(yp, nrays, axis=0)
+        if self.system.object.infinite:
+            u = yi
+            y = yp - pupil_distance*tanarcsin(u)
+        else:
+            y = yi
+            u = sinarctan((yp - y)/pupil_distance)
         if aim:
             for i in range(nrays):
-                ii = i, i+nrays, i+2*nrays
-                self.aim_given(y[ii, :], u[ii, :], wavelength, aim=0, axis=0)
-                y[ii, :] = self.y[0, :, :2]
-                u[ii, :] = self.u[0, :, :2]
+                ii = i, i+nrays, i + 2*nrays
+                yi, ui = self.aim_given(y[ii, :], u[ii, :],
+                        wavelength, aim=0, axis=1)
+                y[ii, :], u[ii, :] = yi[:, :2], ui[:, :2]
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
 
@@ -558,12 +558,12 @@ class FullTrace(Trace):
         rp = paraxial.pupil_height[0]
         return self.rays_line(zp, rp, wavelength, **kwargs)
 
-    def size_elements(self, fn=lambda a, b: a, axis=0):
+    def size_elements(self, fn=lambda a, b: a, axis=1):
         for e, y in zip(self.system[1:], self.y[1:, :, axis]):
             e.radius = fn(np.fabs(y).max(), e.radius)
         self.system.size_convex()
 
-    def plot(self, ax, axis=0, **kwargs):
+    def plot(self, ax, axis=1, **kwargs):
         kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "green")
         kwargs.setdefault("alpha", .3)
@@ -661,6 +661,7 @@ class FullTrace(Trace):
         ia = self.system.aperture_index
         ax = self.pre_setup_fanplot(fig, nh)
         p = paraxial.pupil_distance[0]
+        h = paraxial.pupil_height[0]
         r = paraxial.airy_radius[1]
         for hi, axi in zip(heights, ax):
             axp, axm, axsm, axss, axo = axi
@@ -672,20 +673,22 @@ class FullTrace(Trace):
             for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
                 ref = self.rays_paraxial_point(paraxial, hi, wi,
                         nrays=nrays_spot, distribution="hexapolar")
+                # plot transverse image plane hit pattern (ray spot)
                 y, u = self.y, self.u
                 exy = y[-1, :, :2]
                 exy = exy - exy[ref]
-                axp.plot(exy[:, 1], exy[:, 0],
-                        ".%s" % ci, markersize=3, markeredgewidth=0, label="%s" % wi)
+                axp.plot(exy[:, 0], exy[:, 1], ".%s" % ci,
+                        markersize=3, markeredgewidth=0, label="%s" % wi)
                 if i == 0:
-                    y, x = (y[1, :, :2] + p*u[0, :, :2]/u[0, :, 2:]).T
-                    o = self.opd()
+                    # plot opd over entrance pupil
+                    pxy = y[1, :, :2] + p*u[0, :, :2]/u[0, :, 2:]
+                    pxy -= pxy[ref]
+                    o = self.opd(ref)
                     # griddata barfs on nans
-                    xyo = np.array([x, y, o])
-                    x, y, o = xyo[:, np.all(~np.isnan(xyo), axis=0)]
-                    n = int(nrays_spot)**.5
-                    rp = paraxial.pupil_height[0]
-                    xs, ys = np.mgrid[-rp:rp:1j*n, -rp:rp:1j*n]
+                    xyo = np.r_[pxy.T, [o]]
+                    x, y, o = xyo[:, ~np.any(np.isnan(xyo), axis=0)]
+                    n = 4*int(nrays_spot)**.5
+                    xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
                     os = griddata(x, y, o, xs, ys)
                     mm = np.fabs(os).max()
                     v = np.linspace(-mm, mm, 21)
@@ -694,14 +697,16 @@ class FullTrace(Trace):
                     # TODO normalize opd across heights
                 ref = self.rays_paraxial_point(paraxial, hi, wi,
                         nrays=nrays_line, distribution="tee")
+                # plot transverse image plane versus entrance pupil
+                # coordinates
                 y, u = self.y, self.u
                 exy = y[-1, :, :2]
                 exy = exy - exy[ref]
                 pxy = y[1, :, :2] + p*u[0, :, :2]/u[0, :, 2:]
                 pxy = pxy - pxy[ref]
-                axm.plot(pxy[:ref, 0], exy[:ref, 0], "-%s" % ci, label="%s" % wi)
-                axsm.plot(pxy[ref:, 1], exy[ref:, 0], "-%s" % ci, label="%s" % wi)
-                axss.plot(pxy[ref:, 1], exy[ref:, 1], "-%s" % ci, label="%s" % wi)
+                axm.plot(pxy[:ref, 1], exy[:ref, 1], "-%s" % ci, label="%s" % wi)
+                axsm.plot(pxy[ref:, 0], exy[ref:, 1], "-%s" % ci, label="%s" % wi)
+                axss.plot(pxy[ref:, 0], exy[ref:, 0], "-%s" % ci, label="%s" % wi)
         for axi in ax:
             for axii in axi:
                 self.post_setup_axes(axii)
@@ -725,16 +730,16 @@ class FullTrace(Trace):
             self.rays_paraxial_line(paraxial, wi, nrays=nrays)
             a, b, c = np.split(self.y[-1].T, (nrays, 2*nrays), axis=1)
             p, q, r = np.split(self.u[-2].T, (nrays, 2*nrays), axis=1)
-            xd = a[0] - np.linspace(0, paraxial.height[1], nrays)
+            xd = a[1] - np.linspace(0, paraxial.height[1], nrays)
             # tangential field curvature
             # -(real_y-parax_y)/(tanarcsin(real_u)-tanarcsin(parax_u))
-            xt = -(b[0]-a[0])/(tanarcsin(q[0])-tanarcsin(p[0]))
+            xt = -(b[1]-a[1])/(tanarcsin(q[1])-tanarcsin(p[1]))
             # sagittal field curvature
             # -(real_x-parax_x)/(tanarcsin(real_v)-tanarcsin(parax_v))
-            xs = -(c[1]-a[1])/(tanarcsin(r[1])-tanarcsin(p[1]))
-            axl.plot(a[0], xd, ci+"-", label="DEY")
-            axc.plot(a[0], xt, ci+"-", label="EZt")
-            axc.plot(a[0], xs, ci+"--", label="EZs")
+            xs = -(c[0]-a[0])/(tanarcsin(r[0])-tanarcsin(p[0]))
+            axl.plot(a[1], xd, ci+"-", label="DEY")
+            axc.plot(a[1], xt, ci+"-", label="EZt")
+            axc.plot(a[1], xs, ci+"--", label="EZs")
         self.post_setup_axes(axl)
         self.post_setup_axes(axc)
         return fig

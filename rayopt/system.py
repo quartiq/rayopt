@@ -157,7 +157,7 @@ class System(list):
             else:
                 pending = None
 
-    def plot(self, ax, axis=0, npoints=31, adjust=True, **kwargs):
+    def plot(self, ax, axis=1, npoints=31, adjust=True, **kwargs):
         kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "black")
         if adjust:

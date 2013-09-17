@@ -197,14 +197,15 @@ class Interface(Element):
             return u0
         r = self.shape_func_deriv(y)
         r2 = np.square(r).sum(axis=1)
-        a = np.fabs(mu)*(u0*r).sum(axis=1)/r2
+        muf = np.fabs(mu)
+        a = muf*(u0*r).sum(axis=1)/r2
         # solve g**2 + 2*a*g + b=0
         if np.all(mu == -1): # all/any?
             u = u0 - 2*a[:, None]*r # reflection
         else:
             b = (mu**2 - 1)/r2
             g = -a + np.sign(mu)*np.sqrt(a**2 - b)
-            u = np.fabs(mu)*u0 + g[:, None]*r # refraction
+            u = muf*u0 + g[:, None]*r # refraction
         return u
 
     def surface_cut(self, axis, points):
