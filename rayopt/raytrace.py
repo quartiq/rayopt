@@ -425,7 +425,7 @@ class FullTrace(Trace):
         y, u = np.atleast_2d(y, u)
         ya, ua = np.broadcast_arrays(y, u)
         try:
-            corr = self.aim(ya[aim], ua[aim], l, axis=axis, **kwargs)
+            corr = self.aim(ya[aim], ua[aim], l, axis, **kwargs)
         except RuntimeError:
             corr = 0.
         if self.system.object.infinite:
@@ -442,7 +442,7 @@ class FullTrace(Trace):
         assert target.shape[0] == ya.shape[0]
         for i, ti in enumerate(target):
             try:
-                corr = self.aim(ya[i], ua[i], l, axis, target, **kwargs)
+                corr = self.aim(ya[i], ua[i], l, axis, ti, **kwargs)
             except RuntimeError:
                 corr = 0.
             if self.system.object.infinite:
@@ -545,23 +545,23 @@ class FullTrace(Trace):
             height = sinarctan(height*self.system.object.radius)
         else:
             height = -height*self.system.object.radius
-        yo = np.c_[np.zeros(nrays), np.linspace(0, height, nrays)]
-        yi = np.tile(yo, (3, 1)) # object
-        yp = np.zeros((3, 2)) # pupil
-        yp[(1, 2), (1, 0)] = eps*pupil_height # meridional, sagittal
-        yp = np.repeat(yp, nrays, axis=0)
+        yi = np.c_[np.zeros(nrays), np.linspace(0, height, nrays)]
         if self.system.object.infinite:
             u = yi
-            y = yp - pupil_distance*tanarcsin(u)
+            y = -pupil_distance*tanarcsin(u)
         else:
             y = yi
-            u = sinarctan((yp - y)/pupil_distance)
+            u = sinarctan(-y/pupil_distance)
         if aim:
-            for i in range(nrays):
-                ii = i, i+nrays, i + 2*nrays
-                yi, ui = self.aim_chief(y[ii, :], u[ii, :],
-                        wavelength, aim=0, axis=1)
-                y[ii, :], u[ii, :] = yi[:, :2], ui[:, :2]
+            y, u = self.aim_each(y, u, wavelength, axis=1)
+        e = np.zeros((3, 1, 2)) # pupil
+        e[(1, 2), :, (1, 0)] = eps*pupil_height # meridional, sagittal
+        if self.system.object.infinite:
+            y = (y + e).reshape(-1, 2)
+            u = np.tile(u, (3, 1))
+        else:
+            y = np.tile(y, (3, 1))
+            u = (u + e/pupil_distance).reshape(-1, 2)
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
 
