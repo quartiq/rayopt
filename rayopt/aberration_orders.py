@@ -185,32 +185,3 @@ def aberration_extrinsic(c, r, d, k):
         d[t, t, 0, 3, 0] = 2*c[t, s, 0, 0, 1]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[t, s, 0, 1, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + c[t, s, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + c[t, s, 0, 1, 0]*r[s, t, 0, 2, 0] + c[t, s, 0, 2, 0]*r[s, t, 0, 1, 0] + 2*c[t, s, 1, 0, 0]*r[s, t, 0, 1, 0]**2 + 4*c[t, t, 0, 0, 1]*r[t, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[t, t, 0, 0, 1]*r[t, s, 0, 2, 0] + 2*c[t, t, 0, 1, 0]*r[s, s, 0, 1, 0]*r[t, t, 0, 1, 0] + c[t, t, 0, 1, 0]*r[s, s, 0, 2, 0] + c[t, t, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[t, t, 0, 1, 0]*r[t, t, 0, 1, 0]**2 + 2*c[t, t, 0, 1, 0]*r[t, t, 0, 2, 0] + 2*c[t, t, 0, 1, 1]*r[t, s, 0, 1, 0] + 2*c[t, t, 0, 2, 0]*r[s, s, 0, 1, 0] + 3*c[t, t, 0, 2, 0]*r[t, t, 0, 1, 0] + 2*c[t, t, 1, 0, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + 2*c[t, t, 1, 0, 0]*r[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[t, t, 1, 0, 0]*r[s, t, 0, 2, 0] + 2*c[t, t, 1, 1, 0]*r[s, t, 0, 1, 0]
         d[s, s, 0, 3, 0] = 2*c[s, s, 0, 0, 1]*r[s, s, 0, 1, 0]*r[t, s, 0, 1, 0] + 2*c[s, s, 0, 0, 1]*r[t, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, s, 0, 0, 1]*r[t, s, 0, 2, 0] + c[s, s, 0, 1, 0]*r[s, s, 0, 1, 0]**2 + 2*c[s, s, 0, 1, 0]*r[s, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, s, 0, 1, 0]*r[s, s, 0, 2, 0] + c[s, s, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[s, s, 0, 1, 0]*r[t, t, 0, 2, 0] + 2*c[s, s, 0, 1, 1]*r[t, s, 0, 1, 0] + 3*c[s, s, 0, 2, 0]*r[s, s, 0, 1, 0] + 2*c[s, s, 0, 2, 0]*r[t, t, 0, 1, 0] + 4*c[s, s, 1, 0, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + 2*c[s, s, 1, 0, 0]*r[s, t, 0, 2, 0] + 2*c[s, s, 1, 1, 0]*r[s, t, 0, 1, 0] + 2*c[s, t, 0, 0, 1]*r[t, s, 0, 1, 0]**2 + c[s, t, 0, 1, 0]*r[s, s, 0, 1, 0]*r[t, s, 0, 1, 0] + c[s, t, 0, 1, 0]*r[t, s, 0, 1, 0]*r[t, t, 0, 1, 0] + c[s, t, 0, 1, 0]*r[t, s, 0, 2, 0] + c[s, t, 0, 2, 0]*r[t, s, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0]
         d[s, t, 0, 3, 0] = 2*c[s, s, 0, 0, 1]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[s, s, 0, 1, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + c[s, s, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + c[s, s, 0, 1, 0]*r[s, t, 0, 2, 0] + c[s, s, 0, 2, 0]*r[s, t, 0, 1, 0] + 2*c[s, s, 1, 0, 0]*r[s, t, 0, 1, 0]**2 + 4*c[s, t, 0, 0, 1]*r[t, s, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, t, 0, 0, 1]*r[t, s, 0, 2, 0] + 2*c[s, t, 0, 1, 0]*r[s, s, 0, 1, 0]*r[t, t, 0, 1, 0] + c[s, t, 0, 1, 0]*r[s, s, 0, 2, 0] + c[s, t, 0, 1, 0]*r[s, t, 0, 1, 0]*r[t, s, 0, 1, 0] + c[s, t, 0, 1, 0]*r[t, t, 0, 1, 0]**2 + 2*c[s, t, 0, 1, 0]*r[t, t, 0, 2, 0] + 2*c[s, t, 0, 1, 1]*r[t, s, 0, 1, 0] + 2*c[s, t, 0, 2, 0]*r[s, s, 0, 1, 0] + 3*c[s, t, 0, 2, 0]*r[t, t, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, s, 0, 1, 0]*r[s, t, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, t, 0, 1, 0]*r[t, t, 0, 1, 0] + 2*c[s, t, 1, 0, 0]*r[s, t, 0, 2, 0] + 2*c[s, t, 1, 1, 0]*r[s, t, 0, 1, 0]
-
-def aberration(y, n, p, e, st, a, kmax=4):
-    l = len(e)
-    c = np.zeros((l, 2, 2, kmax, kmax, kmax))
-    d = np.zeros((l, 2, 2, kmax, kmax, kmax))
-    r = np.zeros((l, 2, 2, kmax, kmax, kmax))
-    for i in range(l):
-        h, m = y[i]
-        v, vv = 1/n[i-1], 1/n[i]
-        u, w = p[i-1]
-        f, g = (e[i]*h + u)/v, (e[i]*m + w)/v
-        aberration_intrinsic(e[i], f, g, h, m, v, vv, c[i], kmax - 1)
-    for ki in range(2, kmax):
-        k = ki - 1
-        for j in range(k + 1):
-            for i in range(k - j + 1):
-                b = c[:, :, :, k - j - i, j, i] + d[:, :, :, k - j - i, j, i]
-                b = np.cumsum(b, axis=0)/a
-                r[:, t, :, k - j - i, j, i] = b[:, t]
-                r[:, s, :, k - j - i, j, i] = b[:, s] - b[(st,), s]
-        for i in range(l):
-            aberration_extrinsic(c[i], r[i], d[i], ki)
-    return c, d
-    
-def aberration_trace(trace, kmax=4):
-    e = np.array([el.curvature for el in trace.system.elements])
-    return aberration(trace.y[0], trace.n[:, 0], trace.u[0], e,
-        trace.system.aperture_index, trace.lagrange, kmax)
-
