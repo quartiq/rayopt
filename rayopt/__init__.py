@@ -24,3 +24,4 @@ from .material import fraunhofer
 from .optimize import (Parameter, MaterialThickness, 
     demerit_rms_position, demerit_rms_angle, demerit_mean_angle,
     demerit_aberration3)
+from .analysis import Analysis

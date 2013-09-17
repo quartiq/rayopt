@@ -122,7 +122,10 @@ class Primitive(NameMixin, TransformMixin):
         self.update()
 
     def surface_cut(self, axis, points):
-        t = np.linspace(-self.radius, self.radius, points)
+        rad = self.radius
+        if not np.isfinite(rad):
+            rad = 1.
+        t = np.linspace(-rad, rad, points)
         z = np.zeros(points)
         return t, z
 
@@ -210,7 +213,7 @@ class Interface(Element):
 
     def surface_cut(self, axis, points):
         x, z = super(Interface, self).surface_cut(axis, points)
-        xyz = np.zeros((3, len(x)))
+        xyz = np.zeros((3, x.size))
         xyz[axis] = x
         xyz[2] = z
         z = -self.shape_func(xyz.T)
@@ -246,7 +249,7 @@ class Spheroid(Interface):
         return np.array([-x*e, -y*e, np.ones_like(e)]).T
 
     def intercept(self, y, u):
-        if len(self.aspherics) == 0:
+        if not self.aspherics.size:
             # replace the newton-raphson with the analytic solution
             if self.curvature == 0:
                 s = Element.intercept(self, y, u) # flat
@@ -266,7 +269,7 @@ class Spheroid(Interface):
     def paraxial_matrix(self, n0, l):
         # [y', u'] = M * [y, u]
         c = self.curvature
-        if len(self.aspherics) > 0:
+        if self.aspherics.size:
             c += 2*self.aspherics[0]
         n = self.material.refractive_index(l)
         mu = n0/n
@@ -311,9 +314,11 @@ class Aperture(Primitive):
     typ = "A"
 
     def surface_cut(self, axis, points):
-        t = np.array([-self.radius*1.5, -self.radius, np.nan,
-            self.radius, self.radius*1.5])
-        z = np.zeros(len(t))
+        r = self.radius
+        if not np.isfinite(r):
+            r = 1.
+        t = np.array([-r*1.5, -r, np.nan, r, r*1.5])
+        z = np.zeros_like(t)
         return t, z
 
 
