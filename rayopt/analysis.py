@@ -91,7 +91,7 @@ class Analysis(object):
         if self.plot_longitudinal:
             fig = plt.figure(figsize=(self.figwidth/3, self.figwidth/6))
             self.figures.append(fig)
-            self.longitudinal(fig)
+            self.longitudinal(fig, max(self.plot_transverse))
         return self.text, self.figures
 
     @staticmethod
@@ -230,7 +230,7 @@ class Analysis(object):
             for axii in axi:
                 self.post_setup_axes(axii)
 
-    def longitudinal(self, fig,
+    def longitudinal(self, fig, height=1.,
             wavelengths=None, nrays=11, colors="gbrcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
@@ -242,10 +242,10 @@ class Analysis(object):
         self.setup_axes(axc, "EY", "EZ") #, "field")
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
             t = FullTrace(self.system)
-            t.rays_paraxial_line(paraxial, wi, nrays=nrays)
+            t.rays_paraxial_line(paraxial, height, wi, nrays=nrays)
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
             p, q, r = np.split(t.u[-2].T, (nrays, 2*nrays), axis=1)
-            xd = a[1] - np.linspace(0, paraxial.height[1], nrays)
+            xd = a[1] - np.linspace(0, height*paraxial.height[1], nrays)
             # tangential field curvature
             # -(real_y-parax_y)/(tanarcsin(real_u)-tanarcsin(parax_u))
             xt = -(b[1]-a[1])/(tanarcsin(q[1])-tanarcsin(p[1]))

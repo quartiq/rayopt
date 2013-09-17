@@ -101,9 +101,9 @@ class ParaxialTrace(Trace):
             yu, n = el.propagate_paraxial(yu, n, self.l)
             (self.y[i], self.u[i]), self.n[i] = yu.T, n
             self.v[i] = el.dispersion(self.lmin, self.lmax)
-            if aberration and i > 0:
-                self.c[i] = el.aberration(self.y[i], self.u[i - 1],
-                        self.n[i - 1], self.n[i], self.c.shape[-1])
+            # ignore i == 0 case, object handles it
+            self.c[i] = el.aberration(self.y[i], self.u[i - 1],
+                    self.n[i - 1], self.n[i], self.c.shape[-1])
         if aberration:
             self.extrinsic_aberrations()
 
@@ -387,20 +387,22 @@ class FullTrace(Trace):
         self.rays_given(y, u)
         self.propagate(clip=False)
 
-    def aim(self, index=0, axis=1, target=0., tol=1e-2, maxiter=10,
-            stop=None):
-        """aims ray by index at aperture center
+    def aim(self, y, u, l=None, axis=1, target=0., stop=None,
+            tol=1e-2, maxiter=10):
+        """aims ray at aperture center (or target)
         changing angle (in case of finite object) or
         position in case of infinite object"""
-        var = self.y if self.system.object.infinite else self.u
         if stop is None:
             stop = self.system.aperture_index
-        v0 = var[0, index, axis].copy()
+        self.rays_given(y, u, l)
+        var = self.y if self.system.object.infinite else self.u
+        assert var.shape[1] == 1
+        v0 = var[0, 0, axis].copy()
 
         def distance(a):
-            var[0, index, axis] = a*v0
+            var[0, 0, axis] = a*v0
             self.propagate(stop=stop + 1, clip=False)
-            res = self.y[stop, index, axis]
+            res = self.y[stop, 0, axis]
             return res - target
 
         def find_start(fun, a0):
@@ -414,23 +416,16 @@ class FullTrace(Trace):
                         return ai, fi
             raise RuntimeError("no starting ray found")
 
-        try:
-            a0, f0 = find_start(distance, 1.)
-            if abs(f0 - target) > tol:
-                a0 = newton(distance, a0, tol=tol, maxiter=maxiter)
-            return (a0 - 1)*v0
-        except RuntimeError:
-            var[0, index, axis] = v0
-            raise
+        a0, f0 = find_start(distance, 1.)
+        if abs(f0 - target) > tol:
+            a0 = newton(distance, a0, tol=tol, maxiter=maxiter)
+        return (a0 - 1)*v0
 
-    def aim_given(self, y, u, l=None, aim=0, axis=1, **kwargs):
-        self.allocate(1)
+    def aim_chief(self, y, u, l=None, aim=0, axis=1, **kwargs):
         y, u = np.atleast_2d(y, u)
-        ya = y[aim] if y.shape[0] > 1 else y
-        ua = u[aim] if u.shape[0] > 1 else u
-        self.rays_given(ya, ua, l)
+        ya, ua = np.broadcast_arrays(y, u)
         try:
-            corr = self.aim(index=0, axis=axis, **kwargs)
+            corr = self.aim(ya[aim], ua[aim], l, axis=axis, **kwargs)
         except RuntimeError:
             corr = 0.
         if self.system.object.infinite:
@@ -438,6 +433,23 @@ class FullTrace(Trace):
         else:
             u[:, axis] += corr
         return y, u
+
+    def aim_each(self, y, u, l=None, target=None, axis=1, **kwargs):
+        y, u = np.atleast_2d(y, u)
+        ya, ua = np.broadcast_arrays(y, u)
+        if target is None:
+            target = np.zeros(ya.shape[0])
+        assert target.shape[0] == ya.shape[0]
+        for i, ti in enumerate(target):
+            try:
+                corr = self.aim(ya[i], ua[i], l, axis, target, **kwargs)
+            except RuntimeError:
+                corr = 0.
+            if self.system.object.infinite:
+                ya[i, axis] += corr
+            else:
+                ua[i, axis] += corr
+        return ya, ua
 
     @staticmethod
     def pupil_distribution(distribution, nrays):
@@ -516,7 +528,7 @@ class FullTrace(Trace):
             y = np.array([[0, -height*r]])
             u = sinarctan((yp*pupil_radius - y)/pupil_distance)
         if aim:
-            y, u = self.aim_given(y, u, wavelength, aim=icenter, axis=1)
+            y, u = self.aim_chief(y, u, wavelength, aim=icenter, axis=1)
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
         return icenter
@@ -527,13 +539,13 @@ class FullTrace(Trace):
         rp = paraxial.pupil_height[0]
         return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
-    def rays_line(self, pupil_distance, pupil_height, wavelength=None,
-            nrays=21, aim=True, eps=1e-3, clip=False):
+    def rays_line(self, height, pupil_distance, pupil_height,
+            wavelength=None, nrays=21, aim=True, eps=1e-3, clip=False):
         if self.system.object.infinite:
-            r = sinarctan(self.system.object.radius)
+            height = sinarctan(height*self.system.object.radius)
         else:
-            r = -self.system.object.radius
-        yo = np.c_[np.zeros(nrays), np.linspace(0, r, nrays)]
+            height = -height*self.system.object.radius
+        yo = np.c_[np.zeros(nrays), np.linspace(0, height, nrays)]
         yi = np.tile(yo, (3, 1)) # object
         yp = np.zeros((3, 2)) # pupil
         yp[(1, 2), (1, 0)] = eps*pupil_height # meridional, sagittal
@@ -547,16 +559,17 @@ class FullTrace(Trace):
         if aim:
             for i in range(nrays):
                 ii = i, i+nrays, i + 2*nrays
-                yi, ui = self.aim_given(y[ii, :], u[ii, :],
+                yi, ui = self.aim_chief(y[ii, :], u[ii, :],
                         wavelength, aim=0, axis=1)
                 y[ii, :], u[ii, :] = yi[:, :2], ui[:, :2]
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
 
-    def rays_paraxial_line(self, paraxial, wavelength=None, **kwargs):
+    def rays_paraxial_line(self, paraxial, height=1.,
+            wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
         rp = paraxial.pupil_height[0]
-        return self.rays_line(zp, rp, wavelength, **kwargs)
+        return self.rays_line(height, zp, rp, wavelength, **kwargs)
 
     def size_elements(self, fn=lambda a, b: a, axis=1):
         for e, y in zip(self.system[1:], self.y[1:, :, axis]):
