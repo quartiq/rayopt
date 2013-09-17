@@ -133,7 +133,8 @@ class System(list):
         pending = None
         for e in self:
             z0 += e.thickness
-            x, z = e.transform_from(e.surface_cut(axis, points))
+            xyz = e.transform_from(e.surface_cut(axis, points))
+            x, z = xyz[:, axis], xyz[:, 2]
             z += z0
             if not hasattr(e, "material"):
                 yield x, z

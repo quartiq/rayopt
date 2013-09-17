@@ -32,7 +32,7 @@ class TransformMixin(object):
         self.update()
 
     def update(self):
-        self.rotation = euler_matrix(axes="rzxz", *self.angles)
+        self.rotation = euler_matrix(axes="rxyz", *self.angles)
         self.inverse_rotation = np.linalg.inv(self.rotation)
         translation = translation_matrix(self.offset)
         self.transformation = concatenate_transforms(translation,
@@ -49,7 +49,7 @@ class TransformMixin(object):
             y = np.dot(y, self.inverse_transformation.T)
         else:
             if not angle:
-                y = y - self.origin
+                y = y - self.offset
             y = np.dot(y, self.inverse_rotation.T[:3, :3])
         return y
 
@@ -118,16 +118,17 @@ class Primitive(NameMixin, TransformMixin):
         return y, u, n0, t*n0
 
     def reverse(self):
-        self.offset[2] *= -1
+        self.offset[1:] *= -1
+
         self.update()
 
     def surface_cut(self, axis, points):
         rad = self.radius
         if not np.isfinite(rad):
             rad = 1.
-        t = np.linspace(-rad, rad, points)
-        z = np.zeros(points)
-        return t, z
+        xyz = np.zeros((points, 3))
+        xyz[:, axis] = np.linspace(-rad, rad, points)
+        return xyz
 
     def aberration(self, *args):
         return 0
@@ -212,12 +213,9 @@ class Interface(Element):
         return u
 
     def surface_cut(self, axis, points):
-        x, z = super(Interface, self).surface_cut(axis, points)
-        xyz = np.zeros((3, x.size))
-        xyz[axis] = x
-        xyz[2] = z
-        z = -self.shape_func(xyz.T)
-        return x, z
+        xyz = super(Interface, self).surface_cut(axis, points)
+        xyz[:, 2] = -self.shape_func(xyz)
+        return xyz
 
 
 class Spheroid(Interface):
@@ -317,9 +315,9 @@ class Aperture(Primitive):
         r = self.radius
         if not np.isfinite(r):
             r = 1.
-        t = np.array([-r*1.5, -r, np.nan, r, r*1.5])
-        z = np.zeros_like(t)
-        return t, z
+        xyz = np.zeros((5, 3))
+        xyz[:, axis] = np.array([-r*1.5, -r, np.nan, r, r*1.5])
+        return xyz
 
 
 class Image(Primitive):
