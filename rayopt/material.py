@@ -50,10 +50,11 @@ lambda_C = fraunhofer["C"]
 
 def simple_cache(f):
     cache = {}
-    def wrapper(*args):
-        if args not in cache:
-            cache[args] = f(*args)
-        return cache[args]
+    def wrapper(self, *args):
+        key = self.name, args
+        if key not in cache:
+            cache[key] = f(self, *args)
+        return cache[key]
     wrapper.cache = cache
     return wrapper
 
@@ -67,7 +68,7 @@ class Material(object):
         self.thermal = thermal
         self.nd = nd
         self.vd = vd
-        if vd is None or nd is None:
+        if sellmeier is not None:
             self.sellmeier = np.atleast_2d(sellmeier)
             self.nd = self.refractive_index(lambda_d)
             self.vd = ((self.nd - 1)/(
@@ -136,10 +137,8 @@ class Gas(Material):
 # http://refractiveindex.info
 vacuum = Gas(name="vacuum", nd=1., vd=np.inf)
 vacuum_mirror = Gas(name="vacuum_mirror", mirror=True, nd=-1., vd=np.inf)
-air = Gas(name="air", sellmeier=[
-    [5792105E-8, 238.0185], [167917E-8, 57.362]])
-air_mirror = Gas(name="air_mirror", mirror=True, sellmeier=[
-    [5792105E-8, 238.0185], [167917E-8, 57.362]])
+air = Gas(name="air", sellmeier=[[5792105E-8, 238.0185], [167917E-8, 57.362]])
+air_mirror = Gas(name="air_mirror", mirror=True, sellmeier=air.sellmeier)
 
 basics = dict((m.name, m) for m in (vacuum, vacuum_mirror, air, air_mirror))
 
