@@ -17,13 +17,24 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from matplotlib.mlab import griddata
 from matplotlib import gridspec
 
 from .raytrace import ParaxialTrace, FullTrace
-from .utils import tanarcsin, sinarctan
+from .utils import tanarcsin
+
+
+class CenteredFormatter(mpl.ticker.ScalarFormatter):
+    """Acts exactly like the default Scalar Formatter, but yields an empty
+    label for ticks at "center"."""
+    center = 0
+    def __call__(self, value, pos=None):
+        if value == self.center:
+            return ""
+        else:
+            return mpl.ticker.ScalarFormatter.__call__(self, value, pos)
 
 
 class Analysis(object):
@@ -108,30 +119,27 @@ class Analysis(object):
                 direction="out", axis="both")
         ax.xaxis.set_smart_bounds(True)
         ax.yaxis.set_smart_bounds(True)
-        kw = dict(rotation="horizontal",
-                horizontalalignment="left",
-                verticalalignment="bottom")
+        ax.xaxis.set_major_formatter(CenteredFormatter())
+        ax.yaxis.set_major_formatter(CenteredFormatter())
+        ax.locator_params(tight=True, nbins=4)
+        kw = dict(rotation="horizontal")
         if xlabel:
-            ax.set_xlabel(xlabel, **kw)
+            ax.set_xlabel(xlabel, horizontalalignment="right",
+                    verticalalignment="bottom", **kw)
         if ylabel:
-            ax.set_ylabel(ylabel, **kw)
+            ax.set_ylabel(ylabel, horizontalalignment="left",
+                    verticalalignment="top", **kw)
         if title:
             ax.set_title(title)
     
     @staticmethod
     def post_setup_axes(axi):
-        axi.relim()
+        #axi.relim()
         #axi.autoscale_view(True, True, True)
-        t = axi.get_xticks()
-        axi.set_xticks((t[0], t[-1]))
-        t = axi.get_yticks()
-        axi.set_yticks((t[0], t[-1]))
         xl, xu = axi.get_xlim()
         yl, yu = axi.get_ylim()
-        axi.xaxis.set_label_coords(xu, .02*(yu - yl),
-                transform=axi.transData)
-        axi.yaxis.set_label_coords(.02*(xu - xl), yu,
-                transform=axi.transData)
+        axi.xaxis.set_label_coords(xu, 0, transform=axi.transData)
+        axi.yaxis.set_label_coords(0, yu, transform=axi.transData)
 
     @classmethod
     def pre_setup_fanplot(cls, fig, n):
@@ -162,7 +170,7 @@ class Analysis(object):
                     (axo, "PX", "PY"),
                     ]:
                 cls.setup_axes(axi, xl, yl)
-            for axi in axp, axo:
+            for axi in (): #axp, axo:
                 axi.spines["left"].set_visible(False)
                 axi.spines["bottom"].set_visible(False)
                 axi.tick_params(bottom=False, left=False,
@@ -184,7 +192,7 @@ class Analysis(object):
         r = paraxial.airy_radius[1]
         for hi, axi in zip(heights, ax):
             axp, axm, axsm, axss, axo = axi
-            axp.add_patch(patches.Circle((0, 0), r, edgecolor="black",
+            axp.add_patch(mpl.patches.Circle((0, 0), r, edgecolor="black",
                 facecolor="none"))
             axp.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
                     transform=axp.transAxes,
@@ -202,6 +210,8 @@ class Analysis(object):
                 if i == 0:
                     # plot opd over entrance pupil
                     pxy = t.y[1, :, :2] + p*t.u[0, :, :2]/t.u[0, :, 2:]
+                    #pp = paraxial.pupil_distance[1]
+                    #pxy = t.y[-2, :, :2] + pp*t.u[-2, :, :2]/t.u[-2, :, 2:]
                     pxy -= pxy[ref]
                     o = t.opd(ref)
                     # griddata barfs on nans
@@ -247,11 +257,7 @@ class Analysis(object):
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
             p, q, r = np.split(t.u[-2].T, (nrays, 2*nrays), axis=1)
             xd = a[1] - np.linspace(0, height*paraxial.height[1], nrays)
-            # tangential field curvature
-            # -(real_y-parax_y)/(tanarcsin(real_u)-tanarcsin(parax_u))
             xt = -(b[1]-a[1])/(tanarcsin(q[1])-tanarcsin(p[1]))
-            # sagittal field curvature
-            # -(real_x-parax_x)/(tanarcsin(real_v)-tanarcsin(parax_v))
             xs = -(c[0]-a[0])/(tanarcsin(r[0])-tanarcsin(p[0]))
             axl.plot(a[1], xd, ci+"-", label="DEY")
             axc.plot(a[1], xt, ci+"-", label="EZt")

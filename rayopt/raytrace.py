@@ -29,7 +29,7 @@ from scipy.optimize import newton
 # from .special_sums import polar_sum
 from .aberration_orders import aberration_extrinsic
 from .elements import Spheroid
-from .utils import tanarcsin, sinarctan
+from .utils import sinarctan
 
 
 class Trace(object):
@@ -212,6 +212,8 @@ class ParaxialTrace(Trace):
 
     @property
     def numerical_aperture(self):
+        # we plot u as a slope (tanU)
+        # even though it is paraxial (sinu=tanu=u) we must convert here
         return np.fabs(self.n[(0, -2), :]*sinarctan(self.u[(0, -2), 0]))
 
     @property
