@@ -143,7 +143,7 @@ class System(list):
             xyz = e.transform_from(e.surface_cut(axis, points))
             x, z = xyz[:, axis], xyz[:, 2]
             z += z0
-            if not hasattr(e, "material"):
+            if getattr(e, "material", None) is None:
                 yield x, z
                 continue
             if pending:
