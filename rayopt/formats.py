@@ -39,14 +39,13 @@ def system_from_array(data,
         columns="type roc thickness diameter material".split(),
         shifts={}, material_map={}, **kwargs):
     data = np.array(data)
+    assert data.ndim == 2
     for k, v in shifts.items():
         i = columns.index(k)
         data[:, i] = np.roll(data[:, i], v)
     element_map = {"O": Object, "S": Spheroid, "A": Aperture, "I": Image}
     s = System(**kwargs)
     for line in data:
-        if len(line) < len(columns):
-            continue
         typ = try_get(line, columns, "type", "S")
         extra = line[len(columns):]
         el = element_map[typ](*extra)
@@ -82,38 +81,6 @@ def system_from_text(text, *args, **kwargs):
     n = max(len(l) for l in array)
     array = [l for l in array if len(l) == n]
     return system_from_array(array, *args, **kwargs)
-
-
-def system_from_table(data, **kwargs):
-    s = System(**kwargs)
-    pos = 0.
-    for line in data.splitlines():
-        p = line.split()
-        if not p:
-            continue
-        if p[0] == "Stop":
-            s.elements.append(Aperture(
-                origin=(0,0,0),
-                radius=rad))
-            continue
-        roc = float(p[1])
-        if roc == 0:
-            curv = 0
-        else:
-            curv = 1/roc
-        rad = float(p[-1])/2
-        if p[-2].upper() in all_materials:
-            mat = all_materials[p[-2].upper()]
-        else:
-            mat = air
-        e = Spheroid(
-            curvature=curv,
-            origin=(0,0,pos),
-            radius=rad,
-            material=mat)
-        s.elements.append(e)
-        pos = float(p[2])
-    return s
 
 
 def system_from_oslo(fil):
@@ -226,7 +193,7 @@ def system_from_zemax(fil):
         #assert len(s) - 1 == int(args[0])
     # the first element is the object, the last is the image, convert them
     s.object.radius = s[1].radius
-    del s.elements[1]
+    del s[1]
     s.image.radius = s[-2].radius
     s.image.thickness = s[-2].thickness
     del s[-2]
