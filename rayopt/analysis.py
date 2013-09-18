@@ -170,7 +170,7 @@ class Analysis(object):
                     (axo, "PX", "PY"),
                     ]:
                 cls.setup_axes(axi, xl, yl)
-            for axi in (): #axp, axo:
+            for axi in axp, axo:
                 axi.spines["left"].set_visible(False)
                 axi.spines["bottom"].set_visible(False)
                 axi.tick_params(bottom=False, left=False,
@@ -246,22 +246,28 @@ class Analysis(object):
         paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.object.wavelengths
-        gs = plt.GridSpec(1, 2)
         axl = fig.add_subplot(1, 2, 1)
         self.setup_axes(axl, "EY", "DEY") #, "distortion")
         axc = fig.add_subplot(1, 2, 2)
         self.setup_axes(axc, "EY", "EZ") #, "field")
+        #axa = fig.add_subplot(1, 3, 3)
+        #self.setup_axes(axa, "EY", "DM") #, "Abbe sine violation")
+        #m = paraxial.magnification[0]
+        h = np.linspace(0, height*paraxial.height[1], nrays)
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
             t = FullTrace(self.system)
             t.rays_paraxial_line(paraxial, height, wi, nrays=nrays)
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
             p, q, r = np.split(t.u[-2].T, (nrays, 2*nrays), axis=1)
-            xd = a[1] - np.linspace(0, height*paraxial.height[1], nrays)
-            xt = -(b[1]-a[1])/(tanarcsin(q[1])-tanarcsin(p[1]))
-            xs = -(c[0]-a[0])/(tanarcsin(r[0])-tanarcsin(p[0]))
+            xd = a[1] - h #/h
+            #xd[0] = 0
             axl.plot(a[1], xd, ci+"-", label="DEY")
+            xt = -(b[1]-a[1])/(tanarcsin(q[1])-tanarcsin(p[1]))
             axc.plot(a[1], xt, ci+"-", label="EZt")
+            xs = -(c[0]-a[0])/(tanarcsin(r[0])-tanarcsin(p[0]))
             axc.plot(a[1], xs, ci+"--", label="EZs")
+            #xs = (t.n[0, :nrays]*u[0, /t.n[-2]* - m)/m
+            #axa.plot(a[1], xa, ci+"-", label="DM")
         self.post_setup_axes(axl)
         self.post_setup_axes(axc)
         return fig

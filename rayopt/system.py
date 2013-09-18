@@ -112,7 +112,7 @@ class System(list):
             v = getattr(mat, "vd", np.nan)
             yield "%2i %1s %10.5g %10.4g %10.5g %10s %5.3f %5.2f" % (
                     i, e.typ, e.thickness, roc,
-                    e.radius*2, mat or "", n, v)
+                    e.radius*2, mat or "-", n, v)
 
     def size_convex(self):
         """ensure convex surfaces are at least as large as their

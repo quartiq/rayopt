@@ -228,8 +228,9 @@ class ParaxialTrace(Trace):
 
     @property
     def magnification(self):
-        return (self.n[(0, -2), :]*self.u[(0, -2), (0,
-            1)])/(self.n[(-2, 0), :]*self.u[(-2, 0), (0, 1)])
+        mt = (self.n[0]*self.u[0, 0])/(self.n[-2]*self.u[-2, 0])
+        ma = self.u[-2, 1]/self.u[0, 1]
+        return np.array([mt, ma])
 
     @property
     def number_of_points(self):
