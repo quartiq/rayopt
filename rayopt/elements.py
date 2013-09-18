@@ -108,7 +108,7 @@ class Primitive(NameMixin, TransformMixin):
 
     def propagate(self, y0, u0, n0, l, clip=True):
         # length up to surface
-        y = y0 - [[0, 0, self.thickness]]
+        y = y0 - [0, 0, self.thickness]
         t = self.intercept(y, u0)
         # new transverse position
         y += t[:, None]*u0

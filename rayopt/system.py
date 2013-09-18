@@ -85,7 +85,10 @@ class System(list):
                 # material is old preceeding material
                 m, e.material = e.material, m
 
-    def rescale(self, scale):
+    def rescale(self, scale=None):
+        if scale is None:
+            scale = self.scale/1e-3
+        self.scale /= scale
         for e in self:
             e.rescale(scale)
 
