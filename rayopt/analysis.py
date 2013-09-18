@@ -22,7 +22,8 @@ import matplotlib.patches as patches
 from matplotlib.mlab import griddata
 from matplotlib import gridspec
 
-from .raytrace import ParaxialTrace, FullTrace, tanarcsin, sinarctan
+from .raytrace import ParaxialTrace, FullTrace
+from .utils import tanarcsin, sinarctan
 
 
 class Analysis(object):

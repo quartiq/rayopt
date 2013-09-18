@@ -29,16 +29,7 @@ from scipy.optimize import newton
 # from .special_sums import polar_sum
 from .aberration_orders import aberration_extrinsic
 from .elements import Spheroid
-
-
-def dir_to_angles(r):
-    return r/np.linalg.norm(r)
-
-def tanarcsin(u):
-    return u/np.sqrt(1 - np.square(u))
-
-def sinarctan(u):
-    return u/np.sqrt(1 + np.square(u))
+from .utils import tanarcsin, sinarctan
 
 
 class Trace(object):
@@ -388,7 +379,7 @@ class FullTrace(Trace):
         self.propagate(clip=False)
 
     def aim(self, y, u, l=None, axis=1, target=0., stop=None,
-            tol=1e-2, maxiter=10):
+            tol=1e-3, maxiter=10):
         """aims ray at aperture center (or target)
         changing angle (in case of finite object) or
         position in case of infinite object"""
@@ -520,13 +511,8 @@ class FullTrace(Trace):
         # TODO apodization
         icenter, yp = self.pupil_distribution(distribution, nrays)
         self.allocate(yp.shape[0])
-        r = self.system.object.radius
-        if self.system.object.infinite:
-            u = np.array([[0, height*sinarctan(r)]])
-            y = yp*pupil_radius - pupil_distance*tanarcsin(u)
-        else:
-            y = np.array([[0, -height*r]])
-            u = sinarctan((yp*pupil_radius - y)/pupil_distance)
+        y, u = self.system.object.to_pupil((0, height), yp,
+                pupil_distance, pupil_radius)
         if aim:
             y, u = self.aim_chief(y, u, wavelength, aim=icenter, axis=1)
         self.rays_given(y, u, wavelength)
@@ -541,17 +527,9 @@ class FullTrace(Trace):
 
     def rays_line(self, height, pupil_distance, pupil_height,
             wavelength=None, nrays=21, aim=True, eps=1e-3, clip=False):
-        if self.system.object.infinite:
-            height = sinarctan(height*self.system.object.radius)
-        else:
-            height = -height*self.system.object.radius
         yi = np.c_[np.zeros(nrays), np.linspace(0, height, nrays)]
-        if self.system.object.infinite:
-            u = yi
-            y = -pupil_distance*tanarcsin(u)
-        else:
-            y = yi
-            u = sinarctan(-y/pupil_distance)
+        y, u = self.system.object.to_pupil(yi, (0, 0.), pupil_distance,
+                pupil_height)
         if aim:
             y, u = self.aim_each(y, u, wavelength, axis=1)
         e = np.zeros((3, 1, 2)) # pupil

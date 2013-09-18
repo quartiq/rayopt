@@ -23,6 +23,7 @@ from .transformations import (euler_matrix, translation_matrix,
         concatenate_transforms)
 from .name_mixin import NameMixin
 from .aberration_orders import aberration_intrinsic
+from .utils import sinarctan, tanarcsin
 
 
 class TransformMixin(object):
@@ -310,7 +311,7 @@ class Object(Element):
 
     def rescale(self, scale):
         super(Object, self).rescale(scale)
-        if self.infinite:
+        if self.infinite: # undo
             self.radius /= scale
 
     def paraxial_matrix(self, n0, l):
@@ -321,6 +322,17 @@ class Object(Element):
         n = self.material.refractive_index(l)
         t = np.zeros_like(l)
         return y0, u0, n, t
+
+    def to_pupil(self, height, pupil, distance, radius):
+        yo, yp = np.broadcast_arrays(height, pupil)
+        r = self.radius
+        if self.infinite:
+            u = sinarctan(yo*r)
+            y = yp*radius - distance*tanarcsin(u)
+        else:
+            y = -yo*r
+            u = sinarctan((yp*radius - y)/distance)
+        return y, u
 
 
 class Aperture(Primitive):
