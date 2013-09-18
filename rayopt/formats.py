@@ -37,10 +37,16 @@ def try_get(line, columns, field, default=None):
 
 def system_from_array(data,
         columns="type roc thickness diameter material".split(),
-        material_map={}, **kwargs):
+        shifts={}, material_map={}, **kwargs):
+    data = np.array(data)
+    for k, v in shifts.items():
+        i = columns.index(k)
+        data[:, i] = np.roll(data[:, i], v)
     element_map = {"O": Object, "S": Spheroid, "A": Aperture, "I": Image}
     s = System(**kwargs)
     for line in data:
+        if len(line) < len(columns):
+            continue
         typ = try_get(line, columns, "type", "S")
         extra = line[len(columns):]
         el = element_map[typ](*extra)
@@ -72,8 +78,10 @@ def system_from_array(data,
 
 
 def system_from_text(text, *args, **kwargs):
-    return system_from_array(line.split()
-            for line in text.splitlines() if line.strip(), *args, **kwargs)
+    array = [line.split() for line in text.splitlines()]
+    n = max(len(l) for l in array)
+    array = [l for l in array if len(l) == n]
+    return system_from_array(array, *args, **kwargs)
 
 
 def system_from_table(data, **kwargs):

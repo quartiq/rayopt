@@ -75,11 +75,11 @@ class Analysis(object):
             self.paraxial.plot(ax)
         if self.plot_paraxial_full:
             t.plot(ax)
-        for h, c in zip(self.plot_heights, "gbrcmyk"):
+        for h in self.plot_heights:
             t = FullTrace(self.system)
             t.rays_paraxial_point(self.paraxial, h,
                     nrays=self.plot_rays, clip=False)
-            t.plot(ax, color=c)
+            t.plot(ax)
         
         if self.plot_transverse is True:
             self.plot_transverse = self.plot_heights
@@ -149,7 +149,7 @@ class Analysis(object):
                     sharex=axpx0, sharey=axey0)
             axpx0 = axpx0 or axsm
             axss = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
-                    sharex=axpx0, sharey=axex0)
+                    sharex=axpx0, sharey=axey0)
             axo = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
                     aspect="equal") #, sharex=axpy0, sharey=axpx0)
             ax.append((axp, axm, axsm, axss, axo))
