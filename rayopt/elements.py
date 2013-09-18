@@ -119,8 +119,13 @@ class Primitive(NameMixin, TransformMixin):
 
     def reverse(self):
         self.offset[1:] *= -1
-
         self.update()
+
+    def rescale(self, scale):
+        self.offset *= scale
+        self.update()
+        self.thickness *= scale
+        self.radius *= scale
 
     def surface_cut(self, axis, points):
         rad = self.radius
@@ -280,6 +285,11 @@ class Spheroid(Interface):
         self.curvature *= -1
         self.aspherics *= -1
 
+    def rescale(self, scale):
+        super(Spheroid, self).rescale(scale)
+        self.curvature /= scale
+        self.aspherics /= scale**(2*np.arange(self.aspherics.size) + 1)
+
     def aberration(self, y, u, n0, n, kmax):
         y, yb = y
         u, ub = u
@@ -297,6 +307,11 @@ class Object(Element):
         super(Object, self).__init__(**kwargs)
         self.wavelengths = wavelengths
         self.infinite = infinite
+
+    def rescale(self, scale):
+        super(Object, self).rescale(scale)
+        if self.infinite:
+            self.radius /= scale
 
     def paraxial_matrix(self, n0, l):
         n = self.material.refractive_index(l)

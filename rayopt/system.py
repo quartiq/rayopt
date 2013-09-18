@@ -85,6 +85,10 @@ class System(list):
                 # material is old preceeding material
                 m, e.material = e.material, m
 
+    def rescale(self, scale):
+        for e in self:
+            e.rescale(scale)
+
     def __str__(self):
         return "\n".join(self.text())
 
