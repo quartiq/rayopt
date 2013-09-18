@@ -165,7 +165,7 @@ class Element(Primitive):
         if self.material is not None:
             n = self.material.refractive_index(l)
             u = self.refract(y, u, n0/n)
-        return y, u, n, t*n0
+        return y, u, n, t
 
     def dispersion(self, lmin, lmax):
         v = 0
@@ -347,5 +347,14 @@ class Aperture(Primitive):
         return xyz
 
 
-class Image(Primitive):
+class Image(Spheroid):
     typ = "I"
+
+    def refract(self, y, u0, mu):
+        return u0
+
+    def paraxial_matrix(self, n0, l):
+        # [y', u'] = M * [y, u]
+        d = self.thickness
+        return n0, np.array([[1, d], [0, 1]])
+ 
