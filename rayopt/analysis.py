@@ -100,6 +100,7 @@ class Analysis(object):
             fig = plt.figure(figsize=(self.figwidth, figheight))
             self.figures.append(fig)
             self.transverse(fig, self.plot_transverse)
+
         if self.plot_longitudinal:
             fig = plt.figure(figsize=(self.figwidth/3, self.figwidth/6))
             self.figures.append(fig)
@@ -144,23 +145,21 @@ class Analysis(object):
     @classmethod
     def pre_setup_fanplot(cls, fig, n):
         gs = gridspec.GridSpec(n, 6)
-        axpx0, axpy0, axex0, axey0 = None, None, None, None
+        axpx0, axey0 = None, None
         ax = []
         for i in range(n):
-            axp = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 1),
-                    aspect="equal", sharex=axex0, sharey=axey0)
-            axex0 = axex0 or axp
+            axo = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 1),
+                    aspect="equal", sharex=axpx0)
+            axpx0 = axpx0 or axo
+            axp = fig.add_subplot(gs.new_subplotspec((i, 1), 1, 1),
+                    aspect="equal", sharey=axey0)
             axey0 = axey0 or axp
-            axm = fig.add_subplot(gs.new_subplotspec((i, 1), 1, 2),
-                    sharex=axpy0, sharey=axey0)
-            axpy0 = axpy0 or axm
-            axsm = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
+            axm = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 2),
                     sharex=axpx0, sharey=axey0)
-            axpx0 = axpx0 or axsm
-            axss = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
+            axsm = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
                     sharex=axpx0, sharey=axey0)
-            axo = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
-                    aspect="equal") #, sharex=axpy0, sharey=axpx0)
+            axss = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
+                    sharex=axpx0, sharey=axey0)
             ax.append((axp, axm, axsm, axss, axo))
             for axi, xl, yl in [
                     (axp, "EX", "EY"),
@@ -175,7 +174,6 @@ class Analysis(object):
                 axi.spines["bottom"].set_visible(False)
                 axi.tick_params(bottom=False, left=False,
                         labelbottom=False, labelleft=False)
-                axi.set_aspect("equal")
         return ax
 
     def transverse(self, fig, heights=[1., .707, 0.],
@@ -204,14 +202,14 @@ class Analysis(object):
                         clip=True)
                 # plot transverse image plane hit pattern (ray spot)
                 exy = t.y[-1, :, :2]
-                exy = exy - exy[ref]
+                exy -= exy[ref]
                 axp.plot(exy[:, 0], exy[:, 1], ".%s" % ci,
                         markersize=3, markeredgewidth=0, label="%s" % wi)
                 if i == 0:
                     # plot opd over entrance pupil
-                    pxy = t.y[1, :, :2] + p*t.u[0, :, :2]/t.u[0, :, 2:]
+                    pxy = t.y[1, :, :2] + p*tanarcsin(t.u[0, :])
                     #pp = paraxial.pupil_distance[1]
-                    #pxy = t.y[-2, :, :2] + pp*t.u[-2, :, :2]/t.u[-2, :, 2:]
+                    #pxy = t.y[-2, :, :2] + pp*tanarcsin(t.u[-2, :])
                     pxy -= pxy[ref]
                     o = t.opd(ref)
                     # griddata barfs on nans
@@ -231,9 +229,9 @@ class Analysis(object):
                 # plot transverse image plane versus entrance pupil
                 # coordinates
                 exy = t.y[-1, :, :2]
-                exy = exy - exy[ref]
-                pxy = t.y[1, :, :2] + p*t.u[0, :, :2]/t.u[0, :, 2:]
-                pxy = pxy - pxy[ref]
+                exy -= exy[ref]
+                pxy = t.y[1, :, :2] + p*tanarcsin(t.u[0, :])
+                pxy -= pxy[ref]
                 axm.plot(pxy[:ref, 1], exy[:ref, 1], "-%s" % ci, label="%s" % wi)
                 axsm.plot(pxy[ref:, 0], exy[ref:, 1], "-%s" % ci, label="%s" % wi)
                 axss.plot(pxy[ref:, 0], exy[ref:, 0], "-%s" % ci, label="%s" % wi)
@@ -258,14 +256,14 @@ class Analysis(object):
             t = FullTrace(self.system)
             t.rays_paraxial_line(paraxial, height, wi, nrays=nrays)
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
-            p, q, r = np.split(t.u[-2].T, (nrays, 2*nrays), axis=1)
-            xd = a[1] - h #/h
-            #xd[0] = 0
-            axl.plot(a[1], xd, ci+"-", label="DEY")
-            xt = -(b[1]-a[1])/(tanarcsin(q[1])-tanarcsin(p[1]))
-            axc.plot(a[1], xt, ci+"-", label="EZt")
-            xs = -(c[0]-a[0])/(tanarcsin(r[0])-tanarcsin(p[0]))
-            axc.plot(a[1], xs, ci+"--", label="EZs")
+            p, q, r = np.split(tanarcsin(t.u[-2]).T, (nrays, 2*nrays), axis=1)
+            xd = (a[1] - h)/h
+            xd[0] = 0.
+            axl.plot(a[1], xd, ci+"-", label="%s" % wi)
+            xt = -(b[1]-a[1])/(q[1]-p[1])
+            axc.plot(a[1], xt, ci+"-", label="EZt %s" % wi)
+            xs = -(c[0]-a[0])/(r[0]-p[0])
+            axc.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
             #xs = (t.n[0, :nrays]*u[0, /t.n[-2]* - m)/m
             #axa.plot(a[1], xa, ci+"-", label="DM")
         self.post_setup_axes(axl)

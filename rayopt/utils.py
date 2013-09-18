@@ -23,10 +23,19 @@ def dir_to_angles(r):
     return r/np.linalg.norm(r)
 
 def tanarcsin(u):
-    return u/np.sqrt(1 - np.square(u))
+    if u.ndim == 2 and u.shape[1] == 3:
+        return u[:, :2]/u[:, 2, None]
+    u2 = np.square(u)
+    if u.ndim == 2:
+        u2 = u2[:, :2].sum(axis=1)[:, None]
+    return u/np.sqrt(1 - u2)
 
 def sinarctan(u):
-    return u/np.sqrt(1 + np.square(u))
+    u2 = np.square(u)
+    if u.ndim == 2:
+        assert u.shape[1] < 3
+        u2 = u2[:, :2].sum(axis=1)[:, None]
+    return u/np.sqrt(1 + u2)
 
 
 
