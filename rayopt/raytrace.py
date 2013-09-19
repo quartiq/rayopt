@@ -103,18 +103,20 @@ class ParaxialTrace(Trace):
         st = self.system.aperture_index
         t, s = 0, 1
         kmax = self.d.shape[-1]
-        r = np.zeros((self.length, 2, 2, kmax, kmax, kmax))
-        for ki in range(2, kmax):
-            k = ki - 1
+        r = np.zeros_like(self.d)
+        for k in range(1, kmax - 1):
             for j in range(k + 1):
                 for i in range(k - j + 1):
                     b = (self.c[:, :, :, k - j - i, j, i]
                        + self.d[:, :, :, k - j - i, j, i])
-                    b = np.cumsum(b, axis=0)
+                    b[st-1::-1, s] = -np.cumsum(b[st:0:-1, s], axis=0)
+                    b[st+1:, s] = np.cumsum(b[st:-1, s], axis=0)
+                    b[st, s] = 0
+                    b[1:, t] = np.cumsum(b[:-1, t], axis=0)
                     r[:, t, :, k - j - i, j, i] = b[:, t]
-                    r[:, s, :, k - j - i, j, i] = b[:, s] - b[(st,), s]
+                    r[:, s, :, k - j - i, j, i] = b[:, s]
             for i in range(self.length):
-                aberration_extrinsic(self.c[i], r[i], self.d[i], ki)
+                aberration_extrinsic(self.c[i], r[i], self.d[i], k + 1)
 
     @property
     def seidel3(self):
