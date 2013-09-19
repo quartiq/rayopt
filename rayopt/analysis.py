@@ -39,11 +39,11 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 
 class Analysis(object):
     figwidth = 12.
-    resize = False
+    resize = True
     refocus = True
     print_system = True
     print_paraxial = True
-    resize_full = True
+    resize_full = False
     print_full = False
     plot_paraxial = False
     plot_full = False

@@ -307,6 +307,7 @@ class ParaxialTrace(Trace):
     def size_elements(self):
         for e, y in zip(self.system[1:], self.y[1:]):
             e.radius = np.fabs(y).sum() # axial+chief
+        self.system.image.radius = abs(self.height[1])
 
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
