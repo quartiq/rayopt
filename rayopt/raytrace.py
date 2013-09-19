@@ -360,16 +360,15 @@ class FullTrace(Trace):
         ri = self.system.image.thickness
         if radius is None:
             radius = ri
-        y = self.y[after]
-        y = y - self.y[image, chief] # center sphere on chief image
-        y = y - [0, 0, ri - radius]
-        # u = self.u[-2]
+        # center sphere on chief image
+        y = self.y[after] - [0, 0, ri - radius] - self.y[image, chief]
+        #u = self.u[after]
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
         u = [0, 0, radius] - y
-        u /= np.sqrt(np.square(u).sum(axis=1))[:, None]
+        u /= np.sqrt(np.square(u).sum(1))[:, None]
         t = Spheroid(curvature=1./radius).intercept(y, u)
-        t = t*self.n[after] + self.t[:-1].sum(axis=0)
+        t = t*self.n[after] + self.t[:after + 1].sum(0)
         return t - t[chief]
 
     def rays_paraxial(self, paraxial):

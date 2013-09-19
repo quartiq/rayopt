@@ -199,18 +199,18 @@ class Interface(Element):
         return s # np.where(s>=0, s, np.nan) # TODO mask
 
     def refract(self, y, u0, mu):
-        # General Ray-Tracing Procedure
         # G. H. Spencer and M. V. R. K. Murty
+        # General Ray-Tracing Procedure
         # JOSA, Vol. 52, Issue 6, pp. 672-676 (1962)
         # doi:10.1364/JOSA.52.000672
-        if np.all(mu == 1): # all/any?
+        if mu == 1:
             return u0
         r = self.shape_func_deriv(y)
-        r2 = np.square(r).sum(axis=1)
-        muf = np.fabs(mu)
-        a = muf*(u0*r).sum(axis=1)/r2
+        r2 = np.square(r).sum(1)
+        muf = abs(mu)
+        a = muf*(u0*r).sum(1)/r2
         # solve g**2 + 2*a*g + b=0
-        if np.all(mu == -1): # all/any?
+        if mu == -1:
             u = u0 - 2*a[:, None]*r # reflection
         else:
             b = (mu**2 - 1)/r2
@@ -238,18 +238,21 @@ class Spheroid(Interface):
     def shape_func(self, p):
         x, y, z = p.T
         r2 = x**2 + y**2
-        o = np.sum([ai*r2**(i + 2) for i, ai in 
-            enumerate(self.aspherics)], axis=0)
         c, k = self.curvature, self.conic
-        return z - c*r2/(1 + np.sqrt(1 - k*c**2*r2)) - o
+        e = c*r2/(1 + np.sqrt(1 - k*c**2*r2))
+        if self.aspherics.size:
+            e += sum(ai*r2**(i + 2) for i, ai in
+                     enumerate(self.aspherics))
+        return z - e
 
     def shape_func_deriv(self, p):
         x, y, z = p.T
         r2 = x**2 + y**2
-        o = 2*np.sum([ai*(i + 2)*r2**(i + 1) for i, ai in 
-            enumerate(self.aspherics)], axis=0)
         c, k = self.curvature, self.conic
-        e = c/np.sqrt(1 - k*c**2*r2) + o
+        e = c/np.sqrt(1 - k*c**2*r2)
+        if self.aspherics.size:
+            e += 2*sum(ai*(i + 2)*r2**(i + 1) for i, ai in 
+                       enumerate(self.aspherics))
         return np.array([-x*e, -y*e, np.ones_like(e)]).T
 
     def intercept(self, y, u):
@@ -258,16 +261,18 @@ class Spheroid(Interface):
             if self.curvature == 0:
                 s = Element.intercept(self, y, u) # flat
             else:
-                k = np.array([1., 1., self.conic])[None, :]
-                ky = k*y
-                ku = k*u
+                k = np.array([1., 1., self.conic])
+                ky, ku = k*y, k*u
+                #ky, ku = y.copy(), u.copy()
+                #y[:, 2] *= self.conic
+                #u[:, 2] *= self.conic
                 c = self.curvature
-                d = c*(u*ky).sum(axis=1) - u[:, 2]
-                e = c*(u*ku).sum(axis=1)
-                f = c*(y*ky).sum(axis=1) - 2*y[:, 2]
+                d = c*(u*ky).sum(1) - u[:, 2]
+                e = c*(u*ku).sum(1)
+                f = c*(y*ky).sum(1) - 2*y[:, 2]
                 s = (-d - np.sign(u[:, 2])*np.sqrt(d**2 - e*f))/e
         else:
-            s = super(Spheroid, self).intercept(y, u)
+            s = Interface.intercept(self, y, u) # expensive iterative
         return s #np.where(s*np.sign(self.thickness)>=0, s, np.nan)
 
     def paraxial_matrix(self, n0, l):
