@@ -66,10 +66,12 @@ def system_from_array(data,
             mat = material_map.get(mat, mat)
             if type(mat) is type(1.):
                 m = Material(name="%.5g" % mat, nd=mat)
+            elif mat in all_materials:
+                m = all_materials[mat]
             else:
                 try:
-                    m = all_materials[mat]
-                except KeyError:
+                    m = Material.from_string(mat)
+                except (ValueError, TypeError):
                     m = air
             el.material = m
         s.append(el)

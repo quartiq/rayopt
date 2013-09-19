@@ -76,7 +76,19 @@ class Material(object):
                 self.refractive_index(lambda_C)))
         else:
             self.sellmeier = None
-    
+
+    @classmethod
+    def from_string(cls, txt):
+        v = map(float, txt.split("/"))
+        if len(v) == 1:
+            nd, = v
+            vd = np.inf
+        if len(v) == 2:
+            nd, vd = v
+        else:
+            raise ValueError
+        return cls(name=txt, solid=nd>1, nd=nd, vd=vd)
+
     def __str__(self):
         return self.name
 
