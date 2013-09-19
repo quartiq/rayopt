@@ -78,7 +78,7 @@ class Material(object):
             self.sellmeier = None
 
     @classmethod
-    def from_string(cls, txt):
+    def from_string(cls, txt, name=None):
         v = map(float, txt.split("/"))
         if len(v) == 1:
             nd, = v
@@ -87,6 +87,8 @@ class Material(object):
             nd, vd = v
         else:
             raise ValueError
+        if name is None:
+            name = txt
         return cls(name=txt, solid=nd>1, nd=nd, vd=vd)
 
     def __str__(self):

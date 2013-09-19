@@ -135,7 +135,7 @@ class Analysis(object):
     
     @staticmethod
     def post_setup_axes(axi):
-        #axi.relim()
+        axi.relim()
         #axi.autoscale_view(True, True, True)
         xl, xu = axi.get_xlim()
         yl, yu = axi.get_ylim()
@@ -145,7 +145,7 @@ class Analysis(object):
     @classmethod
     def pre_setup_fanplot(cls, fig, n):
         gs = gridspec.GridSpec(n, 6)
-        axpx0, axey0 = None, None
+        axpx0, axpx1, axey0 = None, None, None
         ax = []
         for i in range(n):
             axo = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 1),
@@ -157,9 +157,10 @@ class Analysis(object):
             axm = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 2),
                     sharex=axpx0, sharey=axey0)
             axsm = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
-                    sharex=axpx0, sharey=axey0)
+                    sharex=axpx1, sharey=axey0)
+            axpx1 = axpx1 or axsm
             axss = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
-                    sharex=axpx0, sharey=axey0)
+                    sharex=axpx1, sharey=axey0)
             ax.append((axp, axm, axsm, axss, axo))
             for axi, xl, yl in [
                     (axp, "EX", "EY"),

@@ -111,7 +111,7 @@ def system_from_oslo(fil):
         elif cmd == "AST":
             s.append(Aperture(radius=e.radius))
         elif cmd == "RD":
-            e.curvature = 1/(float(args[0]))
+            e.curvature = 1/float(args[0])
         elif cmd in ("NXT", "END"):
             s.append(e)
             e = Spheroid()
@@ -126,7 +126,7 @@ def system_from_oslo(fil):
 
 
 def system_from_zemax(fil):
-    s = System([Object(), Image()])
+    s = System([Object(material=air), Image()])
     next_pos = 0.
     a = None
     for line in fil.readlines():
@@ -135,12 +135,13 @@ def system_from_zemax(fil):
         cmd = line[0]
         args = len(line) == 2 and line[1] or ""
         if cmd == "UNIT":
-            #s.scale = {"MM": 1e-3}[args.split()[0]]
+            s.scale = {"MM": 1e-3}[args.split()[0]]
             pass
         elif cmd == "NAME":
             s.description = args.strip("\"")
         elif cmd == "SURF":
             e = Spheroid(thickness=next_pos)
+            e.material = air
             s.insert(-1, e)
         elif cmd == "CURV":
             e.curvature = float(args.split()[0])
@@ -152,12 +153,11 @@ def system_from_zemax(fil):
             if name in all_materials:
                 e.material = all_materials[name]
             else:
-                print "material not found: %s" % name
                 try:
-                    nd = float(args[3])
-                    vd = float(args[4])
-                    e.material = Material(nd=nd, vd=vd)
+                    t = "/".join(args[3:5])
+                    e.material = Material.from_string(t)
                 except:
+                    print "material not found: %s" % name
                     e.material = air
         elif cmd == "DIAM":
             e.radius = float(args.split()[0])/2
@@ -186,7 +186,7 @@ def system_from_zemax(fil):
                      "WAVN", "WAVM", "XFLD", "YFLD", "MNCA", "MNEA",
                      "MNCG", "MNEG", "MXCA", "MXCG", "RGLA", "TRAC",
                      "FLAP", "TCMM", "FLOA", "PMAG", "TOTR", "SLAB",
-                     "POPS", "COMM",
+                     "POPS", "COMM", "PZUP",
                      ):
             pass
         else:
