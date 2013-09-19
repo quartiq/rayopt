@@ -24,7 +24,7 @@ def dir_to_angles(r):
 
 def tanarcsin(u):
     if u.ndim == 2 and u.shape[1] == 3:
-        return u[:, :2]/u[:, 2, None]
+        return u[:, :2]/u[:, 2:]
     u2 = np.square(u)
     if u.ndim == 2:
         u2 = u2[:, :2].sum(axis=1)[:, None]

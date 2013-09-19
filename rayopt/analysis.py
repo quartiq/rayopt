@@ -214,7 +214,7 @@ class Analysis(object):
                         markersize=3, markeredgewidth=0, label="%s" % wi)
                 if i == 0:
                     # plot opd over entrance pupil
-                    pxy = t.y[1, :, :2] + p*tanarcsin(t.u[0, :])
+                    pxy = t.y[1, :, :2] + p*tanarcsin(t.u[0])
                     #pp = paraxial.pupil_distance[1]
                     #pxy = t.y[-2, :, :2] + pp*tanarcsin(t.u[-2, :])
                     pxy -= pxy[ref]
@@ -238,7 +238,7 @@ class Analysis(object):
                 # coordinates
                 exy = t.y[-1, :, :2]
                 exy -= exy[ref]
-                pxy = t.y[1, :, :2] + p*tanarcsin(t.u[0, :])
+                pxy = t.y[1, :, :2] + p*tanarcsin(t.u[0])
                 pxy -= pxy[ref]
                 axm.plot(pxy[:ref, 1], exy[:ref, 1], "-%s" % ci, label="%s" % wi)
                 axsm.plot(pxy[ref:, 0], exy[ref:, 1], "-%s" % ci, label="%s" % wi)
