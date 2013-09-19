@@ -307,8 +307,6 @@ class ParaxialTrace(Trace):
     def size_elements(self):
         for e, y in zip(self.system[1:], self.y[1:]):
             e.radius = np.fabs(y).sum() # axial+chief
-        self.system.image.radius = abs(self.height[1])
-        self.system.size_convex()
 
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
@@ -460,9 +458,9 @@ class FullTrace(Trace):
                         stop=stop)
                 yoa, ypa = self.system.object.from_pupil(y, u,
                         pupil_distance, pupil_height)
-                scales[ax, ta] = ypa[0, ax]/yp[ax]
+                scales[ta, ax] = ypa[0, ax]/yp[ax]
         if len(target) == 1:
-            scales[:, 1-target[0]] = scales[:, target[0]]
+            scales[1-target[0]] = scales[target[0]]
         return scales
 
     @staticmethod
@@ -536,8 +534,8 @@ class FullTrace(Trace):
         if aim == "pupil":
             scales = self.aim_pupil(height, pupil_distance, pupil_height,
                 wavelength)
-            yp *= (scales[:, 1] + scales[:, 0])/2
-            yp += (scales[:, 1] - scales[:, 0])/2
+            yp *= (scales[1] + scales[0])/2
+            yp += (scales[1] - scales[0])/2
         y, u = self.system.object.to_pupil((0, height), yp,
                 pupil_distance, pupil_height)
         if aim == "chief":
@@ -576,10 +574,9 @@ class FullTrace(Trace):
         rp = paraxial.pupil_height[0]
         return self.rays_line(height, zp, rp, wavelength, **kwargs)
 
-    def size_elements(self, fn=lambda a, b: a, axis=1):
-        for e, y in zip(self.system[1:], self.y[1:, :, axis]):
+    def size_elements(self, fn=lambda a, b: a):
+        for e, y in zip(self.system[1:], self.y[1:]):
             e.radius = fn(np.fabs(y).max(), e.radius)
-        self.system.size_convex()
 
     def plot(self, ax, axis=1, **kwargs):
         kwargs.setdefault("color", "green")

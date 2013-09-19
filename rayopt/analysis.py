@@ -39,13 +39,14 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 
 class Analysis(object):
     figwidth = 12.
-    resize = True
+    resize = False
     refocus = True
     print_system = True
     print_paraxial = True
-    print_paraxial_full = False
+    resize_full = True
+    print_full = False
     plot_paraxial = False
-    plot_paraxial_full = False
+    plot_full = False
     plot_heights = [1., .707, 0.]
     plot_rays = 3
     plot_transverse = True
@@ -67,6 +68,7 @@ class Analysis(object):
             self.paraxial.focal_plane_solve()
         if self.resize:
             self.paraxial.size_elements()
+            self.system.fix_sizes()
         self.system.image.radius = abs(self.paraxial.height[1])
         if self.print_system:
             self.text.append(str(self.system))
@@ -74,9 +76,11 @@ class Analysis(object):
             self.text.append(str(self.paraxial))
         t = FullTrace(self.system)
         t.rays_paraxial(self.paraxial)
-        if self.print_paraxial_full:
+        if self.print_full:
             self.text.append(str(t))
-
+        if self.resize_full:
+            t.size_elements()
+            self.system.fix_sizes()
         figheight = 2*max(e.radius for e in self.system)
         figheight = min(figheight/self.paraxial.z[-1]*self.figwidth,
                 2*self.figwidth/3)
@@ -85,7 +89,7 @@ class Analysis(object):
         self.system.plot(ax)
         if self.plot_paraxial:
             self.paraxial.plot(ax)
-        if self.plot_paraxial_full:
+        if self.plot_full:
             t.plot(ax)
         for h in self.plot_heights:
             t = FullTrace(self.system)
@@ -145,15 +149,17 @@ class Analysis(object):
     @classmethod
     def pre_setup_fanplot(cls, fig, n):
         gs = gridspec.GridSpec(n, 6)
-        axpx0, axpx1, axey0 = None, None, None
+        axpx0, axpx1, axey0, axex0, axpy0 = None, None, None, None, None
         ax = []
         for i in range(n):
             axo = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 1),
-                    aspect="equal", sharex=axpx0)
+                    aspect="equal", sharex=axpx0, sharey=axpy0)
             axpx0 = axpx0 or axo
+            axpy0 = axpy0 or axo
             axp = fig.add_subplot(gs.new_subplotspec((i, 1), 1, 1),
-                    aspect="equal", sharey=axey0)
+                    aspect="equal", sharex=axex0, sharey=axey0)
             axey0 = axey0 or axp
+            axex0 = axex0 or axp
             axm = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 2),
                     sharex=axpx0, sharey=axey0)
             axsm = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
@@ -213,15 +219,16 @@ class Analysis(object):
                     #pxy = t.y[-2, :, :2] + pp*tanarcsin(t.u[-2, :])
                     pxy -= pxy[ref]
                     o = t.opd(ref)
+                    n = 4*int(nrays_spot)**.5
+                    xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
                     # griddata barfs on nans
                     xyo = np.r_[pxy.T, [o]]
                     x, y, o = xyo[:, ~np.any(np.isnan(xyo), axis=0)]
-                    n = 4*int(nrays_spot)**.5
-                    xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
-                    os = griddata(x, y, o, xs, ys)
-                    mm = np.fabs(os).max()
-                    v = np.linspace(-mm, mm, 21)
-                    axo.contour(xs, ys, os, v, cmap=plt.cm.RdBu_r)
+                    if len(o):
+                        mm = np.fabs(o).max()
+                        v = np.linspace(-mm, mm, 21)
+                        os = griddata(x, y, o, xs, ys)
+                        axo.contour(xs, ys, os, v, cmap=plt.cm.RdBu_r)
                     #axo.set_title("max=%.2g" % mm)
                     # TODO normalize opd across heights
                 t = FullTrace(self.system)

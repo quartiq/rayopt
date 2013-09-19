@@ -134,6 +134,9 @@ class System(list):
             if el.material.solid:
                 pending, c0 = el, c
 
+    def fix_sizes(self):
+        self.size_convex()
+
     def surfaces_cut(self, axis, points):
         """yields cut outlines of surfaces. solids are closed"""
         z0 = 0.
