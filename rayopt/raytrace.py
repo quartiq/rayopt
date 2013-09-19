@@ -55,6 +55,7 @@ class ParaxialTrace(Trace):
         self.allocate(aberration_orders)
         self.rays()
         self.propagate()
+        self.aberrations()
 
     def allocate(self, k):
         super(ParaxialTrace, self).allocate()
@@ -83,7 +84,7 @@ class ParaxialTrace(Trace):
         y[0, 0], u[0, 0] = r*mi[0, 0] - r*mi[0, 1]*mi[1, 0]/mi[1, 1], 0
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
-    def propagate(self, start=0, stop=None, aberration=True):
+    def propagate(self, start=0, stop=None):
         self.z = np.cumsum([e.thickness for e in self.system])
         init = start - 1 if start else 0
         yu, n = np.array((self.y[init], self.u[init])).T, self.n[init]
@@ -91,12 +92,15 @@ class ParaxialTrace(Trace):
         for i, el in enumerate(els):
             yu, n = el.propagate_paraxial(yu, n, self.l)
             (self.y[i], self.u[i]), self.n[i] = yu.T, n
+
+    def aberrations(self, start=0, stop=None):
+        els = self.system[start:stop or self.length]
+        for i, el in enumerate(els):
             self.v[i] = el.dispersion(self.lmin, self.lmax)
             # ignore i == 0 case, object handles it
             self.c[i] = el.aberration(self.y[i], self.u[i - 1],
                     self.n[i - 1], self.n[i], self.c.shape[-1])
-        if aberration:
-            self.extrinsic_aberrations()
+        self.extrinsic_aberrations()
 
     def extrinsic_aberrations(self): # FIXME: wrong
         self.d[:] = 0

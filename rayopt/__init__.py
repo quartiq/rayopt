@@ -16,13 +16,13 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from .material import fraunhofer
 from .elements import Spheroid, Object, Aperture, Image
 from .system import System
-from .raytrace import FullTrace, ParaxialTrace
 from .formats import (system_from_text, system_from_zemax,
     system_from_oslo)
-from .material import fraunhofer
-from .optimize import (Parameter, MaterialThickness, 
-    demerit_rms_position, demerit_rms_angle, demerit_mean_angle,
-    demerit_aberration3)
+from .raytrace import FullTrace, ParaxialTrace
 from .analysis import Analysis
+#from .optimize import (Parameter, MaterialThickness, 
+#    demerit_rms_position, demerit_rms_angle, demerit_mean_angle,
+#    demerit_aberration3)
