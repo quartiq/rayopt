@@ -258,7 +258,7 @@ class Analysis(object):
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
             p, q, r = np.split(tanarcsin(t.u[-2]).T, (nrays, 2*nrays), axis=1)
             xd = (a[1] - h)/h
-            xd[0] = 0.
+            xd[0] = np.nan
             axl.plot(a[1], xd, ci+"-", label="%s" % wi)
             xt = -(b[1]-a[1])/(q[1]-p[1])
             axc.plot(a[1], xt, ci+"-", label="EZt %s" % wi)
