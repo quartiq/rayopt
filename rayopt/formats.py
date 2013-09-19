@@ -96,7 +96,7 @@ def system_from_oslo(fil):
         if cmd == "LEN":
             s.description = " ".join(args[1:-2]).strip("\"")
         elif cmd == "UNI":
-            #s.scale = float(args[0])*1e-3
+            s.scale = float(args[0])*1e-3
             e = Spheroid()
         elif cmd == "AIR":
             e.material = air
@@ -121,7 +121,6 @@ def system_from_oslo(fil):
         else:
             print cmd, "not handled", args
             continue
-        #assert len(s) - 1 == int(args[0])
     return s
 
 
@@ -130,13 +129,17 @@ def system_from_zemax(fil):
     next_pos = 0.
     a = None
     for line in fil.readlines():
-        if not line.strip(): continue
+        if not line.strip():
+            continue
         line = line.strip().split(" ", 1)
         cmd = line[0]
         args = len(line) == 2 and line[1] or ""
         if cmd == "UNIT":
-            s.scale = {"MM": 1e-3}[args.split()[0]]
-            pass
+            s.scale = {
+                    "MM": 1e-3,
+                    "INCH": 25.4e-3,
+                    "IN": 25.4e-3,
+                    }[args.split()[0]]
         elif cmd == "NAME":
             s.description = args.strip("\"")
         elif cmd == "SURF":
@@ -192,7 +195,6 @@ def system_from_zemax(fil):
         else:
             print cmd, "not handled", args
             continue
-        #assert len(s) - 1 == int(args[0])
     # the first element is the object, the last is the image, convert them
     s.object.radius = s[1].radius
     del s[1]
