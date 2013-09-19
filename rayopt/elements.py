@@ -334,6 +334,15 @@ class Object(Element):
             u = sinarctan((yp*radius - y)/distance)
         return y, u
 
+    def from_pupil(self, y, u, distance, radius):
+        y, u = np.broadcast_arrays(y, u)
+        r = self.radius
+        yp = (y + distance*tanarcsin(u))/radius
+        yo = -y/r
+        if self.infinite:
+            yo = tanarcsin(-yo)
+        return yo, yp
+
 
 class Aperture(Primitive):
     typ = "A"

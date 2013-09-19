@@ -388,6 +388,7 @@ class FullTrace(Trace):
         position in case of infinite object"""
         if stop is None:
             stop = self.system.aperture_index
+        target *= self.system[stop].radius
         self.rays_given(y, u, l)
         var = self.y if self.system.object.infinite else self.u
         assert var.shape[1] == 1
@@ -444,6 +445,25 @@ class FullTrace(Trace):
             else:
                 ua[i, axis] += corr
         return ya, ua
+
+    def aim_pupil(self, height, pupil_distance, pupil_height,
+            l=None, axis=(1,), target=(0, 1), stop=None, **kwargs):
+        scales = np.ones((2, 2))
+        yo = (0, height)
+        for ax in axis:
+            for ta in target:
+                yp = [0, 0]
+                yp[ax] = 2*ta - 1.
+                y, u = self.system.object.to_pupil(yo, yp,
+                        pupil_distance, pupil_height)
+                y, u = self.aim_chief(y, u, l, axis=ax, target=2*ta-1,
+                        stop=stop)
+                yoa, ypa = self.system.object.from_pupil(y, u,
+                        pupil_distance, pupil_height)
+                scales[ax, ta] = ypa[0, ax]/yp[ax]
+        if len(target) == 1:
+            scales[:, 1-target[0]] = scales[:, target[0]]
+        return scales
 
     @staticmethod
     def pupil_distribution(distribution, nrays):
@@ -508,15 +528,19 @@ class FullTrace(Trace):
                 l.append([np.sin(a)*i/n, np.cos(a)*i/n])
             return 0, np.concatenate(l, axis=1).T
      
-    def rays_point(self, height, pupil_distance, pupil_radius,
+    def rays_point(self, height, pupil_distance, pupil_height,
             wavelength=None, nrays=11, distribution="meridional",
-            clip=False, aim=True):
+            clip=False, aim="pupil"):
         # TODO apodization
         icenter, yp = self.pupil_distribution(distribution, nrays)
-        self.allocate(yp.shape[0])
+        if aim == "pupil":
+            scales = self.aim_pupil(height, pupil_distance, pupil_height,
+                wavelength)
+            yp *= (scales[:, 1] + scales[:, 0])/2
+            yp += (scales[:, 1] - scales[:, 0])/2
         y, u = self.system.object.to_pupil((0, height), yp,
-                pupil_distance, pupil_radius)
-        if aim:
+                pupil_distance, pupil_height)
+        if aim == "chief":
             y, u = self.aim_chief(y, u, wavelength, aim=icenter, axis=1)
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
