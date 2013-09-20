@@ -17,8 +17,9 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
+from Cython.Distutils import build_ext
+import numpy
 
 setup(
         name = "pyrayopt",
@@ -31,7 +32,7 @@ setup(
         license = "GPLv3+",
         keywords = "optics lens raytracing optimization point spread",
         install_requires = [
-            "numpy", "traits>=4"],
+            "numpy", "scipy", "matplotlib", "nose", "cython"],
         extras_require = {
             "gui": ["chaco", "traitsui"],
             },
@@ -39,6 +40,18 @@ setup(
         packages = find_packages(),
         #namespace_packages = [],
         #test_suite = "bullseye.tests.test_all",
+        ext_modules=[
+                Extension("rayopt.cpropagate",
+                    sources=["rayopt/cpropagate.pyx",
+                         ],
+                extra_compile_args=[
+                        "-ffast-math", # improves expressions
+                        #"-Wa,-adhlns=cexprssions.lst", # for amusement
+                        ],
+                include_dirs=[numpy.get_include()]),
+            ],
+        cmdclass = {"build_ext": build_ext},
+
         entry_points = {
             #"gui_scripts": ["bullseye = bullseye.app:main"],
             },
