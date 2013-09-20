@@ -241,8 +241,8 @@ class Spheroid(Interface):
         c, k = self.curvature, self.conic
         e = c*r2/(1 + np.sqrt(1 - k*c**2*r2))
         if self.aspherics.size:
-            e += sum(ai*r2**(i + 2) for i, ai in
-                     enumerate(self.aspherics))
+            for i, ai in enumerate(self.aspherics):
+                e += ai*r2**(i + 2)
         return z - e
 
     def shape_func_deriv(self, xyz):
@@ -251,8 +251,8 @@ class Spheroid(Interface):
         c, k = self.curvature, self.conic
         e = c/np.sqrt(1 - k*c**2*r2)
         if self.aspherics.size:
-            e += 2*sum(ai*(i + 2)*r2**(i + 1) for i, ai in 
-                       enumerate(self.aspherics))
+            for i, ai in enumerate(self.aspherics):
+                e += 2*ai*(i + 2)*r2**(i + 1)
         q = np.ones((e.size, 3))
         q[:, 0] = -x*e
         q[:, 1] = -y*e
