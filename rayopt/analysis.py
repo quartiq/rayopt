@@ -184,7 +184,7 @@ class Analysis(object):
         return ax
 
     def transverse(self, fig, heights=[1., .707, 0.],
-            wavelengths=None, nrays_spot=100, nrays_line=32,
+            wavelengths=None, nrays_spot=200, nrays_line=152,
             colors="gbrcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
@@ -200,7 +200,7 @@ class Analysis(object):
             axp.add_patch(mpl.patches.Circle((0, 0), r, edgecolor="black",
                 facecolor="none"))
             axo.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
-                    transform=axp.transAxes,
+                    transform=axo.transAxes,
                     verticalalignment="center")
             for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
                 t = FullTrace(self.system)
@@ -248,8 +248,11 @@ class Analysis(object):
                 self.post_setup_axes(axii)
 
     def longitudinal(self, fig, height=1.,
-            wavelengths=None, nrays=11, colors="gbrcmyk"):
+            wavelengths=None, nrays=21, colors="gbrcmyk"):
         paraxial = self.paraxial
+        # lateral color: image relative to image at wl[0]
+        # focus shift paraxial focus vs wl
+        # longitudinal spherical: marginal focus vs height (vs wl)
         if wavelengths is None:
             wavelengths = self.system.object.wavelengths
         axl = fig.add_subplot(1, 2, 1)

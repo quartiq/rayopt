@@ -190,7 +190,7 @@ class Interface(Element):
             yi, ui, s0i = y[i], u[i], s0[i]
             def func(si): return self.shape_func(yi + si*ui)
             def fprime(si): return np.dot(
-                    self.shape_func_deriv(yi + si*ui).T, ui)
+                    self.shape_func_deriv(yi + si*ui), ui)
             try:
                 s[i] = newton(func=func, fprime=fprime, x0=s0i,
                         tol=1e-7, maxiter=5)
