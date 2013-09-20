@@ -253,7 +253,10 @@ class Spheroid(Interface):
         if self.aspherics.size:
             e += 2*sum(ai*(i + 2)*r2**(i + 1) for i, ai in 
                        enumerate(self.aspherics))
-        return np.array([-x*e, -y*e, np.ones_like(e)]).T
+        q = np.ones((e.size, 3))
+        q[:, 0] = -x*e
+        q[:, 1] = -y*e
+        return q
 
     def intercept(self, y, u):
         if not self.aspherics.size:
