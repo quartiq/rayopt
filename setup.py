@@ -41,14 +41,15 @@ setup(
         #namespace_packages = [],
         #test_suite = "bullseye.tests.test_all",
         ext_modules=[
+                Extension("rayopt._transformations",
+                    sources=["rayopt/_transformations.c"],),
                 Extension("rayopt.cpropagate",
-                    sources=["rayopt/cpropagate.pyx",
-                         ],
-                extra_compile_args=[
+                    sources=["rayopt/cpropagate.pyx"],
+                    extra_compile_args=[
                         "-ffast-math", # improves expressions
                         #"-Wa,-adhlns=cexprssions.lst", # for amusement
                         ],
-                include_dirs=[numpy.get_include()]),
+                    include_dirs=[numpy.get_include()]),
             ],
         cmdclass = {"build_ext": build_ext},
 

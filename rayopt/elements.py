@@ -20,7 +20,7 @@ import numpy as np
 from scipy.optimize import newton
 
 from .transformations import (euler_matrix, translation_matrix,
-        concatenate_transforms)
+        concatenate_matrices)
 from .name_mixin import NameMixin
 from .aberration_orders import aberration_intrinsic
 from .utils import sinarctan, tanarcsin
@@ -36,7 +36,7 @@ class TransformMixin(object):
         self.rotation = euler_matrix(axes="rxyz", *self.angles)
         self.inverse_rotation = np.linalg.inv(self.rotation)
         translation = translation_matrix(self.offset)
-        self.transformation = concatenate_transforms(translation,
+        self.transformation = concatenate_matrices(translation,
                 self.rotation)
         self.inverse_transformation = np.linalg.inv(self.transformation)
         self.at_origin = (np.allclose(self.angles, 0) and
