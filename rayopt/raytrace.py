@@ -451,7 +451,7 @@ class FullTrace(Trace):
         return ya, ua
 
     def aim_pupil(self, height, pupil_distance, pupil_height,
-            l=None, axis=(1,), target=(0, 1), stop=None, **kwargs):
+            l=None, axis=(1,), target=(0, 1), **kwargs):
         scales = np.ones((2, 2))
         yo = (0, height)
         for ax in axis:
@@ -460,8 +460,7 @@ class FullTrace(Trace):
                 yp[ax] = 2*ta - 1.
                 y, u = self.system.object.to_pupil(yo, yp,
                         pupil_distance, pupil_height)
-                y, u = self.aim_chief(y, u, l, axis=ax, target=2*ta-1,
-                        stop=stop)
+                y, u = self.aim_chief(y, u, l, axis=ax, target=2*ta - 1.)
                 yoa, ypa = self.system.object.from_pupil(y, u,
                         pupil_distance, pupil_height)
                 scales[ta, ax] = ypa[0, ax]/yp[ax]
