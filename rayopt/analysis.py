@@ -199,7 +199,7 @@ class Analysis(object):
             axp, axm, axsm, axss, axo = axi
             axp.add_patch(mpl.patches.Circle((0, 0), r, edgecolor="black",
                 facecolor="none"))
-            axp.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
+            axo.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
                     transform=axp.transAxes,
                     verticalalignment="center")
             for i, (wi, ci) in enumerate(zip(wavelengths, colors)):

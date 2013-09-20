@@ -88,16 +88,20 @@ class Material(object):
         else:
             raise ValueError
         if name is None:
-            name = txt
-        return cls(name=txt, solid=nd>1, nd=nd, vd=vd)
+            name = "-"
+        return cls(name=name, solid=nd>1, nd=nd, vd=vd)
 
     def __str__(self):
         return self.name
 
+    def nd_vd(self, wavelength):
+        return (self.nd + (wavelength - lambda_d)/(lambda_C - lambda_F)
+                *(1 - self.nd)/self.vd)
+
     @simple_cache
     def refractive_index(self, wavelength):
         if self.sellmeier is None:
-            return self.nd*np.ones_like(wavelength)
+            return self.nd_vd(wavelength)
         w2 = (np.array(wavelength)/1e-6)**2
         c0 = self.sellmeier[:, (0,)]
         c1 = self.sellmeier[:, (1,)]
