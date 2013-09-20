@@ -235,8 +235,8 @@ class Spheroid(Interface):
         #if self.curvature and self.radius:
         #    assert self.radius**2 < 1/(self.conic*self.curvature**2)
 
-    def shape_func(self, p):
-        x, y, z = p.T
+    def shape_func(self, xyz):
+        x, y, z = xyz.T
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
         e = c*r2/(1 + np.sqrt(1 - k*c**2*r2))
@@ -245,8 +245,8 @@ class Spheroid(Interface):
                      enumerate(self.aspherics))
         return z - e
 
-    def shape_func_deriv(self, p):
-        x, y, z = p.T
+    def shape_func_deriv(self, xyz):
+        x, y, z = xyz.T
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
         e = c/np.sqrt(1 - k*c**2*r2)

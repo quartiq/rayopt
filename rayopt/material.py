@@ -66,16 +66,14 @@ class Material(object):
         self.solid = solid
         self.mirror = mirror
         self.thermal = thermal
-        self.nd = nd
-        self.vd = vd
         if sellmeier is not None:
             self.sellmeier = np.atleast_2d(sellmeier)
             self.nd = self.refractive_index(lambda_d)
-            self.vd = ((self.nd - 1)/(
-                self.refractive_index(lambda_F)-
-                self.refractive_index(lambda_C)))
+            self.vd = self.dispersion(lambda_F, lambda_d, lambda_C)
         else:
             self.sellmeier = None
+            self.nd = nd
+            self.vd = vd
 
     @classmethod
     def from_string(cls, txt, name=None):
@@ -94,14 +92,11 @@ class Material(object):
     def __str__(self):
         return self.name
 
-    def nd_vd(self, wavelength):
+    def n_from_nd_vd(self, wavelength):
         return (self.nd + (wavelength - lambda_d)/(lambda_C - lambda_F)
                 *(1 - self.nd)/self.vd)
 
-    @simple_cache
-    def refractive_index(self, wavelength):
-        if self.sellmeier is None:
-            return self.nd_vd(wavelength)
+    def n_from_sellmeier(self, wavelength):
         w2 = (np.array(wavelength)/1e-6)**2
         c0 = self.sellmeier[:, (0,)]
         c1 = self.sellmeier[:, (1,)]
@@ -111,19 +106,18 @@ class Material(object):
             n = -n
         return n.reshape(w2.shape)
 
-    def dispersion(self, wavelength_short, wavelength_mid,
-            wavelength_long):
-        if self.sellmeier is None:
-            return self.vd
-        return (self.refractive_index(wavelength_mid) - 1)/(
-                self.refractive_index(wavelength_short)-
-                self.refractive_index(wavelength_long))
+    @simple_cache
+    def refractive_index(self, wavelength):
+        if self.sellmeier is not None:
+            return self.n_from_sellmeier(wavelength)
+        else:
+            return self.n_from_nd_vd(wavelength)
 
-    def delta_n(self, wavelength_short, wavelength_long):
-        if self.sellmeier is None:
-            return (self.nd - 1)/self.vd
-        return (self.refractive_index(wavelength_short)-
-                self.refractive_index(wavelength_long))
+    def dispersion(self, short, mid, long):
+        return (self.refractive_index(mid) - 1)/self.delta_n(short, long)
+
+    def delta_n(self, short, long):
+        return (self.refractive_index(short) - self.refractive_index(long))
 
     def dn_thermal(self, t, n, wavelength):
         d0, d1, d2, e0, e1, tref, lref = self.thermal
@@ -138,10 +132,7 @@ class Gas(Material):
     def __init__(self, solid=False, **kwargs):
         super(Gas, self).__init__(solid=solid, **kwargs)
 
-    @simple_cache
-    def refractive_index(self, wavelength):
-        if self.sellmeier is None:
-            return self.nd*np.ones_like(wavelength)
+    def n_from_sellmeier(self, wavelength):
         w2 = (np.array(wavelength)/1e-6)**2
         c0 = self.sellmeier[:, (0,)]
         c1 = self.sellmeier[:, (1,)]
@@ -207,15 +198,15 @@ def load_catalog_zemax(fil, name=None):
 
 
 def load_catalogs(all, catalogs):
+    kw = dict(protocol=pickle.HIGHEST_PROTOCOL, writeback=False)
     try:
-        db = shelve.open(all, "r", protocol=pickle.HIGHEST_PROTOCOL,
-                writeback=False)
+        db = shelve.open(all, "r", **kw)
         if not db.keys():
             db.close()
             raise
     except:
-        db = shelve.open(all, "c", protocol=pickle.HIGHEST_PROTOCOL,
-                writeback=False)
+        # keeping it open writeable corrupts it
+        db = shelve.open(all, "c", **kw)
         for f in catalogs:
             _, name = os.path.split(f)
             name, _ = os.path.splitext(name)
@@ -223,8 +214,7 @@ def load_catalogs(all, catalogs):
             db.update(cf)
         db.update(basics)
         db.close()
-        db = shelve.open(all, "r", protocol=pickle.HIGHEST_PROTOCOL,
-                writeback=False)
+        db = shelve.open(all, "r", **kw)
     return db
 
 
