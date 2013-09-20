@@ -332,7 +332,7 @@ class Object(Element):
         return y0, u0, n, t
 
     def to_pupil(self, height, pupil, distance, radius):
-        yo, yp = np.broadcast_arrays(height, pupil)
+        yo, yp, radius = np.broadcast_arrays(height, pupil, radius)
         r = self.radius
         if self.infinite:
             u = sinarctan(yo*r)
@@ -343,13 +343,19 @@ class Object(Element):
         return y, u
 
     def from_pupil(self, y, u, distance, radius):
-        y, u = np.broadcast_arrays(y, u)
+        y, u, radius = np.broadcast_arrays(y, u, radius)
         r = self.radius
         yp = (y + distance*tanarcsin(u))/radius
         yo = -y/r
         if self.infinite:
             yo = tanarcsin(-yo)
         return yo, yp
+
+    def pupil_distance(self, y, u, axis=1):
+        return -y[axis]/tanarcsin(u)[axis]
+
+    def pupil_height(self, y, u, pupil_distance, axis=1):
+        return y[axis] + pupil_distance*tanarcsin(u)[axis]
 
 
 class Aperture(Primitive):

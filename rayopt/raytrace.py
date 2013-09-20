@@ -344,6 +344,7 @@ class FullTrace(Trace):
 
     def rays_given(self, y, u, l=None):
         y, u = np.atleast_2d(y, u)
+        y, u = np.broadcast_arrays(y, u)
         if l is None:
             l = self.system.object.wavelengths[0]
         self.allocate(max(y.shape[0], u.shape[0]))
@@ -418,58 +419,31 @@ class FullTrace(Trace):
         a0, f0 = find_start(distance, 1.)
         if abs(f0 - target) > tol:
             a0 = newton(distance, a0, tol=tol, maxiter=maxiter)
-        return (a0 - 1)*v0
-
-    def aim_chief(self, y, u, l=None, aim=0, axis=1, **kwargs):
-        y, u = np.atleast_2d(y, u)
-        ya, ua = np.broadcast_arrays(y, u)
-        try:
-            corr = self.aim(ya[aim], ua[aim], l, axis, **kwargs)
-        except RuntimeError:
-            corr = 0.
-        if self.system.object.infinite:
-            y[:, axis] += corr
-        else:
-            u[:, axis] += corr
-        return y, u
-
-    def aim_each(self, y, u, l=None, target=None, axis=1, **kwargs):
-        y, u = np.atleast_2d(y, u)
-        ya, ua = np.broadcast_arrays(y, u)
-        if target is None:
-            target = np.zeros(ya.shape[0])
-        assert target.shape[0] == ya.shape[0]
-        for i, ti in enumerate(target):
-            try:
-                corr = self.aim(ya[i], ua[i], l, axis, ti, **kwargs)
-            except RuntimeError:
-                corr = 0.
-            if self.system.object.infinite:
-                ya[i, axis] += corr
-            else:
-                ua[i, axis] += corr
-        return ya, ua
+        var[0, 0, axis] = a0*v0
+        return self.y[0, 0, :2], self.u[0, 0, :2]
 
     def aim_pupil(self, height, pupil_distance, pupil_height,
-            l=None, axis=(1,), target=(0, 1), **kwargs):
-        scales = np.ones((2, 2))
+            l=None, axis=(0, 1), **kwargs):
         yo = (0, height)
+        pd = pupil_height
+        if height:
+            yp = (0, 0)
+            y, u = self.system.object.to_pupil(yo, yp,
+                   pupil_distance, pupil_height)
+            y, u = self.aim(y, u, l, axis=1, target=0)
+            pd = self.system.object.pupil_distance(y, u)
+        ph = np.ones(2)*pd/pupil_height
         for ax in axis:
-            for ta in target:
-                yp = [0, 0]
-                yp[ax] = 2*ta - 1.
-                y, u = self.system.object.to_pupil(yo, yp,
-                        pupil_distance, pupil_height)
-                y, u = self.aim_chief(y, u, l, axis=ax, target=2*ta - 1.)
-                yoa, ypa = self.system.object.from_pupil(y, u,
-                        pupil_distance, pupil_height)
-                scales[ta, ax] = ypa[0, ax]/yp[ax]
-        if len(target) == 1:
-            scales[1-target[0]] = scales[target[0]]
-        return scales
+            yp = ((1, 0), (0, 1))[ax]
+            y, u = self.system.object.to_pupil(yo, yp, pd, ph[ax])
+            y, u = self.aim(y, u, l, axis=ax, target=1)
+            ph[ax] = self.system.object.pupil_height(y, u, pd,
+                    axis=ax)
+        return pd, ph
 
     @staticmethod
     def pupil_distribution(distribution, nrays):
+        # TODO apodization
         """returns nrays in normalized aperture coordinates x/meridional
         and y/sagittal according to distribution, all rays are clipped
         to unit circle aperture.
@@ -533,18 +507,17 @@ class FullTrace(Trace):
      
     def rays_point(self, height, pupil_distance, pupil_height,
             wavelength=None, nrays=11, distribution="meridional",
-            clip=False, aim="pupil"):
-        # TODO apodization
+            clip=False, aim=(0, 1)):
+        if aim:
+            try:
+                pupil_distance, pupil_height = self.aim_pupil(height,
+                        pupil_distance, pupil_height, wavelength, axis=aim)
+            except RuntimeError:
+                print "pupil aim failed", height
+                pass
         icenter, yp = self.pupil_distribution(distribution, nrays)
-        if aim == "pupil":
-            scales = self.aim_pupil(height, pupil_distance, pupil_height,
-                wavelength)
-            yp *= (scales[1] + scales[0])/2
-            yp += (scales[1] - scales[0])/2
         y, u = self.system.object.to_pupil((0, height), yp,
                 pupil_distance, pupil_height)
-        if aim == "chief":
-            y, u = self.aim_chief(y, u, wavelength, aim=icenter, axis=1)
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
         return icenter
@@ -561,7 +534,12 @@ class FullTrace(Trace):
         y, u = self.system.object.to_pupil(yi, (0, 0.), pupil_distance,
                 pupil_height)
         if aim:
-            y, u = self.aim_each(y, u, wavelength, axis=1)
+            for i in range(y.shape[0]):
+                try:
+                    y[i], u[i] = self.aim(y[i], u[i], wavelength, axis=1)
+                except RuntimeError:
+                    print "chief aim failed", i
+                    pass
         e = np.zeros((3, 1, 2)) # pupil
         e[(1, 2), :, (1, 0)] = eps*pupil_height # meridional, sagittal
         if self.system.object.infinite:
