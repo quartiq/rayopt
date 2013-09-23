@@ -36,7 +36,7 @@ cdef double NAN
 NAN = float("nan")
 
 
-def propagate(object obj,
+def propagate(object obj not None,
         np.ndarray[dtype_t, ndim=2] y0 not None,
         np.ndarray[dtype_t, ndim=2] u0 not None,
         double n0, double l, int clip=True,
@@ -58,15 +58,18 @@ def propagate(object obj,
         u = np.empty([m, 3], dtype=dtype)
     if t is None:
         t = np.empty([m], dtype=dtype)
-    n = obj.material.refractive_index(l)
+    if obj.material is not None:
+        n = obj.material.refractive_index(l)
+    else:
+        n = n0
     for i in range(m):
         _propagate(&y0[i, 0], &u0[i, 0], &y[i, 0], &u[i, 0], &t[i],
         d, r, n0, n, c, k, clip)
     return y, u, n, t
 
-cdef _propagate(double *y0, double *u0, double *y, double *u, double *t,
-        double d, double r, double n0, double n, double c, double k, int
-        do_clip):
+cdef void _propagate(double *y0, double *u0, double *y, double *u, double *t,
+        double d, double r, double n0, double n, double c, double k,
+        int do_clip):
     y[0] = y0[0]
     y[1] = y0[1]
     y[2] = y0[2] - d
@@ -74,15 +77,12 @@ cdef _propagate(double *y0, double *u0, double *y, double *u, double *t,
     y[0] += t[0]*u0[0]
     y[1] += t[0]*u0[1]
     y[2] += t[0]*u0[2]
-    u[0] = u0[0]
-    u[1] = u0[1]
-    u[2] = u0[2]
+    refract(y, u0, n0/n, c, k, u)
     if do_clip:
         clip(y, u, r)
-    refract(y, u, n0/n, c, k, u)
     t[0] *= n0
 
-cdef void clip(double *y, double *u, double radius):
+cdef inline void clip(double *y, double *u, double radius):
     cdef double r2
     r2 = y[0]**2 + y[1]**2
     if r2 > radius**2:
@@ -94,7 +94,7 @@ cdef void clip(double *y, double *u, double radius):
 #    e = c*r2/(1 + sqrt(1 - k*c**2*r2))
 #    return y[2] - e
 
-cdef void sag_normal(double *y, double c, double k, double *dy):
+cdef inline void sag_normal(double *y, double c, double k, double *dy):
     cdef double r2, e
     r2 = y[0]**2 + y[1]**2
     e = c/sqrt(1 - k*c**2*r2)
@@ -110,7 +110,7 @@ cdef inline double sign(double y):
     else:
         return 0.
 
-cdef double intercept(double *y, double *u, double c, double k):
+cdef inline double intercept(double *y, double *u, double c, double k):
     cdef double d, e, f, s
     if c == 0:
         return -y[2]/u[2]
@@ -120,7 +120,7 @@ cdef double intercept(double *y, double *u, double c, double k):
     s = (-d - sign(u[2])*sqrt(d**2 - e*f))/e
     return s
 
-cdef void refract(double *y, double *u0, double mu, double c, double k, double *u):
+cdef inline void refract(double *y, double *u0, double mu, double c, double k, double *u):
     # G. H. Spencer and M. V. R. K. Murty
     # General Ray-Tracing Procedure
     # JOSA, Vol. 52, Issue 6, pp. 672-676 (1962)
@@ -133,7 +133,7 @@ cdef void refract(double *y, double *u0, double mu, double c, double k, double *
         return
     sag_normal(y, c, k, r)
     r2 = r[0]**2 + r[1]**2 + r[2]**2
-    muf = abs(mu)
+    muf = fabs(mu)
     a = muf*(u0[0]*r[0] + u0[1]*r[1] + u0[2]*r[2])/r2
     # solve g**2 + 2*a*g + b=0
     if mu == -1: # reflection
@@ -143,6 +143,6 @@ cdef void refract(double *y, double *u0, double mu, double c, double k, double *
     else: # refraction
         b = (mu**2 - 1)/r2
         g = -a + sign(mu)*sqrt(a**2 - b)
-        u[0] = muf*u0[0] - g*r[0]
-        u[1] = muf*u0[1] - g*r[1]
-        u[2] = muf*u0[2] - g*r[2]
+        u[0] = muf*u0[0] + g*r[0]
+        u[1] = muf*u0[1] + g*r[1]
+        u[2] = muf*u0[2] + g*r[2]

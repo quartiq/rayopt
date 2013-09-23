@@ -386,7 +386,7 @@ try:
     old_propagate = Spheroid.propagate
     def n(obj, y0, u0, n0, l, clip=True):
         #print obj, y0, u0, n0, l, clip
-        return old_propagate(obj, y0, u0, n0, l, clip)
+        #return old_propagate(obj, y0, u0, n0, l, clip)
         return new_propagate(obj, y0, u0, n0, l, clip)
     Spheroid.propagate = n 
     #Spheroid.propagate = new_propagate
