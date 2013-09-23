@@ -380,4 +380,15 @@ class Image(Spheroid):
         # [y', u'] = M * [y, u]
         d = self.thickness
         return n0, np.array([[1, d], [0, 1]])
- 
+
+try:
+    from .cpropagate import propagate as new_propagate
+    old_propagate = Spheroid.propagate
+    def n(obj, y0, u0, n0, l, clip=True):
+        #print obj, y0, u0, n0, l, clip
+        return old_propagate(obj, y0, u0, n0, l, clip)
+        return new_propagate(obj, y0, u0, n0, l, clip)
+    Spheroid.propagate = n 
+    #Spheroid.propagate = new_propagate
+except ImportError:
+    pass
