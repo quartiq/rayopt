@@ -32,7 +32,7 @@ setup(
         license = "GPLv3+",
         keywords = "optics lens raytracing optimization point spread",
         install_requires = [
-            "numpy", "scipy", "matplotlib", "nose", "cython"],
+            "numpy", "scipy", "matplotlib", "nose", "numba"],
         extras_require = {
             "gui": ["chaco", "traitsui"],
             },
