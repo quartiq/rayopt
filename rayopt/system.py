@@ -106,7 +106,7 @@ class System(list):
                 "Material", "n", "V")
         for i,e in enumerate(self):
             curv = getattr(e, "curvature", 0)
-            roc = curv == 0 and np.inf or 1/curv
+            roc = curv == 0 and np.inf or 1./curv
             mat = getattr(e, "material", None)
             n = getattr(mat, "nd", np.nan)
             v = getattr(mat, "vd", np.nan)

@@ -339,8 +339,8 @@ class FullTrace(Trace):
         self.u = np.empty_like(self.y)
         self.l = 1.
         self.z = np.empty(self.length)
-        self.n = np.empty((self.length, nrays))
-        self.t = np.empty_like(self.n)
+        self.n = np.empty_like(self.z)
+        self.t = np.empty((self.length, nrays))
 
     def rays_given(self, y, u, l=None):
         y, u = np.atleast_2d(y, u)
@@ -364,6 +364,12 @@ class FullTrace(Trace):
             self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
 
     def opd(self, chief=0, radius=None, after=-2):
+        t = self.t[:after + 1].sum(0)
+        if self.system.object.infinite:
+            # input reference sphere is a tilted plane
+            # u0 * (y0 - y - t*u) == 0
+            tj = np.dot(self.u[0, chief], (self.y[0, chief] - self.y[0]).T)
+            t -= tj*self.n[0]
         if radius is None:
             radius = self.z[-1] - self.z[after]
             #axis=1
@@ -371,20 +377,16 @@ class FullTrace(Trace):
             #    radius = self.y[-1, chief, axis]/self.u[-2, chief, axis]
         # center sphere on chief image
         y = self.y[after] - self.y[-1, chief]
-        y[:, 2] -= self.system.image.thickness
+        y[:, 2] -= self.z[-1] - self.z[after]
+        u = self.u[after]
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
-        #u = self.u[after]
-        u = -y/np.sqrt(np.square(y).sum(1))[:, None]
-        y += [0, 0, radius]
+        #u = -y/np.sqrt(np.square(y).sum(1))[:, None]
+        y[:, 2] += radius
         ti = Spheroid(curvature=1./radius).intercept(y, u)
-        t = self.t[:after + 1].sum(0) + ti*self.n[after]
-        if self.system.object.infinite:
-            # input reference sphere is a tilted plane
-            # u0 * (y0 - y - t*u) == 0
-            tj = np.dot(self.u[0, chief], (self.y[0, chief] - self.y[0]).T)
-            t -= tj*self.n[0]
-        return (t - t[chief])/self.l
+        t += ti*self.n[after]
+        t -= t[chief]
+        return t/self.l
 
     def rays_paraxial(self, paraxial):
         y = np.zeros((2, 2))
@@ -401,7 +403,6 @@ class FullTrace(Trace):
         position in case of infinite object"""
         if stop is None:
             stop = self.system.aperture_index
-        target *= self.system[stop].radius
         self.rays_given(y, u, l)
         var = self.y if self.system.object.infinite else self.u
         assert var.shape[1] == 1
@@ -578,7 +579,7 @@ class FullTrace(Trace):
     def print_trace(self):
         for i in range(self.nrays):
             yield "ray %i" % i
-            c = np.concatenate((self.n[:, i, None], self.z[:, None],
+            c = np.concatenate((self.n[:, None], self.z[:, None],
                 np.cumsum(self.t[:, i, None], axis=0)-self.z[:, None],
                 self.y[:, i, :], self.u[:, i, :]), axis=1)
             for _ in self.print_coeffs(c, "n/track z/rel path/"

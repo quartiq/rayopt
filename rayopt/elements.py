@@ -264,11 +264,11 @@ class Spheroid(Interface):
             if self.curvature == 0:
                 s = Element.intercept(self, y, u) # flat
             else:
-                k = np.array([1., 1., self.conic])
-                ky, ku = k*y, k*u
-                #ky, ku = y.copy(), u.copy()
-                #y[:, 2] *= self.conic
-                #u[:, 2] *= self.conic
+                ky, ku = y, u
+                if self.conic != 1:
+                    ky, ku = y.copy(), u.copy()
+                    ky[:, 2] *= self.conic
+                    ku[:, 2] *= self.conic
                 c = self.curvature
                 d = c*(u*ky).sum(1) - u[:, 2]
                 e = c*(u*ku).sum(1)
@@ -304,7 +304,7 @@ class Spheroid(Interface):
         u, ub = u
         f, g = (self.curvature*y + u)*n0, (self.curvature*yb + ub)*n0
         c = np.zeros((2, 2, kmax, kmax, kmax))
-        aberration_intrinsic(self.curvature, f, g, y, yb, 1/n0, 1/n,
+        aberration_intrinsic(self.curvature, f, g, y, yb, 1./n0, 1./n,
                 c, kmax - 1)
         return c
 

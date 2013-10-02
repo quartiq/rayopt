@@ -185,7 +185,7 @@ class Analysis(object):
 
     def transverse(self, fig, heights=[1., .707, 0.],
             wavelengths=None, nrays_spot=200, nrays_line=152,
-            colors="gbrcmyk"):
+            colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.object.wavelengths
@@ -219,17 +219,17 @@ class Analysis(object):
                     #pxy = t.y[-2, :, :2] + pp*tanarcsin(t.u[-2, :])
                     pxy -= pxy[ref]
                     o = t.opd(ref)
-                    n = 4*int(nrays_spot)**.5
-                    xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
                     # griddata barfs on nans
                     xyo = np.r_[pxy.T, [o]]
-                    x, y, o = xyo[:, ~np.any(np.isnan(xyo), axis=0)]
+                    x, y, o = xyo[:, np.all(np.isfinite(xyo), axis=0)]
                     if len(o):
+                        n = 4*nrays_spot**.5
+                        xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
+                        os = griddata(x, y, o, xs, ys)
                         mm = np.fabs(o).max()
                         v = np.linspace(-mm, mm, 21)
-                        os = griddata(x, y, o, xs, ys)
                         axo.contour(xs, ys, os, v, cmap=plt.cm.RdBu_r)
-                    #axo.set_title("max=%.2g" % mm)
+                    #axo.set_title("max=%.2gl" % mm)
                     # TODO normalize opd across heights
                 t = FullTrace(self.system)
                 ref = t.rays_paraxial_point(paraxial, hi, wi,
@@ -248,7 +248,7 @@ class Analysis(object):
                 self.post_setup_axes(axii)
 
     def longitudinal(self, fig, height=1.,
-            wavelengths=None, nrays=21, colors="gbrcmyk"):
+            wavelengths=None, nrays=21, colors="grbcmyk"):
         paraxial = self.paraxial
         # lateral color: image relative to image at wl[0]
         # focus shift paraxial focus vs wl
