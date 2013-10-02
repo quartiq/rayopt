@@ -328,7 +328,7 @@ class Object(Element):
     
     def propagate(self, y0, u0, n0, l, clip=True):
         n = self.material.refractive_index(l)
-        t = np.zeros_like(l)
+        t = np.zeros_like(l) # could use distance to ref sphere here
         return y0, u0, n, t
 
     def to_pupil(self, height, pupil, distance, radius):

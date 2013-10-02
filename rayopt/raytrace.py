@@ -363,20 +363,28 @@ class FullTrace(Trace):
             y, u, n, t = e.transformed_yu(e.propagate, y, u, n, l, clip)
             self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
 
-    def opd(self, chief=0, radius=None, after=-2, image=-1):
-        ri = self.system.image.thickness
+    def opd(self, chief=0, radius=None, after=-2):
         if radius is None:
-            radius = ri
+            radius = self.z[-1] - self.z[after]
+            #axis=1
+            #if np.fabs(self.u[-2, chief, axis]) > 1e-6:
+            #    radius = self.y[-1, chief, axis]/self.u[-2, chief, axis]
         # center sphere on chief image
-        y = self.y[after] - [0, 0, ri - radius] - self.y[image, chief]
-        #u = self.u[after]
+        y = self.y[after] - self.y[-1, chief]
+        y[:, 2] -= self.system.image.thickness
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
-        u = [0, 0, radius] - y
-        u /= np.sqrt(np.square(u).sum(1))[:, None]
-        t = Spheroid(curvature=1./radius).intercept(y, u)
-        t = t*self.n[after] + self.t[:after + 1].sum(0)
-        return t - t[chief]
+        #u = self.u[after]
+        u = -y/np.sqrt(np.square(y).sum(1))[:, None]
+        y += [0, 0, radius]
+        ti = Spheroid(curvature=1./radius).intercept(y, u)
+        t = self.t[:after + 1].sum(0) + ti*self.n[after]
+        if self.system.object.infinite:
+            # input reference sphere is a tilted plane
+            # u0 * (y0 - y - t*u) == 0
+            tj = np.dot(self.u[0, chief], (self.y[0, chief] - self.y[0]).T)
+            t -= tj*self.n[0]
+        return (t - t[chief])/self.l
 
     def rays_paraxial(self, paraxial):
         y = np.zeros((2, 2))
