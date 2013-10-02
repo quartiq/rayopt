@@ -16,6 +16,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function, absolute_import, division
+
 import shelve, os.path, glob, cPickle as pickle
 
 import numpy as np
@@ -190,9 +192,9 @@ def load_catalog_zemax(fil, name=None):
                     g.transmission = {}
                 g.transmission[(s[0], s[2])] = s[1]
             else:
-                print cmd, args, "not handled"
+                print(cmd, args, "not handled")
         except Exception, e:
-            print cmd, args, "failed parsing", e
+            print(cmd, args, "failed parsing", e)
     catalog[g.name] = g
     return catalog
 

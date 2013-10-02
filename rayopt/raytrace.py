@@ -21,6 +21,8 @@ Raytracing like Spencer and Murty 1962, J Opt Soc Am 52, 6
 with some improvements
 """
 
+from __future__ import print_function, absolute_import, division
+
 import itertools
 
 import numpy as np
@@ -403,6 +405,7 @@ class FullTrace(Trace):
         position in case of infinite object"""
         if stop is None:
             stop = self.system.aperture_index
+        target *= self.system[stop].radius
         self.rays_given(y, u, l)
         var = self.y if self.system.object.infinite else self.u
         assert var.shape[1] == 1
@@ -522,7 +525,7 @@ class FullTrace(Trace):
                 pupil_distance, pupil_height = self.aim_pupil(height,
                         pupil_distance, pupil_height, wavelength, axis=aim)
             except RuntimeError:
-                print "pupil aim failed", height
+                print("pupil aim failed", height)
                 pass
         icenter, yp = self.pupil_distribution(distribution, nrays)
         y, u = self.system.object.to_pupil((0, height), yp,
@@ -547,7 +550,7 @@ class FullTrace(Trace):
                 try:
                     y[i], u[i] = self.aim(y[i], u[i], wavelength, axis=1)
                 except RuntimeError:
-                    print "chief aim failed", i
+                    print("chief aim failed", i)
                     pass
         e = np.zeros((3, 1, 2)) # pupil
         e[(1, 2), :, (1, 0)] = eps*pupil_height # meridional, sagittal

@@ -16,6 +16,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function, absolute_import, division
+
 import numpy as np
 
 from .elements import Object, Image, Aperture
@@ -232,7 +234,7 @@ class System(list):
                 maxCPUTime=2e3, maxNonSuccess=30,
                 maxFunEvals=2000, iprint=1, plot=1)
         res = problem.solve(method)
-        print res
+        print(res)
         x, f = res.xf, res.ff
         for i,p in enumerate(parameters):
              p.set_value(self, x[i])

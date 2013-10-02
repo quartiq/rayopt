@@ -16,6 +16,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function, absolute_import, division
+
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -29,12 +31,11 @@ from .utils import tanarcsin
 class CenteredFormatter(mpl.ticker.ScalarFormatter):
     """Acts exactly like the default Scalar Formatter, but yields an empty
     label for ticks at "center"."""
-    center = 0
+    center = 0.
     def __call__(self, value, pos=None):
         if value == self.center:
             return ""
-        else:
-            return mpl.ticker.ScalarFormatter.__call__(self, value, pos)
+        return super(CenteredFormatter, self).__call__(value, pos)
 
 
 class Analysis(object):
