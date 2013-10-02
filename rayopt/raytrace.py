@@ -399,23 +399,31 @@ class FullTrace(Trace):
         self.propagate(clip=False)
 
     def aim(self, y, u, l=None, axis=1, target=0., stop=None,
-            tol=1e-3, maxiter=10):
+            tol=1e-3, maxiter=100):
         """aims ray at aperture center (or target)
         changing angle (in case of finite object) or
         position in case of infinite object"""
-        if stop is None:
-            stop = self.system.aperture_index
-        target *= self.system[stop].radius
         self.rays_given(y, u, l)
         var = self.y if self.system.object.infinite else self.u
         assert var.shape[1] == 1
         v0 = var[0, 0, axis].copy()
 
-        def distance(a):
-            var[0, 0, axis] = a*v0
-            self.propagate(stop=stop + 1, clip=False)
-            res = self.y[stop, 0, axis]
-            return res - target
+        if stop is -1: # return clipping ray
+            radii = np.array([e.radius for e in self.system[1:-1]])
+            def distance(a):
+                var[0, 0, axis] = a*v0
+                self.propagate(stop=-1, clip=False)
+                res = self.y[1:-1, 0, axis]*target
+                return max(res - radii)
+        else: # return pupil ray
+            if stop is None:
+                stop = self.system.aperture_index
+            target *= self.system[stop].radius
+            def distance(a):
+                var[0, 0, axis] = a*v0
+                self.propagate(stop=stop + 1, clip=False)
+                res = self.y[stop, 0, axis]
+                return res - target
 
         def find_start(fun, a0):
             f0 = fun(a0)
@@ -437,20 +445,21 @@ class FullTrace(Trace):
     def aim_pupil(self, height, pupil_distance, pupil_height,
             l=None, axis=(0, 1), **kwargs):
         yo = (0, height)
-        pd = pupil_height
+        pd = pupil_distance
+        ph = np.ones(2)*pupil_height
         if height:
+            # can only determine pupil distance if chief is non-axial
             yp = (0, 0)
-            y, u = self.system.object.to_pupil(yo, yp,
-                   pupil_distance, pupil_height)
+            y, u = self.system.object.to_pupil(yo, yp, pd, ph[1])
             y, u = self.aim(y, u, l, axis=1, target=0)
             pd = self.system.object.pupil_distance(y, u)
-        ph = np.ones(2)*pd/pupil_height
+            # rescale apparent pupil height (improve guess)
+            ph *= pd/pupil_distance
         for ax in axis:
-            yp = ((1, 0), (0, 1))[ax]
+            yp = (0, 1) if ax else (1, 0)
             y, u = self.system.object.to_pupil(yo, yp, pd, ph[ax])
             y, u = self.aim(y, u, l, axis=ax, target=1)
-            ph[ax] = self.system.object.pupil_height(y, u, pd,
-                    axis=ax)
+            ph[ax] = self.system.object.pupil_height(y, u, pd, axis=ax)
         return pd, ph
 
     @staticmethod
@@ -516,7 +525,42 @@ class FullTrace(Trace):
                 a = np.linspace(0, 2*np.pi, 6*i, endpoint=False)
                 l.append([np.sin(a)*i/n, np.cos(a)*i/n])
             return 0, np.concatenate(l, axis=1).T
-     
+
+    def rays_clipping(self, height, pupil_distance, pupil_height,
+            wavelength=None, axis=1, clip=False, **kwargs):
+        yo = (0, height)
+        pd = pupil_distance
+        ph = np.ones(2)*pupil_height
+        try:
+            pd, ph = self.aim_pupil(height, pd, ph[axis], wavelength,
+                    axis=(), **kwargs)
+        except RuntimeError:
+            print("chief failed", height)
+            pass
+        y, u = self.system.object.to_pupil(yo, (0, 0), pd, ph[axis])
+        ys, us = [y], [u]
+        for t in -1, 1:
+            yp = [0, 0]
+            yp[axis] = t
+            y, u = self.system.object.to_pupil(yo, yp, pd, ph[axis])
+            try:
+                y, u = self.aim(y, u, wavelength, axis=axis, target=t, stop=-1)
+            except RuntimeError:
+                print("clipping aim failed", height, t)
+                pass
+            ys.append(y)
+            us.append(u)
+        y, u = np.vstack(ys), np.vstack(us)
+        self.rays_given(y, u, wavelength)
+        self.propagate(clip=clip)
+
+    def rays_paraxial_clipping(self, paraxial, height=1.,
+            wavelength=None, **kwargs):
+        # TODO: refactor rays_paraxial_*
+        zp = paraxial.pupil_distance[0] + paraxial.z[1]
+        rp = paraxial.pupil_height[0]
+        return self.rays_clipping(height, zp, rp, wavelength, **kwargs)
+
     def rays_point(self, height, pupil_distance, pupil_height,
             wavelength=None, nrays=11, distribution="meridional",
             clip=False, aim=(0, 1)):

@@ -92,10 +92,9 @@ class Analysis(object):
             self.paraxial.plot(ax)
         if self.plot_full:
             t.plot(ax)
-        for h in self.plot_heights:
+        for h in 0, max(self.plot_heights):
             t = FullTrace(self.system)
-            t.rays_paraxial_point(self.paraxial, h,
-                    nrays=self.plot_rays, clip=False)
+            t.rays_paraxial_clipping(self.paraxial, h)
             t.plot(ax)
         
         if self.plot_transverse is True:
