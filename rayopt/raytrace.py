@@ -31,7 +31,7 @@ from scipy.optimize import newton
 # from .special_sums import polar_sum
 from .aberration_orders import aberration_extrinsic
 from .elements import Spheroid
-from .utils import sinarctan
+from .utils import sinarctan, tanarcsin
 
 
 class Trace(object):
@@ -317,10 +317,9 @@ class ParaxialTrace(Trace):
     # TODO introduce aperture at argmax(abs(y_axial)/radius)
     # or at argmin(abs(u_axial))
 
-    def size_elements(self):
+    def resize(self):
         for e, y in zip(self.system[1:], self.y[1:]):
             e.radius = np.fabs(y).sum() # axial+chief
-        self.system.image.radius = abs(self.height[1])
 
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
@@ -333,7 +332,7 @@ class ParaxialTrace(Trace):
         self.system[i].curvature = c
         self.propagate()
 
-    def focal_plane_solve(self):
+    def refocus(self):
         self.system.image.thickness -= self.y[-1, 0]/self.u[-1, 0]
         self.propagate()
        
@@ -369,6 +368,15 @@ class FullTrace(Trace):
         for i, e in enumerate(self.system[start:stop or self.length]):
             y, u, n, t = e.transformed_yu(e.propagate, y, u, n, l, clip)
             self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
+
+    def refocus(self):
+        y = self.y[-1, :, :2]
+        u = tanarcsin(self.u[-2])[:, :2]
+        good = np.all(np.isfinite(u), axis=1)
+        y, u = y[good], u[good]
+        y, u = (y - y.mean(0)).ravel(), (u - u.mean(0)).ravel()
+        t = -np.dot(y, u)/np.dot(u, u)
+        self.system.image.thickness += t
 
     def opd(self, chief=0, radius=None, after=-2):
         t = self.t[:after + 1].sum(0)
@@ -620,7 +628,7 @@ class FullTrace(Trace):
         rp = paraxial.pupil_height[0]
         return self.rays_line(height, zp, rp, wavelength, **kwargs)
 
-    def size_elements(self, fn=lambda a, b: a):
+    def resize(self, fn=lambda a, b: a):
         r = np.sqrt(np.square(self.y[:, :, :2]).sum(2))
         for e, ri in zip(self.system[1:], r[1:]):
             e.radius = fn(ri, e.radius)

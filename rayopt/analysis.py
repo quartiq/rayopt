@@ -41,10 +41,11 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 class Analysis(object):
     figwidth = 12.
     resize = True
-    refocus = True
+    refocus_paraxial = True
     print_system = True
     print_paraxial = True
     resize_full = False
+    refocus_full = True
     print_full = False
     plot_paraxial = False
     plot_full = False
@@ -68,12 +69,23 @@ class Analysis(object):
 
     def run(self):
         self.paraxial = ParaxialTrace(self.system)
-        if self.refocus:
-            self.paraxial.focal_plane_solve()
+        if self.refocus_paraxial:
+            self.paraxial.refocus()
         if self.resize:
-            self.paraxial.size_elements()
+            self.paraxial.resize()
             self.system.fix_sizes()
         self.system.image.radius = abs(self.paraxial.height[1])
+        if self.resize_full:
+            t = FullTrace(self.system)
+            t.rays_paraxial(self.paraxial)
+            t.resize()
+            self.system.fix_sizes()
+        if self.refocus_full:
+            t = FullTrace(self.system)
+            t.rays_paraxial_point(self.paraxial, 0.,
+                    nrays=100, distribution="hexapolar", clip=True)
+            t.refocus()
+            self.paraxial.propagate()
         if self.print_system:
             self.text.append(unicode(self.system))
         if self.print_paraxial:
@@ -96,9 +108,6 @@ class Analysis(object):
             t = FullTrace(self.system)
             t.rays_paraxial_clipping(self.paraxial, h)
             t.plot(ax)
-        if self.resize_full:
-            t.size_elements()
-            self.system.fix_sizes()
        
         if self.plot_transverse is True:
             self.plot_transverse = self.plot_heights
@@ -324,7 +333,7 @@ class Analysis(object):
             wavelengths = self.system.object.wavelengths
         axd, axc, axf, axs, axa = ax
         for axi, xl, yl, tl in [
-                (axd, "EY", "%DEY", "DIST", ),
+                (axd, "EY", "%DEY", "DIST"),
                 (axc, "EY", "DEY", "TCOLOR"),
                 (axf, "EY", "DEZ", "ASTIG"),
                 (axs, "PY", "DEZ", "SPHA"),
@@ -358,13 +367,14 @@ class Analysis(object):
         wl, wu = min(wavelengths), max(wavelengths)
         ww = np.linspace(wl - (wu - wl)/4, wu + (wu - wl)/4, nrays)
         zc = []
-        for wwi in ww:
+        ph, pd = paraxial.pupil_distance[0], paraxial.pupil_height[0]
+        for wwi in np.r_[wavelengths[0], ww]:
             t = FullTrace(self.system)
-            y, u = self.system.object.to_pupil((0, 0), (0, 1e-3),
-                    paraxial.pupil_distance[0], paraxial.pupil_height[0])
+            y, u = self.system.object.to_pupil((0, 0), (0, 1e-3), ph, pd)
             t.rays_given(y, u, wwi)
             t.propagate(clip=False)
             zc.append(-t.y[-1, 0, 1]/tanarcsin(t.u[-2])[0, 1])
+        zc = np.array(zc[1:]) - zc[0]
         axa.plot(ww, zc, "-")
         for axi in ax:
             self.post_setup_axes(axi)
