@@ -17,7 +17,10 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function, absolute_import, division
+
 import numpy as np
+
 
 def angle_sum(m, angle, aspect=1., binsize=None):
     """Compute the sum of a 2D array along an rotated axis.
@@ -57,7 +60,7 @@ def angle_sum(m, angle, aspect=1., binsize=None):
     center value will always end up in the center bin.
 
     For angle=3/4*pi the summation is along the diagonal.
-    For angle=3/4*pi the summation is along the antidiagonal.
+    For angle=1/4*pi the summation is along the antidiagonal.
    
     The origin of the rotation is the [0,0] index. This determines the
     bin rounding.
@@ -136,7 +139,7 @@ def angle_sum(m, angle, aspect=1., binsize=None):
     # original coordinates
     i, j = np.ogrid[:m.shape[0], :m.shape[1]]
     # output coordinate
-    k = (np.cos(angle)*aspect/binsize)*j-(np.sin(angle)/binsize)*i
+    k = (np.cos(angle)*aspect/binsize)*j - (np.sin(angle)/binsize)*i
     # output array size
     cx, cy = (0, 0, -1, -1), (0, -1, 0, -1)
     km = k[cx, cy].min()
@@ -144,7 +147,7 @@ def angle_sum(m, angle, aspect=1., binsize=None):
     #assert k.min() == km
     #assert k.max() == kp
     # output bin index
-    k = np.floor(k-(km-.5)).astype(np.int)
+    k = np.floor(k - (km - .5)).astype(np.int)
     return np.bincount(k.ravel(), m.ravel()) #, minlength=kp-km
 
 
@@ -195,7 +198,7 @@ def polar_sum(m, center, direction, aspect=1., binsize=None):
     The azimuthal bins are therefore [-pi, -pi+binsize),
     [-pi+binsize, 2*binsize), ... up to [p-binsize, p) for some p with 
     pi-binsize <= p < pi. The values at +pi end up in the first bin.
-    See arctan2() for the definition of the behaviour other special
+    See arctan2() for the definition of the behaviour in other special
     cases.
 
     There is no interpolation and artefacts are likely if this function
@@ -204,7 +207,8 @@ def polar_sum(m, center, direction, aspect=1., binsize=None):
     The full array sum is always strictly conserved:
         polar_sum(m, ...).sum() == m.sum()
 
-    The function uses (coordinate).astype(np.int) to bin.
+    The function uses (coordinate).astype(np.int) to bin (c.f. around,
+    trunc, rint).
 
     Examples
     --------
@@ -237,18 +241,18 @@ def polar_sum(m, center, direction, aspect=1., binsize=None):
     m = np.atleast_2d(m)
     # original coordinates
     i, j = np.ogrid[:m.shape[0], :m.shape[1]]
-    i, j = i-center[0], j-center[1]
+    i, j = i - center[0], j - center[1]
     # output coordinate
     if direction == "azimuthal":
-        k = (j**2*aspect**2+i**2)**.5
+        k = (j**2*aspect**2 + i**2)**.5
         if binsize is None:
             binsize = min(1., aspect)
         minlength = None
     elif direction == "radial":
-        k = np.arctan2(i, j*aspect)+np.pi
+        k = np.arctan2(i, j*aspect) + np.pi
         if binsize is None:
             binsize = 2*np.pi/100
-        minlength = int(2*np.pi/binsize)+1
+        minlength = int(2*np.pi/binsize) + 1
     else:
         raise ValueError("direction needs to be 'radial' or 'azimuthal'")
     k = (k/binsize).astype(np.int)
