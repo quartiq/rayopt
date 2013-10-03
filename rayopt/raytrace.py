@@ -42,13 +42,13 @@ class Trace(object):
         self.length = len(self.system)
 
     def print_coeffs(self, coeff, labels, sum=True):
-        yield ("%2s %1s" + "% 10s" * len(labels)) % (
-                ("#", "T") + tuple(labels))
-        fmt = "%2s %1s" + "% 10.4g" * len(labels)
+        yield (u"%2s %1s" + u"% 10s" * len(labels)) % (
+                (u"#", u"T") + tuple(labels))
+        fmt = u"%2s %1s" + u"% 10.4g" * len(labels)
         for i, a in enumerate(coeff):
             yield fmt % ((i, self.system[i].typ) + tuple(a))
         if sum:
-            yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
+            yield fmt % ((u" ∑", u"") + tuple(coeff.sum(0)))
 
 
 class ParaxialTrace(Trace):
@@ -235,6 +235,11 @@ class ParaxialTrace(Trace):
         return 1.22*self.l/(2*na)/self.system.scale
 
     @property
+    def rayleigh_range(self):
+        r = self.airy_radius
+        return np.pi*r**2/self.l*self.system.scale
+
+    @property
     def magnification(self):
         mt = (self.n[0]*self.u[0, 0])/(self.n[-2]*self.u[-2, 0])
         ma = self.u[-2, 1]/self.u[0, 1]
@@ -388,7 +393,7 @@ class FullTrace(Trace):
         ti = Spheroid(curvature=1./radius).intercept(y, u)
         t += ti*self.n[after]
         t -= t[chief]
-        return t/self.l
+        return -t/(self.l/self.system.scale)
 
     def rays_paraxial(self, paraxial):
         y = np.zeros((2, 2))
