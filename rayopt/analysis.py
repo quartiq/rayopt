@@ -82,9 +82,6 @@ class Analysis(object):
         t.rays_paraxial(self.paraxial)
         if self.print_full:
             self.text.append(unicode(t))
-        if self.resize_full:
-            t.size_elements()
-            self.system.fix_sizes()
         figheight = 2*max(e.radius for e in self.system)
         figheight = min(figheight/self.paraxial.z[-1]*self.figwidth,
                 2*self.figwidth/3)
@@ -99,7 +96,10 @@ class Analysis(object):
             t = FullTrace(self.system)
             t.rays_paraxial_clipping(self.paraxial, h)
             t.plot(ax)
-        
+        if self.resize_full:
+            t.size_elements()
+            self.system.fix_sizes()
+       
         if self.plot_transverse is True:
             self.plot_transverse = self.plot_heights
         if self.plot_transverse:
@@ -109,8 +109,8 @@ class Analysis(object):
             self.transverse(fig, self.plot_transverse)
 
         if self.plot_longitudinal:
-            fig, ax = plt.subplots(1, 4,
-                    figsize=(self.figwidth, self.figwidth/3))
+            fig, ax = plt.subplots(1, 5,
+                    figsize=(self.figwidth, self.figwidth/5))
             self.figures.append(fig)
             self.longitudinal(ax, max(self.plot_transverse))
 
@@ -137,11 +137,16 @@ class Analysis(object):
         return self.text, self.figures
 
     @staticmethod
-    def setup_axes(ax, xlabel=None, ylabel=None, title=None):
+    def setup_axes(ax, xlabel=None, ylabel=None, title=None, xzero=True,
+            yzero=True):
         ax.spines["right"].set_visible(False)
         ax.spines["top"].set_visible(False)
-        ax.spines["left"].set_position("zero")
-        ax.spines["bottom"].set_position("zero")
+        if yzero:
+            ax.spines["left"].set_position("zero")
+            ax.yaxis.set_major_formatter(CenteredFormatter())
+        if xzero:
+            ax.spines["bottom"].set_position("zero")
+            ax.xaxis.set_major_formatter(CenteredFormatter())
         ax.tick_params(bottom=True, top=False,
                 left=True, right=False,
                 labeltop=False, labelright=False,
@@ -149,8 +154,6 @@ class Analysis(object):
                 direction="out", axis="both")
         ax.xaxis.set_smart_bounds(True)
         ax.yaxis.set_smart_bounds(True)
-        ax.xaxis.set_major_formatter(CenteredFormatter())
-        ax.yaxis.set_major_formatter(CenteredFormatter())
         ax.locator_params(tight=True, nbins=4)
         kw = dict(rotation="horizontal")
         if xlabel:
@@ -196,8 +199,8 @@ class Analysis(object):
         return ax
 
     @classmethod
-    def pre_setup_xyplot(cls, axi):
-        cls.setup_axes(axi)
+    def pre_setup_xyplot(cls, axi, **kwargs):
+        cls.setup_axes(axi, **kwargs)
         axi.set_aspect("equal")
         axi.spines["left"].set_visible(False)
         axi.spines["bottom"].set_visible(False)
@@ -283,9 +286,7 @@ class Analysis(object):
         h = paraxial.pupil_height[0]
         mm = None
         for hi, axi in zip(heights, ax):
-            axi.text(.5, 1., "OY=%s" % hi,
-                    transform=axi.transAxes,
-                    horizontalalignment="center")
+            axi.set_title("OY=%s" % hi)
             t = FullTrace(self.system)
             ref = t.rays_paraxial_point(paraxial, hi, wavelength,
                     nrays=nrays, distribution="hexapolar", clip=True)
@@ -321,29 +322,49 @@ class Analysis(object):
         # longitudinal spherical: marginal focus vs height (vs wl)
         if wavelengths is None:
             wavelengths = self.system.object.wavelengths
-        axd, axf, axs, axc = ax
+        axd, axc, axf, axs, axa = ax
         for axi, xl, yl, tl in [
-                (axd, "EY", "DEY", "DIST"),
-                (axf, "EY", "DEZ", "FIELD"),
-                (axc, "EY", "DEY", "TCHA"),
-                (axs, "EY", "DEZ", "SPHA"),
+                (axd, "EY", "%DEY", "DIST", ),
+                (axc, "EY", "DEY", "TCOLOR"),
+                (axf, "EY", "DEZ", "ASTIG"),
+                (axs, "PY", "DEZ", "SPHA"),
+                (axa, "EY", "DEZ", "LCOLOR"),
                 ]:
-            self.setup_axes(axi, xl, yl, tl)
-        #m = paraxial.magnification[0]
+            self.setup_axes(axi, xl, yl, tl, yzero=False)
         h = np.linspace(0, height*paraxial.height[1], nrays)
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
             t = FullTrace(self.system)
             t.rays_paraxial_line(paraxial, height, wi, nrays=nrays)
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
             p, q, r = np.split(tanarcsin(t.u[-2]).T, (nrays, 2*nrays), axis=1)
-            xd = (a[1] - h)/h
-            xd[0] = np.nan
-            axd.plot(a[1], xd, ci+"-", label="%s" % wi)
+            if i == 0:
+                xd = (a[1] - h)/h
+                xd[0] = np.nan
+                axd.plot(a[1], xd, ci+"-", label="%s" % wi)
+                a0 = a
+            else:
+                axc.plot(a[1], a[1] - a0[1], ci+"-", label="%s" % wi)
             xt = -(b[1]-a[1])/(q[1]-p[1])
             axf.plot(a[1], xt, ci+"-", label="EZt %s" % wi)
             xs = -(c[0]-a[0])/(r[0]-p[0])
             axf.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
-            #xs = (t.n[0, :nrays]*u[0, /t.n[-2]* - m)/m
-            #axa.plot(a[1], xa, ci+"-", label="DM")
+            t = FullTrace(self.system)
+            t.rays_paraxial_point(paraxial, 0., wi, nrays=nrays,
+                    distribution="half-meridional")
+            p = paraxial.pupil_distance[0]
+            py = t.y[1, :, 1] + p*tanarcsin(t.u[0])[:, 1]
+            z = -t.y[-1, :, 1]/tanarcsin(t.u[-2])[:, 1]
+            axs.plot(py, z, ci+"-", label="%s" % wi)
+        wl, wu = min(wavelengths), max(wavelengths)
+        ww = np.linspace(wl - (wu - wl)/4, wu + (wu - wl)/4, nrays)
+        zc = []
+        for wwi in ww:
+            t = FullTrace(self.system)
+            y, u = self.system.object.to_pupil((0, 0), (0, 1e-3),
+                    paraxial.pupil_distance[0], paraxial.pupil_height[0])
+            t.rays_given(y, u, wwi)
+            t.propagate(clip=False)
+            zc.append(-t.y[-1, 0, 1]/tanarcsin(t.u[-2])[0, 1])
+        axa.plot(ww, zc, "-")
         for axi in ax:
             self.post_setup_axes(axi)

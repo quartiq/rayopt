@@ -488,6 +488,8 @@ class FullTrace(Trace):
         n = nrays
         if n == 1:
             return 0, np.zeros((n, 2))
+        elif d == "half-meridional":
+            return 0, np.c_[np.zeros(n), np.linspace(0, 1, n)]
         elif d == "meridional":
             n -= n % 2
             return n/2, np.c_[np.zeros(n + 1), np.linspace(-1, 1, n + 1)]
@@ -619,8 +621,9 @@ class FullTrace(Trace):
         return self.rays_line(height, zp, rp, wavelength, **kwargs)
 
     def size_elements(self, fn=lambda a, b: a):
-        for e, y in zip(self.system[1:], self.y[1:]):
-            e.radius = fn(np.fabs(y).max(), e.radius)
+        r = np.sqrt(np.square(self.y[:, :, :2]).sum(2))
+        for e, ri in zip(self.system[1:], r[1:]):
+            e.radius = fn(ri, e.radius)
 
     def plot(self, ax, axis=1, **kwargs):
         kwargs.setdefault("color", "green")
