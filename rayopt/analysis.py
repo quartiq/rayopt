@@ -51,6 +51,9 @@ class Analysis(object):
     plot_heights = [1., .707, 0.]
     plot_rays = 3
     plot_transverse = True
+    plot_spots = True
+    defocus = 5
+    plot_opds = True
     plot_longitudinal = True
 
     def __init__(self, system, run=True, **kwargs):
@@ -72,13 +75,13 @@ class Analysis(object):
             self.system.fix_sizes()
         self.system.image.radius = abs(self.paraxial.height[1])
         if self.print_system:
-            self.text.append(str(self.system))
+            self.text.append(unicode(self.system))
         if self.print_paraxial:
-            self.text.append(str(self.paraxial))
+            self.text.append(unicode(self.paraxial))
         t = FullTrace(self.system)
         t.rays_paraxial(self.paraxial)
         if self.print_full:
-            self.text.append(str(t))
+            self.text.append(unicode(t))
         if self.resize_full:
             t.size_elements()
             self.system.fix_sizes()
@@ -100,15 +103,37 @@ class Analysis(object):
         if self.plot_transverse is True:
             self.plot_transverse = self.plot_heights
         if self.plot_transverse:
-            figheight = self.figwidth*len(self.plot_transverse)/6
+            figheight = self.figwidth*len(self.plot_transverse)/5
             fig = plt.figure(figsize=(self.figwidth, figheight))
             self.figures.append(fig)
             self.transverse(fig, self.plot_transverse)
 
         if self.plot_longitudinal:
-            fig = plt.figure(figsize=(self.figwidth/3, self.figwidth/6))
+            fig, ax = plt.subplots(1, 4,
+                    figsize=(self.figwidth, self.figwidth/3))
             self.figures.append(fig)
-            self.longitudinal(fig, max(self.plot_transverse))
+            self.longitudinal(ax, max(self.plot_transverse))
+
+        if self.plot_spots is True:
+            self.plot_spots = self.plot_heights
+        if self.plot_spots:
+            figheight = self.figwidth*len(self.plot_spots)/self.defocus
+            fig, ax = plt.subplots(len(self.plot_spots), self.defocus,
+                    figsize=(self.figwidth, figheight), sharex=True,
+                    sharey=True)
+            self.figures.append(fig)
+            self.spots(ax, self.plot_spots)
+
+        if self.plot_opds is True:
+            self.plot_opds = self.plot_heights
+        if self.plot_opds:
+            figheight = self.figwidth/len(self.plot_opds)
+            fig, ax = plt.subplots(1, len(self.plot_opds),
+                    figsize=(self.figwidth, figheight), sharex=True,
+                    sharey=True)
+            self.figures.append(fig)
+            self.opds(ax, self.plot_opds)
+
         return self.text, self.figures
 
     @staticmethod
@@ -148,106 +173,147 @@ class Analysis(object):
 
     @classmethod
     def pre_setup_fanplot(cls, fig, n):
-        gs = gridspec.GridSpec(n, 6)
-        axpx0, axpx1, axey0, axex0, axpy0 = None, None, None, None, None
+        gs = gridspec.GridSpec(n, 4)
+        axpx, axe, axpy = None, None, None
         ax = []
         for i in range(n):
-            axo = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 1),
-                    aspect="equal", sharex=axpx0, sharey=axpy0)
-            axpx0 = axpx0 or axo
-            axpy0 = axpy0 or axo
-            axp = fig.add_subplot(gs.new_subplotspec((i, 1), 1, 1),
-                    aspect="equal", sharex=axex0, sharey=axey0)
-            axey0 = axey0 or axp
-            axex0 = axex0 or axp
-            axm = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 2),
-                    sharex=axpx0, sharey=axey0)
-            axsm = fig.add_subplot(gs.new_subplotspec((i, 4), 1, 1),
-                    sharex=axpx1, sharey=axey0)
-            axpx1 = axpx1 or axsm
-            axss = fig.add_subplot(gs.new_subplotspec((i, 5), 1, 1),
-                    sharex=axpx1, sharey=axey0)
-            ax.append((axp, axm, axsm, axss, axo))
+            axm = fig.add_subplot(gs.new_subplotspec((i, 0), 1, 2),
+                    sharex=axpy, sharey=axe)
+            axpy = axpy or axm
+            axe = axe or axm
+            axsm = fig.add_subplot(gs.new_subplotspec((i, 2), 1, 1),
+                    sharex=axpx, sharey=axe)
+            axpx = axpx or axsm
+            axss = fig.add_subplot(gs.new_subplotspec((i, 3), 1, 1),
+                    sharex=axpx, sharey=axe)
+            ax.append((axm, axsm, axss))
             for axi, xl, yl in [
-                    (axp, "EX", "EY"),
                     (axm, "PY", "EY"),
                     (axsm, "PX", "EY"),
                     (axss, "PX", "EX"),
-                    (axo, "PX", "PY"),
                     ]:
                 cls.setup_axes(axi, xl, yl)
-            for axi in axp, axo:
-                axi.spines["left"].set_visible(False)
-                axi.spines["bottom"].set_visible(False)
-                axi.tick_params(bottom=False, left=False,
-                        labelbottom=False, labelleft=False)
         return ax
 
+    @classmethod
+    def pre_setup_xyplot(cls, axi):
+        cls.setup_axes(axi)
+        axi.set_aspect("equal")
+        axi.spines["left"].set_visible(False)
+        axi.spines["bottom"].set_visible(False)
+        axi.tick_params(bottom=False, left=False,
+                labelbottom=False, labelleft=False)
+
     def transverse(self, fig, heights=[1., .707, 0.],
-            wavelengths=None, nrays_spot=200, nrays_line=152,
+            wavelengths=None, nrays_line=152,
             colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.object.wavelengths
-        nh = len(heights)
-        ia = self.system.aperture_index
-        ax = self.pre_setup_fanplot(fig, nh)
+        ax = self.pre_setup_fanplot(fig, len(heights))
         p = paraxial.pupil_distance[0]
-        h = paraxial.pupil_height[0]
-        r = paraxial.airy_radius[1]
         for hi, axi in zip(heights, ax):
-            axp, axm, axsm, axss, axo = axi
-            axp.add_patch(mpl.patches.Circle((0, 0), r, edgecolor="black",
-                facecolor="none"))
-            axo.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
-                    transform=axo.transAxes,
+            axm, axsm, axss = axi
+            axm.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
+                    transform=axm.transAxes,
                     verticalalignment="center")
-            for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
-                t = FullTrace(self.system)
-                ref = t.rays_paraxial_point(paraxial, hi, wi,
-                        nrays=nrays_spot, distribution="hexapolar",
-                        clip=True)
-                # plot transverse image plane hit pattern (ray spot)
-                exy = t.y[-1, :, :2]
-                exy -= exy[ref]
-                axp.plot(exy[:, 0], exy[:, 1], ".%s" % ci,
-                        markersize=3, markeredgewidth=0, label="%s" % wi)
-                if i == 0:
-                    # plot opd over entrance pupil
-                    pxy = t.y[1, :, :2] + p*tanarcsin(t.u[0])
-                    #pp = paraxial.pupil_distance[1]
-                    #pxy = t.y[-2, :, :2] + pp*tanarcsin(t.u[-2, :])
-                    pxy -= pxy[ref]
-                    o = t.opd(ref)
-                    # griddata barfs on nans
-                    xyo = np.r_[pxy.T, [o]]
-                    x, y, o = xyo[:, np.all(np.isfinite(xyo), axis=0)]
-                    if len(o):
-                        n = 4*nrays_spot**.5
-                        xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
-                        os = griddata(x, y, o, xs, ys)
-                        mm = np.fabs(o).max()
-                        v = np.linspace(-mm, mm, 21)
-                        axo.contour(xs, ys, os, v, cmap=plt.cm.RdBu_r)
-                    #axo.set_title("max=%.2gl" % mm)
-                    # TODO normalize opd across heights
+            for wi, ci in zip(wavelengths, colors):
                 t = FullTrace(self.system)
                 ref = t.rays_paraxial_point(paraxial, hi, wi,
                         nrays=nrays_line, distribution="tee", clip=True)
                 # plot transverse image plane versus entrance pupil
                 # coordinates
-                exy = t.y[-1, :, :2]
-                exy -= exy[ref]
-                pxy = t.y[1, :, :2] + p*tanarcsin(t.u[0])
-                pxy -= pxy[ref]
-                axm.plot(pxy[:ref, 1], exy[:ref, 1], "-%s" % ci, label="%s" % wi)
-                axsm.plot(pxy[ref:, 0], exy[ref:, 1], "-%s" % ci, label="%s" % wi)
-                axss.plot(pxy[ref:, 0], exy[ref:, 0], "-%s" % ci, label="%s" % wi)
+                y = t.y[-1, :, :2] - t.y[-1, ref, :2]
+                py = t.y[1, :, :2] + p*tanarcsin(t.u[0])
+                py -= py[ref]
+                axm.plot(py[:ref, 1], y[:ref, 1], "-%s" % ci, label="%s" % wi)
+                axsm.plot(py[ref:, 0], y[ref:, 1], "-%s" % ci, label="%s" % wi)
+                axss.plot(py[ref:, 0], y[ref:, 0], "-%s" % ci, label="%s" % wi)
         for axi in ax:
             for axii in axi:
                 self.post_setup_axes(axii)
 
-    def longitudinal(self, fig, height=1.,
+    def spots(self, ax, heights=[1., .707, 0.],
+            wavelengths=None, nrays=200, colors="grbcmyk"):
+        paraxial = self.paraxial
+        if wavelengths is None:
+            wavelengths = self.system.object.wavelengths
+        nh = len(heights)
+        nd = ax.shape[1]
+        for axi in ax.flat:
+            self.pre_setup_xyplot(axi)
+        z = paraxial.rayleigh_range[1]
+        z = (np.arange(nd) - nd//2) * z
+        for hi, axi in zip(heights, ax[:, 0]):
+            axi.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
+                    transform=axi.transAxes,
+                    verticalalignment="center")
+        for zi, axi in zip(z, ax[-1, :]):
+            axi.text(.5, -.1, "DZ=%.1g" % zi,
+                    transform=axi.transAxes,
+                    horizontalalignment="center")
+        for hi, axi in zip(heights, ax):
+            for wi, ci in zip(wavelengths, colors):
+                r = paraxial.airy_radius[1]/paraxial.l*wi
+                t = FullTrace(self.system)
+                ref = t.rays_paraxial_point(paraxial, hi, wi,
+                        nrays=nrays, distribution="hexapolar",
+                        clip=True)
+                # plot transverse image plane hit pattern (ray spot)
+                y = t.y[-1, :, :2] - t.y[-1, ref, :2]
+                u = tanarcsin(t.u[-2])
+                for axij, zi in zip(axi, z):
+                    axij.add_patch(mpl.patches.Circle((0, 0), r, edgecolor=ci,
+                        facecolor="none"))
+                    yi = y + zi*u
+                    axij.plot(yi[:, 0], yi[:, 1], ".%s" % ci,
+                            markersize=3, markeredgewidth=0, label="%s" % wi)
+        for axi in ax:
+            for axii in axi:
+                self.post_setup_axes(axii)
+
+    def opds(self, ax, heights=[1., .707, 0.],
+            wavelength=None, nrays=200, colors="grbcmyk"):
+        paraxial = self.paraxial
+        if wavelength is None:
+            wavelength = self.system.object.wavelengths[0]
+        for axi in ax.flat:
+            self.pre_setup_xyplot(axi)
+        p = paraxial.pupil_distance[0]
+        h = paraxial.pupil_height[0]
+        mm = None
+        for hi, axi in zip(heights, ax):
+            axi.text(.5, 1., "OY=%s" % hi,
+                    transform=axi.transAxes,
+                    horizontalalignment="center")
+            t = FullTrace(self.system)
+            ref = t.rays_paraxial_point(paraxial, hi, wavelength,
+                    nrays=nrays, distribution="hexapolar", clip=True)
+            py = t.y[1, :, :2] + p*tanarcsin(t.u[0])
+            # plot opd over entrance pupil
+            #pp = paraxial.pupil_distance[1]
+            #py = t.y[-2, :, :2] + pp*tanarcsin(t.u[-2, :])
+            py -= py[ref]
+            o = t.opd(ref)
+            # griddata barfs on nans
+            xyo = np.r_[py.T, [o]]
+            x, y, o = xyo[:, np.all(np.isfinite(xyo), axis=0)]
+            if len(o):
+                n = 4*nrays**.5
+                xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
+                os = griddata(x, y, o, xs, ys)
+                if mm is None:
+                    mm = np.fabs(o).max()
+                    v = np.linspace(-mm, mm, 21)
+                axi.contour(xs, ys, os, v, cmap=plt.cm.RdBu_r)
+                axi.text(.5, -.1, u"PTP: %.3g" % o.ptp(),
+                        transform=axi.transAxes,
+                        horizontalalignment="center")
+            # TODO normalize opd across heights
+        for axi in ax:
+            self.post_setup_axes(axi)
+
+    def longitudinal(self, ax, height=1.,
             wavelengths=None, nrays=21, colors="grbcmyk"):
         paraxial = self.paraxial
         # lateral color: image relative to image at wl[0]
@@ -255,12 +321,14 @@ class Analysis(object):
         # longitudinal spherical: marginal focus vs height (vs wl)
         if wavelengths is None:
             wavelengths = self.system.object.wavelengths
-        axl = fig.add_subplot(1, 2, 1)
-        self.setup_axes(axl, "EY", "DEY") #, "distortion")
-        axc = fig.add_subplot(1, 2, 2)
-        self.setup_axes(axc, "EY", "EZ") #, "field")
-        #axa = fig.add_subplot(1, 3, 3)
-        #self.setup_axes(axa, "EY", "DM") #, "Abbe sine violation")
+        axd, axf, axs, axc = ax
+        for axi, xl, yl, tl in [
+                (axd, "EY", "DEY", "DIST"),
+                (axf, "EY", "DEZ", "FIELD"),
+                (axc, "EY", "DEY", "TCHA"),
+                (axs, "EY", "DEZ", "SPHA"),
+                ]:
+            self.setup_axes(axi, xl, yl, tl)
         #m = paraxial.magnification[0]
         h = np.linspace(0, height*paraxial.height[1], nrays)
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
@@ -270,13 +338,12 @@ class Analysis(object):
             p, q, r = np.split(tanarcsin(t.u[-2]).T, (nrays, 2*nrays), axis=1)
             xd = (a[1] - h)/h
             xd[0] = np.nan
-            axl.plot(a[1], xd, ci+"-", label="%s" % wi)
+            axd.plot(a[1], xd, ci+"-", label="%s" % wi)
             xt = -(b[1]-a[1])/(q[1]-p[1])
-            axc.plot(a[1], xt, ci+"-", label="EZt %s" % wi)
+            axf.plot(a[1], xt, ci+"-", label="EZt %s" % wi)
             xs = -(c[0]-a[0])/(r[0]-p[0])
-            axc.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
+            axf.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
             #xs = (t.n[0, :nrays]*u[0, /t.n[-2]* - m)/m
             #axa.plot(a[1], xa, ci+"-", label="DM")
-        self.post_setup_axes(axl)
-        self.post_setup_axes(axc)
-        return fig
+        for axi in ax:
+            self.post_setup_axes(axi)
