@@ -366,7 +366,7 @@ class Analysis(object):
             wavelengths = self.system.object.wavelengths
         axd, axc, axf, axs, axa = ax
         for axi, xl, yl, tl in [
-                (axd, "EY", "%DEY", "DIST"),
+                (axd, "EY", "REY", "DIST"),
                 (axc, "EY", "DEY", "TCOLOR"),
                 (axf, "EY", "DEZ", "ASTIG"),
                 (axs, "PY", "DEZ", "SPHA"),
