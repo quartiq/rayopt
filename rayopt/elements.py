@@ -100,19 +100,18 @@ class Primitive(NameMixin, TransformMixin):
 
     def propagate_paraxial(self, yu0, n0, l):
         n, m = self.paraxial_matrix(n0, l)
-        yu0 = np.atleast_2d(yu0)
-        yu = np.dot(m, yu0.T).T
+        yu = np.dot(yu0, m.T)
         return yu, n
 
     def propagate_gaussian(self, q0, n0, l):
         n, m = self.paraxial_matrix(n0, l)
-        q = np.dot((q0, 1.), m.T)
+        q = np.dot((q0, 1), m.T)
         q = q[0]/q[1]
         return q, n
 
     def paraxial_matrix(self, n0, l):
         d = self.thickness
-        return n0, np.array([[1., d], [0, 1]])
+        return n0, np.array([[1, d], [0, 1]])
 
     def propagate(self, y0, u0, n0, l, clip=True):
         # length up to surface
@@ -139,7 +138,7 @@ class Primitive(NameMixin, TransformMixin):
     def surface_cut(self, axis, points):
         rad = self.radius
         if not np.isfinite(rad):
-            rad = 1.
+            rad = 1
         xyz = np.zeros((points, 3))
         xyz[:, axis] = np.linspace(-rad, rad, points)
         return xyz
@@ -312,7 +311,7 @@ class Spheroid(Interface):
         u, ub = u
         f, g = (self.curvature*y + u)*n0, (self.curvature*yb + ub)*n0
         c = np.zeros((2, 2, kmax, kmax, kmax))
-        aberration_intrinsic(self.curvature, f, g, y, yb, 1./n0, 1./n,
+        aberration_intrinsic(self.curvature, f, g, y, yb, 1/n0, 1/n,
                 c, kmax - 1)
         return c
 
@@ -372,7 +371,7 @@ class Aperture(Primitive):
     def surface_cut(self, axis, points):
         r = self.radius
         if not np.isfinite(r):
-            r = 1.
+            r = 1
         xyz = np.zeros((5, 3))
         xyz[:, axis] = np.array([-r*1.5, -r, np.nan, r, r*1.5])
         return xyz
