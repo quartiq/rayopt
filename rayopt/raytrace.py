@@ -565,19 +565,16 @@ class FullTrace(Trace):
                 **kwargs)
         good = np.isfinite(o)
         n = np.count_nonzero(good)
-        o = np.where(good, np.exp(2j*np.pi*o)/n**.5, 0)
+        o = np.where(good, np.exp(-2j*np.pi*o), 0)/n**.5
         if resample:
             # FIXME resample assumes constant amplitude in exit pupil
             nx, ny = (i*pad for i in o.shape)
-            dx = x[1, 0] - x[0, 0]
             apsf = np.fft.fft2(o, (nx, ny))
-            psf = (apsf*apsf.conj()).real
-            p = np.fft.fftfreq(nx, dx)[:, None]
-            q = np.fft.fftfreq(ny, dx)[None, :]
-            k = 2*np.pi/(self.l/self.system.scale)
-            p *= radius/k
-            q *= radius/k
-            p, q = np.broadcast_arrays(p, q)
+            psf = (apsf*apsf.conj()).real/apsf.size
+            dx = x[1, 0] - x[0, 0]
+            k = 1/(self.l/self.system.scale)
+            f = np.fft.fftfreq(nx, dx)*radius/k
+            p, q = np.broadcast_arrays(f[:, None], f)
         else:
             raise NotImplementedError
             n = self.y.shape[1]**.5

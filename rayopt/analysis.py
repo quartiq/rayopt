@@ -326,25 +326,31 @@ class Analysis(object):
             axp.add_patch(mpl.patches.Circle((0, 0), r,
                     edgecolor="green", facecolor="none"))
             x, y, psf = t.psf(ref)
+            dx = x[1, 0] - x[0, 0]
             axp.contour(np.fft.fftshift(x), np.fft.fftshift(y),
-                    np.fft.fftshift(psf), cmap=plt.cm.Greys)
+                    np.fft.fftshift(np.log10(psf)), 11, vmin=-10,
+                    vmax=0, cmap=plt.cm.Reds, alpha=.3)
+            axp.contour(np.fft.fftshift(x), np.fft.fftshift(y),
+                    np.fft.fftshift(psf), 21, vmin=0, cmap=plt.cm.Greys)
             ee = polar_sum(np.fft.fftshift(psf),
                     (psf.shape[0]/2, psf.shape[1]/2), "azimuthal")
             ee = np.cumsum(ee)
             if rm is None:
-                rm = np.argwhere(ee > .9)[0]*2
+                rm = np.searchsorted(ee, .9)*1.5*dx
             axp.set_xlim(-rm, rm)
             axp.set_ylim(-rm, rm)
-            xe = np.arange(ee.size)*(x[1, 0] - x[0, 0])
+            xe = np.arange(ee.size)*dx
             axe.plot(xe, ee, "k-")
             axe.set_xlim(0, rm)
             axe.set_ylim(0, 1)
             axe.set_aspect("auto")
             for i, ci in enumerate(("-", "--")):
-                ot = np.fft.ifft(psf.sum(i))[:psf.shape[i]/2]
-                ot /= ot[0]
-                axm.plot(np.absolute(ot), "k"+ci)
-            axm.set_xlim(0, 1/rm)
+                ot = np.fft.ifft(psf.sum(i)*psf.size**.5)
+                of = np.fft.fftfreq(ot.size, dx)
+                ot, of = ot[:ot.size/2], of[:of.size/2]
+                axm.plot(of, np.absolute(ot), "k"+ci)
+                #axm.plot(of, ot.real, "k"+ci)
+            axm.set_xlim(0, 1/r)
             axm.set_ylim(0, 1)
         for axi in ax:
             for axij in axi:
