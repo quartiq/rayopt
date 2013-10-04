@@ -27,8 +27,8 @@ import itertools
 
 import numpy as np
 from scipy.optimize import newton
+from scipy.interpolate import griddata
 
-# from .special_sums import polar_sum
 from .aberration_orders import aberration_extrinsic
 from .elements import Spheroid
 from .utils import sinarctan, tanarcsin
@@ -371,14 +371,15 @@ class FullTrace(Trace):
 
     def refocus(self):
         y = self.y[-1, :, :2]
-        u = tanarcsin(self.u[-2])[:, :2]
+        u = tanarcsin(self.u[-2])
         good = np.all(np.isfinite(u), axis=1)
         y, u = y[good], u[good]
         y, u = (y - y.mean(0)).ravel(), (u - u.mean(0)).ravel()
+        # solution of sum((y+tu-sum(y+tu)/n)**2) == min
         t = -np.dot(y, u)/np.dot(u, u)
         self.system.image.thickness += t
 
-    def opd(self, chief=0, radius=None, after=-2):
+    def opd(self, chief=0, radius=None, after=-2, resample=4):
         t = self.t[:after + 1].sum(0)
         if self.system.object.infinite:
             # input reference sphere is a tilted plane
@@ -393,15 +394,59 @@ class FullTrace(Trace):
         # center sphere on chief image
         y = self.y[after] - self.y[-1, chief]
         y[:, 2] -= self.z[-1] - self.z[after]
-        u = self.u[after]
+        #u = self.u[after]
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
-        #u = -y/np.sqrt(np.square(y).sum(1))[:, None]
+        u = -y/np.sqrt(np.square(y).sum(1))[:, None]
         y[:, 2] += radius
         ti = Spheroid(curvature=1./radius).intercept(y, u)
         t += ti*self.n[after]
-        t -= t[chief]
-        return -t/(self.l/self.system.scale)
+        t = -(t - t[chief])/(self.l/self.system.scale)
+        py = y + ti[:, None]*u
+        py[:, 2] -= radius
+        py -= py[chief]
+        x, y, z = py.T
+        if resample:
+            pyt = np.vstack((x, y, t))
+            x, y, t = pyt[:, np.all(np.isfinite(pyt), axis=0)]
+            if not t.size:
+                raise ValueError("no rays made it through")
+            n = resample*self.y.shape[1]**.5
+            h = np.fabs((x, y)).max()
+            xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
+            ts = griddata((x, y), t, (xs, ys))
+            x, y, t = xs, ys, ts
+        else:
+            x, y = py.T
+        return x, y, t
+
+    def psf(self, chief=0, pad=4, resample=4, **kwargs):
+        radius = self.system.image.thickness
+        x, y, o = self.opd(chief, resample=resample, radius=radius,
+                **kwargs)
+        good = np.isfinite(o)
+        n = np.count_nonzero(good)
+        o = np.where(good, np.exp(2j*np.pi*o)/n**.5, 0)
+        if resample:
+            # FIXME resample assumes constant amplitude in exit pupil
+            nx, ny = (i*pad for i in o.shape)
+            dx = x[1, 0] - x[0, 0]
+            apsf = np.fft.fft2(o, (nx, ny))
+            psf = (apsf*apsf.conj()).real
+            p = np.fft.fftfreq(nx, dx)[:, None]
+            q = np.fft.fftfreq(ny, dx)[None, :]
+            k = 2*np.pi/(self.l/self.system.scale)
+            p *= radius/k
+            q *= radius/k
+            p, q = np.broadcast_arrays(p, q)
+        else:
+            raise NotImplementedError
+            n = self.y.shape[1]**.5
+            radius/2*np.pi*self.l/self.system.scale
+            r = 3*x.max()
+            p, q = np.mgrid[-1:1:1j*n, -1:1:1j*n]*r
+            np.einsum("->", o, x, y)
+        return p, q, psf
 
     def rays_paraxial(self, paraxial):
         y = np.zeros((2, 2))

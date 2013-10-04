@@ -21,11 +21,11 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.mlab import griddata
 from matplotlib import gridspec
 
 from .raytrace import ParaxialTrace, FullTrace
 from .utils import tanarcsin
+from .special_sums import polar_sum
 
 
 class CenteredFormatter(mpl.ticker.ScalarFormatter):
@@ -136,10 +136,10 @@ class Analysis(object):
         if self.plot_opds is True:
             self.plot_opds = self.plot_heights
         if self.plot_opds:
-            figheight = self.figwidth/len(self.plot_opds)
-            fig, ax = plt.subplots(1, len(self.plot_opds),
-                    figsize=(self.figwidth, figheight), sharex=True,
-                    sharey=True)
+            figheight = self.figwidth*len(self.plot_opds)/4
+            fig, ax = plt.subplots(len(self.plot_opds), 4,
+                    figsize=(self.figwidth, figheight))
+            #, sharex=True, sharey=True)
             self.figures.append(fig)
             self.opds(ax, self.plot_opds)
 
@@ -289,39 +289,60 @@ class Analysis(object):
         paraxial = self.paraxial
         if wavelength is None:
             wavelength = self.system.object.wavelengths[0]
-        for axi in ax.flat:
-            self.pre_setup_xyplot(axi)
-        p = paraxial.pupil_distance[0]
-        h = paraxial.pupil_height[0]
         mm = None
+        rm = None
+        for hi, axi in zip(heights, ax[:, 0]):
+            axi.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
+                    transform=axi.transAxes,
+                    verticalalignment="center")
         for hi, axi in zip(heights, ax):
-            axi.set_title("OY=%s" % hi)
+            axo, axp, axe, axm = axi
+            self.pre_setup_xyplot(axo)
+            self.pre_setup_xyplot(axp)
+            self.setup_axes(axe, "R", "E")
+            self.setup_axes(axm, "F", "C")
             t = FullTrace(self.system)
             ref = t.rays_paraxial_point(paraxial, hi, wavelength,
                     nrays=nrays, distribution="hexapolar", clip=True)
-            py = t.y[1, :, :2] + p*tanarcsin(t.u[0])
-            # plot opd over entrance pupil
-            #pp = paraxial.pupil_distance[1]
-            #py = t.y[-2, :, :2] + pp*tanarcsin(t.u[-2, :])
-            py -= py[ref]
-            o = t.opd(ref)
-            # griddata barfs on nans
-            xyo = np.r_[py.T, [o]]
-            x, y, o = xyo[:, np.all(np.isfinite(xyo), axis=0)]
-            if len(o):
-                n = 4*nrays**.5
-                xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
-                os = griddata(x, y, o, xs, ys)
-                if mm is None:
-                    mm = np.fabs(o).max()
-                    v = np.linspace(-mm, mm, 21)
-                axi.contour(xs, ys, os, v, cmap=plt.cm.RdBu_r)
-                axi.text(.5, -.1, u"PTP: %.3g" % o.ptp(),
-                        transform=axi.transAxes,
-                        horizontalalignment="center")
-            # TODO normalize opd across heights
+            try:
+                x, y, o = t.opd(ref)
+            except ValueError:
+                continue
+            if mm is None:
+                og = o[np.isfinite(o)]
+                mm = np.fabs(og).max()
+                v = np.linspace(-mm, mm, 21)
+            axo.contour(x, y, o, v, cmap=plt.cm.RdBu_r)
+            axo.text(.5, -.1, u"PTP: %.3g" % og.ptp(),
+                    transform=axo.transAxes,
+                    horizontalalignment="center")
+            r = paraxial.airy_radius[1]/paraxial.l*wavelength
+            axp.add_patch(mpl.patches.Circle((0, 0), r,
+                    edgecolor="green", facecolor="none"))
+            x, y, psf = t.psf(ref)
+            axp.contour(np.fft.fftshift(x), np.fft.fftshift(y),
+                    np.fft.fftshift(psf), cmap=plt.cm.Greys)
+            ee = polar_sum(np.fft.fftshift(psf),
+                    (psf.shape[0]/2, psf.shape[1]/2), "azimuthal")
+            ee = np.cumsum(ee)
+            if rm is None:
+                rm = np.argwhere(ee > .9)[0]*2
+            axp.set_xlim(-rm, rm)
+            axp.set_ylim(-rm, rm)
+            xe = np.arange(ee.size)*(x[1, 0] - x[0, 0])
+            axe.plot(xe, ee, "k-")
+            axe.set_xlim(0, rm)
+            axe.set_ylim(0, 1)
+            axe.set_aspect("auto")
+            for i, ci in enumerate(("-", "--")):
+                ot = np.fft.ifft(psf.sum(i))[:psf.shape[i]/2]
+                ot /= ot[0]
+                axm.plot(np.absolute(ot), "k"+ci)
+            axm.set_xlim(0, 1/rm)
+            axm.set_ylim(0, 1)
         for axi in ax:
-            self.post_setup_axes(axi)
+            for axij in axi:
+                self.post_setup_axes(axij)
 
     def longitudinal(self, ax, height=1.,
             wavelengths=None, nrays=21, colors="grbcmyk"):
