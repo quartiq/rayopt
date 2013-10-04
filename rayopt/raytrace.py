@@ -424,10 +424,44 @@ class GaussianTrace(Trace):
         return (self.q.imag/np.pi/self.n*self.l/self.system.scale)**.5
 
     @property
+    def diverging(self):
+        return self.curvature_radius > 0
+
+    @property
+    def confined(self):
+        return self.rayleigh_range > 0
+
+    @property
+    def intensity_max(self, lambd):
+        return (2/np.pi)**.5/self.waist_radius
+
+    @property
     def eigenmodes(self):
         a, b, c, d = self.system.paraxial_matrix(self.l).flat
         q = np.roots((c, d - a, -b))
         return q
+
+    @property
+    def m(self):
+        a, b, c, d = self.system.paraxial_matrix(self.l).flat
+        m = (a + d)/2
+        return m
+
+    @property
+    def eigenvalues(self):
+        m = self.m
+        m1 = (m**2 - 1+0j)**.5
+        return m + m1, m - m1
+
+    @property
+    def real(self):
+        return (self.m**2).imag == 0
+
+    @property
+    def stable(self):
+        return (self.m**2).real < 1
+
+    # TODO: sagittal, meridional, angled, make_complete
 
     def print_trace(self):
         c = np.c_[self.z, self.curvature_radius, self.spot_radius,
