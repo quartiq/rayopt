@@ -23,7 +23,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-from .raytrace import ParaxialTrace, FullTrace
+from .raytrace import ParaxialTrace, FullTrace, GaussianTrace
 from .utils import tanarcsin
 from .special_sums import polar_sum
 
@@ -42,6 +42,8 @@ class Analysis(object):
     figwidth = 12.
     resize = True
     refocus_paraxial = True
+    trace_gaussian = True
+    print_gaussian = False
     print_system = True
     print_paraxial = True
     resize_full = False
@@ -75,6 +77,10 @@ class Analysis(object):
             self.paraxial.resize()
             self.system.fix_sizes()
         self.system.image.radius = abs(self.paraxial.height[1])
+        if self.trace_gaussian:
+            self.gaussian = GaussianTrace(self.system)
+        if self.print_gaussian:
+            self.text.append(unicode(self.gaussian))
         if self.resize_full:
             t = FullTrace(self.system)
             t.rays_paraxial(self.paraxial)

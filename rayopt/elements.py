@@ -104,6 +104,12 @@ class Primitive(NameMixin, TransformMixin):
         yu = np.dot(m, yu0.T).T
         return yu, n
 
+    def propagate_gaussian(self, q0, n0, l):
+        n, m = self.paraxial_matrix(n0, l)
+        q = np.dot((q0, 1.), m.T)
+        q = q[0]/q[1]
+        return q, n
+
     def paraxial_matrix(self, n0, l):
         d = self.thickness
         return n0, np.array([[1., d], [0, 1]])

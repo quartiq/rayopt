@@ -92,6 +92,7 @@ class ParaxialTrace(Trace):
         yu, n = np.array((self.y[init], self.u[init])).T, self.n[init]
         els = self.system[start:stop or self.length]
         for i, el in enumerate(els):
+            i += start
             yu, n = el.propagate_paraxial(yu, n, self.l)
             (self.y[i], self.u[i]), self.n[i] = yu.T, n
 
@@ -251,6 +252,11 @@ class ParaxialTrace(Trace):
         (assuming no aberrations)"""
         return 4*self.lagrange**2/self.l**2
 
+    @property
+    def eigenrays(self):
+        e, v = np.linalg.eig(self.system.paraxial_matrix(self.l))
+        return e, v
+
     def print_c3(self):
         return self.print_coeffs(self.seidel3,
                 "SA3 CMA3 AST3 PTZ3 DIS3".split())
@@ -280,9 +286,11 @@ class ParaxialTrace(Trace):
         yield "transverse, angular magnification: %s" % self.magnification
 
     def print_trace(self):
-        c = np.c_[self.y[:, 0], self.u[:, 0], self.y[:, 1], self.u[:, 1]]
+        c = np.c_[self.z, self.y[:, 0], self.u[:, 0],
+                self.y[:, 1], self.u[:, 1]]
         return self.print_coeffs(c,
-                "axial y/axial u/chief y/chief u".split("/"), sum=False)
+                "track/axial y/axial u/chief y/chief u".split("/"),
+                sum=False)
 
     def __str__(self):
         t = itertools.chain(
@@ -290,7 +298,7 @@ class ParaxialTrace(Trace):
                 self.print_trace(), ("",),
                 self.print_c3(), ("",),
                 #self.print_h3(), ("",),
-                self.print_c5(),
+                self.print_c5(), ("",),
                 )
         return "\n".join(t)
 
@@ -337,6 +345,134 @@ class ParaxialTrace(Trace):
         self.propagate()
        
 
+class GaussianTrace(Trace):
+    def __init__(self, system):
+        super(GaussianTrace, self).__init__(system)
+        self.allocate()
+        self.rays()
+        self.propagate()
+
+    def allocate(self):
+        super(GaussianTrace, self).allocate()
+        self.q = np.empty((self.length,), dtype=np.complex_)
+        self.l = 1.
+        self.z = np.empty(self.length)
+        self.n = np.empty_like(self.z)
+
+    def rays(self, q=None):
+        # 1/q = 1/R - i*lambda/(pi*n*w**2)
+        # q = z + i*z0
+        # z0 = pi*n*w0**2/lambda
+        if q is None:
+            # assert not self.system.object.infinite # let it slip
+            obj = self.system.object
+            self.l = obj.wavelengths[0]
+            n = obj.material.refractive_index(self.l)
+            q = 1j*np.pi*n*obj.radius**2/self.l*self.system.scale
+        self.q[0] = q
+
+    def propagate(self, start=0, stop=None):
+        self.z = np.cumsum([e.thickness for e in self.system])
+        init = start - 1 if start else 0
+        q, n = self.q[init], self.n[init]
+        els = self.system[start:stop or self.length]
+        for i, el in enumerate(els):
+            i += start
+            q, n = el.propagate_gaussian(q, n, self.l)
+            self.q[i], self.n[i] = q, n
+
+    def qn_at(self, z=None):
+        if z is None:
+            return self.q, self.n
+        else:
+            # q[i] is valid after element i
+            # element indices for self.z[i-1] < z < self.z[i]
+            i = np.searchsorted(self.z, z) - 1
+            dz = z - self.z[i, :]
+            q = self.q[i, :] + dz
+            n = self.n[i, :]
+            return q, n
+
+    def spot_radius_at(self, z):
+        q, n = self.qn_at(z)
+        r = (-1/(1/q).imag*self.l/self.system.scale/np.pi/n)**.5
+        return r
+
+    def curvature_radius_at(self, z):
+        q, n = self.qn_at(z)
+        r = 1/(1/q).real
+        return r
+
+    @property
+    def curvature_radius(self): # on element
+        return self.curvature_radius_at(z=None)
+
+    @property
+    def spot_radius(self): # on element
+        return self.spot_radius_at(z=None)
+
+    @property
+    def waist_position(self): # after element relative to element
+        return -self.q.real
+
+    @property
+    def rayleigh_range(self): # after element
+        return self.q.imag
+
+    @property
+    def waist_radius(self): # after element
+        return (self.q.imag/np.pi/self.n*self.l/self.system.scale)**.5
+
+    @property
+    def eigenmodes(self):
+        a, b, c, d = self.system.paraxial_matrix(self.l).flat
+        q = np.roots((c, d - a, -b))
+        return q
+
+    def print_trace(self):
+        c = np.c_[self.z, self.curvature_radius, self.spot_radius,
+                self.waist_position, self.waist_radius]
+        return self.print_coeffs(c,
+                "track/curv rad/spot rad/waist pos/waist rad".split("/"),
+                sum=False)
+
+    def __str__(self):
+        t = itertools.chain(
+                self.print_trace(), ("",),
+                )
+        return "\n".join(t)
+
+    def resize(self, waists=3):
+        for e, y in zip(self.system[1:], self.spot_radius[1:]):
+            e.radius = y*waists
+
+    def refocus(self):
+        self.system.image.thickness += self.waist_position[-1]
+        self.propagate()
+
+    def plot(self, ax, npoints=101, waist_position=False,
+            rayleigh_range=False, **kwargs):
+        kwargs.setdefault("color", "black")
+        z = np.linspace(min(self.z), max(self.z), npoints)
+        w = self.spot_radius_at(z)
+        ax.plot(z, w, **kwargs)
+        ax.plot(z, -w, **kwargs)
+        if waist_position:
+            p = self.waist_position + self.z
+            h = self.waist_radius*([-1], [1])
+            p, h = np.broadcast_arrays(p, h)
+            ax.plot(p, h, **kwargs)
+        if rayleigh_range:
+            # [lr, tb, i]
+            r = self.rayleigh_range
+            p = (self.waist_position + self.z + (-r, r))
+            h = (self.waist_radius*2**.5*([-1], [1]))
+            p, h = np.broadcast_arrays(p[:, None], h)
+            p = p.reshape(2, -1)
+            h = h.reshape(2, -1)
+            ax.plot(p, h, **kwargs)
+
+
 class FullTrace(Trace):
     def allocate(self, nrays):
         super(FullTrace, self).allocate()
@@ -366,6 +502,7 @@ class FullTrace(Trace):
         init = start - 1 if start else 0
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
         for i, e in enumerate(self.system[start:stop or self.length]):
+            i += start
             y, u, n, t = e.transformed_yu(e.propagate, y, u, n, l, clip)
             self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
 
@@ -394,14 +531,16 @@ class FullTrace(Trace):
         # center sphere on chief image
         y = self.y[after] - self.y[-1, chief]
         y[:, 2] -= self.z[-1] - self.z[after]
-        #u = self.u[after]
+        u = self.u[after]
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
-        u = -y/np.sqrt(np.square(y).sum(1))[:, None]
+        #u = -y/np.sqrt(np.square(y).sum(1))[:, None]
         y[:, 2] += radius
         ti = Spheroid(curvature=1./radius).intercept(y, u)
         t += ti*self.n[after]
         t = -(t - t[chief])/(self.l/self.system.scale)
+        # positive t rays have a shorter path to ref sphere and 
+        # are arriving before chief
         py = y + ti[:, None]*u
         py[:, 2] -= radius
         py -= py[chief]
@@ -674,7 +813,8 @@ class FullTrace(Trace):
         return self.rays_line(height, zp, rp, wavelength, **kwargs)
 
     def resize(self, fn=lambda a, b: a):
-        r = np.sqrt(np.square(self.y[:, :, :2]).sum(2))
+        x, y = self.y[:, :, 0], self.y[:, :, 1]
+        r = np.hypot(x, y)
         for e, ri in zip(self.system[1:], r[1:]):
             e.radius = fn(ri, e.radius)
 
@@ -698,7 +838,7 @@ class FullTrace(Trace):
 
     def __str__(self):
         t = itertools.chain(
-                self.print_trace(),
+                self.print_trace(), ("",),
                 )
         return "\n".join(t)
 

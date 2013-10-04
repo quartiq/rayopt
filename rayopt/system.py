@@ -116,7 +116,7 @@ class System(list):
                     i, e.typ, e.thickness, roc,
                     e.radius*2, mat or "-", n, v)
 
-    def size_convex(self):
+    def resize_convex(self):
         """ensure convex surfaces are at least as large as their
         corresponding closing surface"""
         pending = None
@@ -137,7 +137,7 @@ class System(list):
                 pending, c0 = el, c
 
     def fix_sizes(self):
-        self.size_convex()
+        self.resize_convex()
 
     def surfaces_cut(self, axis, points):
         """yields cut outlines of surfaces. solids are closed"""
@@ -175,16 +175,19 @@ class System(list):
         kwargs.setdefault("color", "black")
         if adjust:
             ax.set_aspect("equal")
-            ax.spines["right"].set_color("none")
-            ax.spines["top"].set_color("none")
-            ax.spines["left"].set_color("none")
-            ax.spines["bottom"].set_position("zero")
-            ax.spines["bottom"].set_smart_bounds(True)
-            ax.xaxis.set_ticks_position("bottom")
-            ax.set_xticklabels(())
+            ax.spines["right"].set_visible(False)
+            ax.spines["left"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.spines["bottom"].set_visible(False)
+            #ax.spines["bottom"].set_position("zero")
+            #ax.spines["bottom"].set_smart_bounds(True)
+            #ax.xaxis.set_ticks_position("bottom")
+            #ax.set_xticklabels(())
+            ax.set_xticks(())
             ax.set_yticks(())
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(z, x, **kwargs)
+        ax.plot((0, sum(e.thickness for e in self)), (0, 0), "k--")
 
     def paraxial_matrices(self, l, start=0, stop=None, n=None):
         for e in self[start:stop or len(self)]:
@@ -196,46 +199,3 @@ class System(list):
         for n, mi in self.paraxial_matrices(l, start, stop):
             m = np.dot(mi, m)
         return m
-
-    def optimize(self, rays, parameters, demerits, constraints=(),
-            method="ralg"):
-
-        def objective_function(x):
-            for i,p in enumerate(parameters):
-                p.set_value(self, x[i])
-            p = self.paraxial_trace()
-            r = [self.propagate_through(ir) for ir in rays]
-            d = [np.array(de(self, p, r)).reshape((-1,))*de.weight for de in demerits]
-            return np.concatenate(d)
-
-        x0 = np.array([p.get_value(self) for p in parameters])
-        # bs = 2
-        # bounds = [(min(p/bs, p*bs), max(p/bs, p*bs)) for p in x0]
-        #from numpy.random import randn
-        #x0 *= 1+randn(len(x0))*.1
-
-        eqs = [c for c in constraints if c.equality]
-        ineqs = [c for c in constraints if not c.equality]
-
-        def equality_constraints(x):
-            return np.concatenate([c(self) for c in eqs])
-        def inequality_constraints(x):
-            return np.concatenate([c(self) for c in ineqs])
-
-        from openopt import NLP
-        problem = NLP(objective_function, x0,
-                c=ineqs and inequality_constraints or None,
-                h=eqs and equality_constraints or None,
-                lb=np.array([p.bounds[0] for p in parameters]),
-                ub=np.array([p.bounds[1] for p in parameters]),
-                #scale=[p.scale for p in parameters],
-                diffInt=[p.scale*1e-2 for p in parameters],
-                ftol=1e-10, gtol=1e-10, xtol=1e-14,
-                maxCPUTime=2e3, maxNonSuccess=30,
-                maxFunEvals=2000, iprint=1, plot=1)
-        res = problem.solve(method)
-        print(res)
-        x, f = res.xf, res.ff
-        for i,p in enumerate(parameters):
-             p.set_value(self, x[i])
-        return x0,x,f
