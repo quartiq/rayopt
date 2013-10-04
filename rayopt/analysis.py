@@ -181,13 +181,17 @@ class Analysis(object):
             ax.set_title(title)
     
     @staticmethod
-    def post_setup_axes(axi):
-        axi.relim()
-        #axi.autoscale_view(True, True, True)
-        xl, xu = axi.get_xlim()
-        yl, yu = axi.get_ylim()
-        axi.xaxis.set_label_coords(xu, 0, transform=axi.transData)
-        axi.yaxis.set_label_coords(0, yu, transform=axi.transData)
+    def post_setup_axes(ax):
+        ax.relim()
+        #ax.autoscale_view(True, True, True)
+        xl, xu = ax.get_xlim()
+        yl, yu = ax.get_ylim()
+        if ax.spines["left"].get_position() == "zero":
+            xl = 0
+        if ax.spines["bottom"].get_position() == "zero":
+            yl = 0
+        ax.xaxis.set_label_coords(xu, yl, transform=ax.transData)
+        ax.yaxis.set_label_coords(xl, yu, transform=ax.transData)
 
     @classmethod
     def pre_setup_fanplot(cls, fig, n):
@@ -303,6 +307,7 @@ class Analysis(object):
                     verticalalignment="center")
         for hi, axi in zip(heights, ax):
             axo, axp, axe, axm = axi
+            # TODO: link axes
             self.pre_setup_xyplot(axo)
             self.pre_setup_xyplot(axp)
             self.setup_axes(axe, "R", "E")
@@ -314,8 +319,8 @@ class Analysis(object):
                 x, y, o = t.opd(ref)
             except ValueError:
                 continue
+            og = o[np.isfinite(o)]
             if mm is None:
-                og = o[np.isfinite(o)]
                 mm = np.fabs(og).max()
                 v = np.linspace(-mm, mm, 21)
             axo.contour(x, y, o, v, cmap=plt.cm.RdBu_r)
@@ -325,15 +330,18 @@ class Analysis(object):
             r = paraxial.airy_radius[1]/paraxial.l*wavelength
             axp.add_patch(mpl.patches.Circle((0, 0), r,
                     edgecolor="green", facecolor="none"))
-            x, y, psf = t.psf(ref)
+            x, y, psf = map(np.fft.fftshift, t.psf(ref))
+            x0 = (psf*x).sum()
+            y0 = (psf*y).sum()
+            x, y = x - x0, y - y0
             dx = x[1, 0] - x[0, 0]
-            axp.contour(np.fft.fftshift(x), np.fft.fftshift(y),
-                    np.fft.fftshift(np.log10(psf)), 11, vmin=-10,
-                    vmax=0, cmap=plt.cm.Reds, alpha=.3)
-            axp.contour(np.fft.fftshift(x), np.fft.fftshift(y),
-                    np.fft.fftshift(psf), 21, vmin=0, cmap=plt.cm.Greys)
-            ee = polar_sum(np.fft.fftshift(psf),
-                    (psf.shape[0]/2, psf.shape[1]/2), "azimuthal")
+            psfl = np.log10(psf)
+            levels = psfl.max() - 1 - np.arange(4)
+            axp.contour(x, y, psfl, levels, cmap=plt.cm.Reds, alpha=.2)
+            levels = np.linspace(0, psf.max(), 21)
+            axp.contour(x, y, psf, levels, cmap=plt.cm.Greys)
+            ee = polar_sum(psf, (psf.shape[0]/2 + x0/dx,
+                    psf.shape[1]/2 + y0/dx), "azimuthal")
             ee = np.cumsum(ee)
             if rm is None:
                 rm = np.searchsorted(ee, .9)*1.5*dx
@@ -345,7 +353,7 @@ class Analysis(object):
             axe.set_ylim(0, 1)
             axe.set_aspect("auto")
             for i, ci in enumerate(("-", "--")):
-                ot = np.fft.ifft(psf.sum(i)*psf.size**.5)
+                ot = np.fft.ifft(np.fft.ifftshift(psf.sum(i))*psf.size**.5)
                 of = np.fft.fftfreq(ot.size, dx)
                 ot, of = ot[:ot.size/2], of[:of.size/2]
                 axm.plot(of, np.absolute(ot), "k"+ci)
@@ -370,7 +378,7 @@ class Analysis(object):
                 (axc, "EY", "DEY", "TCOLOR"),
                 (axf, "EY", "DEZ", "ASTIG"),
                 (axs, "PY", "DEZ", "SPHA"),
-                (axa, "EY", "DEZ", "LCOLOR"),
+                (axa, "L", "DEZ", "LCOLOR"),
                 ]:
             self.setup_axes(axi, xl, yl, tl, yzero=False)
         h = np.linspace(0, height*paraxial.height[1], nrays)
