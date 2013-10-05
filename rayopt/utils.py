@@ -37,5 +37,8 @@ def sinarctan(u):
         u2 = u2[:, :2].sum(axis=1)[:, None]
     return u/np.sqrt(1 + u2)
 
-
-
+def sfloat(a):
+    try:
+        return float(a)
+    except ValueError:
+        return None

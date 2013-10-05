@@ -18,14 +18,11 @@
 
 from __future__ import print_function, absolute_import, division
 
-import shelve, os.path, glob, cPickle as pickle
+import shelve, os.path, cPickle as pickle
 
 import numpy as np
 
-
-def sfloat(a):
-    try: return float(a)
-    except: return None
+from .utils import sfloat
 
 
 fraunhofer = dict(   # http://en.wikipedia.org/wiki/Abbe_number
@@ -220,9 +217,10 @@ def load_catalogs(all, catalogs):
     return db
 
 
-catpath = "/home/rj/work/nist/pyrayopt/glass/"
+catpath = os.path.expanduser("~/work/nist/pyrayopt/glass")
 cats = "misc infrared schott ohara hoya corning heraeus hikari sumita"
 cats = cats.split()[::-1]
 cats = [os.path.join(catpath, "%s.agf" % _) for _ in cats]
 all = os.path.join(catpath, "all.shelve")
 all_materials = load_catalogs(all, cats)
+AllGlasses = all_materials

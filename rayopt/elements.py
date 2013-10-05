@@ -30,19 +30,22 @@ from .utils import sinarctan, tanarcsin
 
 class TransformMixin(object):
     def __init__(self, offset=None, angles=None):
-        self.offset = offset or np.zeros(3)
-        self.angles = angles or np.zeros(3)
+        self.offset = offset
+        self.angles = angles
         self.update()
 
     def update(self):
+        if self.offset is None and self.angles is None:
+            self.at_origin = True
+            return
+        self.at_origin = (np.allclose(self.angles, 0) and
+                np.allclose(self.offset, 0))
         self.rotation = euler_matrix(axes="rxyz", *self.angles)
         self.inverse_rotation = np.linalg.inv(self.rotation)
         translation = translation_matrix(self.offset)
         self.transformation = concatenate_matrices(translation,
                 self.rotation)
         self.inverse_transformation = np.linalg.inv(self.transformation)
-        self.at_origin = (np.allclose(self.angles, 0) and
-                np.allclose(self.offset, 0))
 
     def transform_to(self, y, angle=False):
         y = np.atleast_2d(y)
