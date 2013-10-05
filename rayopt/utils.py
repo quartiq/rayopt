@@ -42,3 +42,9 @@ def sfloat(a):
         return float(a)
     except ValueError:
         return None
+
+def sint(a):
+    try:
+        return int(a)
+    except ValueError:
+        return None

@@ -32,6 +32,7 @@ def oslo_lenscat(prefix, name):
     dir_name = os.path.join(prefix, "%s.dir" % name)
     dir = np.loadtxt(dir_name, delimiter=",", skiprows=1, 
                      dtype="i,i,i,S64,f,f,f", ndmin=1)
+    # offset, length, name, efl, diameter, thickness
     lens_name = os.path.join(prefix, "%s.dat" % name)
     lens = open(lens_name, "r")
     lens = [lens.read(i) for i in dir["f1"]]
@@ -40,6 +41,7 @@ def oslo_lenscat(prefix, name):
     if os.access(name_name, os.R_OK):
         name = np.loadtxt(name_name, delimiter=",", skiprows=1,
                       dtype="S64,S128", ndmin=1)
+        # abbrev, description
         for k, n in name:
             name_lens.setdefault(len(k), {})[k] = n.strip("\"")
     lenscat = {}
@@ -98,8 +100,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
             i = int(cmd[2])
             s.aspherics[i] = sfloat(args[0])
         elif cmd == "NXT":
-            s = Spheroid(material=AllGlasses["air"])
-            s.thickness = th
+            s = Spheroid(material=AllGlasses["air"], thickness=th)
             sys.append(s)
         else:
             print("unhandled", cmd, args)

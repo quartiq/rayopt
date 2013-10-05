@@ -22,7 +22,7 @@ import shelve, os.path, cPickle as pickle
 
 import numpy as np
 
-from .utils import sfloat
+from .utils import sfloat, sint
 
 
 fraunhofer = dict(   # http://en.wikipedia.org/wiki/Abbe_number
@@ -194,6 +194,49 @@ def load_catalog_zemax(fil, name=None):
             print(cmd, args, "failed parsing", e)
     catalog[g.name] = g
     return catalog
+
+
+def load_catalog_oslo(f, catalog_name=None):
+    glasscat = {}
+    f = open(f, "r")
+    line = f.readline().split()
+    ver, num, name = line[:3]
+    #if len(line) > 3:
+    #    print line
+    for l in f:
+        line = l.strip().split()
+        if not line:
+            continue
+        name = line.pop(0)
+        nd = sfloat(line.pop(0))
+        vd = sfloat(line.pop(0))
+        density = sfloat(line.pop(0))
+        del line[:6]
+        del line[:2]
+        a, num = sint(line.pop(0)), sint(line.pop(0))
+        sellmeier = np.array(map(sfloat, line[:num]))
+        if a in (1, 2):
+            sellmeier = sellmeier.reshape(2, -1).T
+        del line[:num]
+        mat = Material(name=name, sellmeier=sellmeier, nd=nd, vd=vd)
+        mat.catalog = catalog_name
+        glasscat[mat.name] = mat
+        #if not np.allclose(nd, mat.nd):
+        #    print(name, nd, mat.nd)
+        mat.density = density
+        continue # weird remaining format
+        if not line:
+            continue
+        a, num = sint(line.pop(0)), sint(line.pop(0))
+        if a != 1:
+            del line[:num]
+        a, num = sint(line.pop(0)), sint(line.pop(0))
+        assert a == 1, l
+        num *= 2
+        transmission = np.array(map(sfloat, line[:num])).reshape(-1, 2)
+        del line[:num]
+    #assert len(glasscat) == int(num), (len(glasscat), num)
+    return glasscat
 
 
 def load_catalogs(all, catalogs):
