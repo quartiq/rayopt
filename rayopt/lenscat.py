@@ -23,7 +23,8 @@ import shelve, os.path, cPickle as pickle
 import numpy as np
 
 from .utils import sfloat
-from .elements import Spheroid
+from .elements import Spheroid, Object, Aperture, Image
+from .system import System
 from .material import AllGlasses
 
 
@@ -105,7 +106,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
     return sys
 
 
-def default_sys_from_elem(elem):
+def default_sys_from_elem(ele):
     obj = Object(infinite=True, radius=.1, material=AllGlasses["air"])
     ap = Aperture(thickness=1., radius=max(e.radius for e in ele))
     img = Image()
