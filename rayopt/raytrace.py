@@ -594,8 +594,6 @@ class FullTrace(Trace):
             xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
             ts = griddata((x, y), t, (xs, ys))
             x, y, t = xs, ys, ts
-        else:
-            x, y = py.T
         return x, y, t
 
     def psf(self, chief=0, pad=4, resample=4, **kwargs):

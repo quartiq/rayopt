@@ -126,8 +126,8 @@ class Primitive(NameMixin, TransformMixin):
     def clip(self, y, u):
         if not np.isfinite(self.radius):
             return
-        r2 = y[:, 0]**2 + y[:, 1]**2
-        u[:, 2] = np.where(r2 > self.radius**2, np.nan, u[:, 2])
+        bad = (y[:, 0]**2 + y[:, 1]**2) > self.radius**2
+        u[:, 2] = np.where(bad, np.nan, u[:, 2])
 
     def propagate_paraxial(self, yu0, n0, l):
         n, m = self.paraxial_matrix(n0, l)
@@ -191,18 +191,18 @@ class Aperture(Primitive):
         return xyz
 
 
-class Element(Primitive):
-    typ = "E"
+class Interface(Primitive):
+    typ = "F"
 
     def __init__(self, material=None, **kwargs):
-        super(Element, self).__init__(**kwargs)
+        super(Interface, self).__init__(**kwargs)
         self.material = material
 
     def refractive_index(self, wavelength):
         return self.material.refractive_index(wavelength)
 
     def paraxial_matrix(self, n0, l):
-        n, m = super(Element, self).paraxial_matrix(n0, l)
+        n, m = super(Interface, self).paraxial_matrix(n0, l)
         if self.material is not None:
             n = self.material.refractive_index(l)
         return n, m
@@ -211,22 +211,18 @@ class Element(Primitive):
         return u0
 
     def propagate(self, y0, u0, n0, l, clip=True):
-        y, u, n, t = super(Element, self).propagate(y0, u0, n0, l,
-                clip)
+        y, u, n, t = super(Interface, self).propagate(
+                y0, u0, n0, l, clip)
         if self.material is not None:
             n = self.material.refractive_index(l)
             u = self.refract(y, u, n0/n)
         return y, u, n, t
 
     def dispersion(self, lmin, lmax):
-        v = 0
+        v = 0.
         if self.material is not None:
             v = self.material.delta_n(lmin, lmax)
         return v
-
-
-class Interface(Element):
-    typ = "F"
 
     def shape_func(self, p):
         raise NotImplementedError
@@ -235,15 +231,14 @@ class Interface(Element):
         raise NotImplementedError
 
     def intercept(self, y, u):
-        s = np.zeros(y.shape[0])
-        s0 = super(Interface, self).intercept(y, u)
+        s = super(Interface, self).intercept(y, u)
         for i in range(y.shape[0]):
-            yi, ui, s0i = y[i], u[i], s0[i]
+            yi, ui, si = y[i], u[i], s[i]
             def func(si): return self.shape_func(yi + si*ui)
             def fprime(si): return np.dot(
                     self.shape_func_deriv(yi + si*ui), ui)
             try:
-                s[i] = newton(func=func, fprime=fprime, x0=s0i,
+                s[i] = newton(func=func, fprime=fprime, x0=si,
                         tol=1e-7, maxiter=5)
             except RuntimeError:
                 s[i] = np.nan
@@ -364,6 +359,6 @@ class Spheroid(Interface):
                 c, kmax - 1)
         return c
 
-
+# just aliases as Spheroid has all features
 Object = Spheroid
 Image = Spheroid
