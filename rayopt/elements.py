@@ -237,11 +237,13 @@ class Interface(Element):
 class Spheroid(Interface):
     typ = "S"
 
-    def __init__(self, curvature=0., conic=1., aspherics=[], **kwargs):
+    def __init__(self, curvature=0., conic=1., aspherics=None, **kwargs):
         super(Spheroid, self).__init__(**kwargs)
         self.curvature = curvature
         self.conic = conic
-        self.aspherics = np.array(aspherics)
+        if aspherics is not None:
+            aspherics = np.array(aspherics)
+        self.aspherics = aspherics
         #if self.curvature and self.radius:
         #    assert self.radius**2 < 1/(self.conic*self.curvature**2)
 
@@ -250,7 +252,7 @@ class Spheroid(Interface):
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
         e = c*r2/(1 + np.sqrt(1 - k*c**2*r2))
-        if self.aspherics.size:
+        if self.aspherics is not None:
             for i, ai in enumerate(self.aspherics):
                 e += ai*r2**(i + 2)
         return z - e
@@ -260,7 +262,7 @@ class Spheroid(Interface):
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
         e = c/np.sqrt(1 - k*c**2*r2)
-        if self.aspherics.size:
+        if self.aspherics is not None:
             for i, ai in enumerate(self.aspherics):
                 e += 2*ai*(i + 2)*r2**(i + 1)
         q = np.ones((e.size, 3))
@@ -269,29 +271,27 @@ class Spheroid(Interface):
         return q
 
     def intercept(self, y, u):
-        if not self.aspherics.size:
-            # replace the newton-raphson with the analytic solution
-            if self.curvature == 0:
-                s = Element.intercept(self, y, u) # flat
-            else:
-                ky, ku = y, u
-                if self.conic != 1:
-                    ky, ku = y.copy(), u.copy()
-                    ky[:, 2] *= self.conic
-                    ku[:, 2] *= self.conic
-                c = self.curvature
-                d = c*(u*ky).sum(1) - u[:, 2]
-                e = c*(u*ku).sum(1)
-                f = c*(y*ky).sum(1) - 2*y[:, 2]
-                s = (-d - np.sign(u[:, 2])*np.sqrt(d**2 - e*f))/e
-        else:
-            s = Interface.intercept(self, y, u) # expensive iterative
+        if self.aspherics is not None:
+            return Interface.intercept(self, y, u) # expensive iterative
+        # replace the newton-raphson with the analytic solution
+        c = self.curvature
+        if c == 0:
+            return -y[:, 2]/u[:, 2] # flat
+        ky, ku = y, u
+        if self.conic != 1:
+            ky, ku = ky.copy(), ku.copy()
+            ky[:, 2] *= self.conic
+            ku[:, 2] *= self.conic
+        d = c*(u*ky).sum(1) - u[:, 2]
+        e = c*(u*ku).sum(1)
+        f = c*(y*ky).sum(1) - 2*y[:, 2]
+        s = (-d - np.sign(u[:, 2])*np.sqrt(d**2 - e*f))/e
         return s #np.where(s*np.sign(self.thickness)>=0, s, np.nan)
 
     def paraxial_matrix(self, n0, l):
         # [y', u'] = M * [y, u]
         c = self.curvature
-        if self.aspherics.size:
+        if self.aspherics is not None:
             c += 2*self.aspherics[0]
         n = self.material.refractive_index(l)
         mu = n0/n
@@ -302,12 +302,14 @@ class Spheroid(Interface):
     def reverse(self):
         super(Spheroid, self).reverse()
         self.curvature *= -1
-        self.aspherics *= -1
+        if self.aspherics is not None:
+            self.aspherics *= -1
 
     def rescale(self, scale):
         super(Spheroid, self).rescale(scale)
         self.curvature /= scale
-        self.aspherics /= scale**(2*np.arange(self.aspherics.size) + 1)
+        if self.aspherics is not None:
+            self.aspherics /= scale**(2*np.arange(self.aspherics.size) + 1)
 
     def aberration(self, y, u, n0, n, kmax):
         y, yb = y

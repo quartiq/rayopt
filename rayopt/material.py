@@ -51,9 +51,11 @@ def simple_cache(f):
     cache = {}
     def wrapper(self, *args):
         key = self, args
-        if key not in cache:
-            cache[key] = f(self, *args)
-        return cache[key]
+        try:
+            return cache[key]
+        except KeyError:
+            cache[key] = v = f(self, *args)
+            return v
     wrapper.cache = cache
     return wrapper
 
@@ -96,14 +98,14 @@ class Material(object):
                 *(1 - self.nd)/self.vd)
 
     def n_from_sellmeier(self, wavelength):
-        w2 = (np.array(wavelength)/1e-6)**2
-        c0 = self.sellmeier[:, (0,)]
-        c1 = self.sellmeier[:, (1,)]
-        n2 = 1. + (c0*w2/(w2 - c1)).sum(0)
+        w2 = (wavelength/1e-6)**2
+        c0 = self.sellmeier[:, 0]
+        c1 = self.sellmeier[:, 1]
+        n2 = 1. + (c0*w2/(w2 - c1)).sum()
         n = np.sqrt(n2)
         if self.mirror:
             n = -n
-        return n.reshape(w2.shape)
+        return n
 
     @simple_cache
     def refractive_index(self, wavelength):
@@ -132,15 +134,15 @@ class Gas(Material):
         super(Gas, self).__init__(solid=solid, **kwargs)
 
     def n_from_sellmeier(self, wavelength):
-        w2 = (np.array(wavelength)/1e-6)**2
-        c0 = self.sellmeier[:, (0,)]
-        c1 = self.sellmeier[:, (1,)]
-        #n2 = 1. + (c0*w2/(w2 - c1)).sum(0)
+        w2 = (wavelength/1e-6)**2
+        c0 = self.sellmeier[:, 0]
+        c1 = self.sellmeier[:, 1]
+        #n2 = 1. + (c0*w2/(w2 - c1)).sum()
         #n = np.sqrt(n2)
-        n  = 1. + (c0/(c1 - w2)).sum(0)
+        n  = 1. + (c0/(c1 - w2)).sum()
         if self.mirror:
             n = -n
-        return n.reshape(w2.shape)
+        return n
 
 # http://refractiveindex.info
 vacuum = Gas(name="vacuum", nd=1., vd=np.inf)

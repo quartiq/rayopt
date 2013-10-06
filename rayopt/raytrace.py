@@ -549,6 +549,7 @@ class FullTrace(Trace):
         # solution of sum((y+tu-sum(y+tu)/n)**2) == min
         t = -np.dot(y, u)/np.dot(u, u)
         self.system.image.thickness += t
+        self.propagate()
 
     def opd(self, chief=0, radius=None, after=-2, resample=4):
         t = self.t[:after + 1].sum(0)
