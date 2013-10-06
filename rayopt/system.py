@@ -21,15 +21,18 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 
 from .elements import Object, Image, Aperture
+from .material import lambda_d, lambda_C, lambda_F
 
 
 class System(list):
-    def __init__(self, elements=[], description="", scale=1e-3):
+    def __init__(self, elements=[], description="", scale=1e-3,
+            wavelengths=[lambda_d, lambda_C, lambda_F]):
         if elements is None:
             elements = [Object(), Aperture(), Image()]
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
+        self.wavelengths = wavelengths
 
     @property
     def object(self):
@@ -101,7 +104,7 @@ class System(list):
         yield "System: %s" % self.description
         yield "Scale: %s mm" % (self.scale/1e-3)
         yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
-                    for w in self.object.wavelengths)
+                    for w in self.wavelengths)
         yield "Surfaces:"
         yield "%2s %1s %10s %10s %10s %10s %5s %5s" % (
                 "#", "T", "Thickness", "Rad Curv", "Diameter", 

@@ -324,9 +324,8 @@ class Spheroid(Interface):
 class Object(Element):
     typ = "O"
 
-    def __init__(self, wavelengths=[588e-9], infinite=None, **kwargs):
+    def __init__(self, infinite=True, **kwargs):
         super(Object, self).__init__(**kwargs)
-        self.wavelengths = wavelengths
         self.infinite = infinite
 
     def rescale(self, scale):
@@ -384,11 +383,3 @@ class Aperture(Primitive):
 
 class Image(Spheroid):
     typ = "I"
-
-    def refract(self, y, u0, mu):
-        return u0
-
-    def paraxial_matrix(self, n0, l):
-        # [y', u'] = M * [y, u]
-        d = self.thickness
-        return n0, np.array([[1, d], [0, 1]])

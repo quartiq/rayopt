@@ -231,7 +231,7 @@ class Analysis(object):
             colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
-            wavelengths = self.system.object.wavelengths
+            wavelengths = self.system.wavelengths
         ax = self.pre_setup_fanplot(fig, len(heights))
         p = paraxial.pupil_distance[0]
         for hi, axi in zip(heights, ax):
@@ -259,7 +259,7 @@ class Analysis(object):
             wavelengths=None, nrays=200, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
-            wavelengths = self.system.object.wavelengths
+            wavelengths = self.system.wavelengths
         nh = len(heights)
         nd = ax.shape[1]
         for axi in ax.flat:
@@ -298,7 +298,7 @@ class Analysis(object):
             wavelength=None, nrays=200, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelength is None:
-            wavelength = self.system.object.wavelengths[0]
+            wavelength = self.system.wavelengths[0]
         mm = None
         rm = None
         for hi, axi in zip(heights, ax[:, 0]):
@@ -371,7 +371,7 @@ class Analysis(object):
         # focus shift paraxial focus vs wl
         # longitudinal spherical: marginal focus vs height (vs wl)
         if wavelengths is None:
-            wavelengths = self.system.object.wavelengths
+            wavelengths = self.system.wavelengths
         axd, axc, axf, axs, axa = ax
         for axi, xl, yl, tl in [
                 (axd, "EY", "REY", "DIST"),

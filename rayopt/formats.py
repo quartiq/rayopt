@@ -21,7 +21,8 @@ import numpy as np
 
 from .system import System
 from .elements import Spheroid, Aperture, Image, Object
-from .material import air, all_materials, Material
+from .material import (air, all_materials, Material, lambda_d, lambda_C,
+        lambda_F)
 
 
 def try_get(line, columns, field, default=None):
@@ -36,8 +37,8 @@ def try_get(line, columns, field, default=None):
 
 
 def system_from_array(data,
-        columns="type roc thickness diameter material".split(),
-        shifts={}, material_map={}, **kwargs):
+        columns="type roc thickness diameter material".split(), shifts={},
+        material_map={}, **kwargs):
     data = np.array(data)
     assert data.ndim == 2
     for k, v in shifts.items():
@@ -167,7 +168,7 @@ def system_from_zemax(fil):
         elif cmd == "STOP":
             s.insert(-1, Aperture())
         elif cmd == "WAVL":
-            s.object.wavelengths = [float(i)*1e-6 for i in args.split() if i]
+            s.wavelengths = [float(i)*1e-6 for i in args.split() if i]
         elif cmd in ("GCAT", # glass catalog names
                      "OPDX", # opd
                      "RAIM", # ray aiming

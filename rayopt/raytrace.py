@@ -61,7 +61,7 @@ class ParaxialTrace(Trace):
 
     def allocate(self, k):
         super(ParaxialTrace, self).allocate()
-        l = self.system.object.wavelengths
+        l = self.system.wavelengths
         self.l = l[0]
         self.lmin = min(l)
         self.lmax = max(l)
@@ -75,7 +75,7 @@ class ParaxialTrace(Trace):
 
     def rays(self):
         y, u = self.y, self.u
-        l = self.system.object.wavelengths[0]
+        l = self.system.wavelengths[0]
         ai = self.system.aperture_index
         m = self.system.paraxial_matrix(l, stop=ai + 1)
         mi = np.linalg.inv(m)
@@ -365,8 +365,8 @@ class GaussianTrace(Trace):
         # z0 = pi*n*w0**2/lambda
         if q is None:
             # assert not self.system.object.infinite # let it slip
+            self.l = self.system.wavelengths[0]
             obj = self.system.object
-            self.l = obj.wavelengths[0]
             n = obj.material.refractive_index(self.l)
             q = 1j*np.pi*n*obj.radius**2/self.l*self.system.scale
         self.q[0] = q
@@ -522,7 +522,7 @@ class FullTrace(Trace):
         y, u = np.atleast_2d(y, u)
         y, u = np.broadcast_arrays(y, u)
         if l is None:
-            l = self.system.object.wavelengths[0]
+            l = self.system.wavelengths[0]
         self.allocate(max(y.shape[0], u.shape[0]))
         self.l = l
         self.y[0, :, :] = 0
