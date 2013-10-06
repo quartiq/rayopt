@@ -84,11 +84,11 @@ class TransformMixin(object):
 class Primitive(NameMixin, TransformMixin):
     typ = "P"
 
-    def __init__(self, thickness=0., radius=np.inf, finite=True,
+    def __init__(self, distance=0., radius=np.inf, finite=True,
             angular_radius=np.inf, **kwargs):
         super(Primitive, self).__init__(**kwargs)
         self.radius = radius
-        self.thickness = thickness
+        self.distance = distance
         self.finite = finite
         self.angular_radius = angular_radius
         # angular radius is tan(u) as sin(u) is ambiguous
@@ -141,12 +141,12 @@ class Primitive(NameMixin, TransformMixin):
         return q, n
 
     def paraxial_matrix(self, n0, l):
-        d = self.thickness
+        d = self.distance
         return n0, np.array([[1, d], [0, 1]])
 
     def propagate(self, y0, u0, n0, l, clip=True):
         # length up to surface
-        y = y0 - [0, 0, self.thickness]
+        y = y0 - [0, 0, self.distance]
         t = self.intercept(y, u0)
         # new transverse position
         y += t[:, None]*u0
@@ -165,7 +165,7 @@ class Primitive(NameMixin, TransformMixin):
         if self.offset is not None:
             self.offset *= scale
         self.update()
-        self.thickness *= scale
+        self.distance *= scale
         self.radius *= scale
 
     def surface_cut(self, axis, points):
@@ -322,7 +322,7 @@ class Spheroid(Interface):
         e = c*(u*ku).sum(1)
         f = c*(y*ky).sum(1) - 2*y[:, 2]
         s = (-d - np.sign(u[:, 2])*np.sqrt(d**2 - e*f))/e
-        return s #np.where(s*np.sign(self.thickness)>=0, s, np.nan)
+        return s #np.where(s*np.sign(self.distance)>=0, s, np.nan)
 
     def paraxial_matrix(self, n0, l):
         # [y', u'] = M * [y, u]
@@ -334,7 +334,7 @@ class Spheroid(Interface):
         else:
             n = n0
         mu = n0/n
-        d = self.thickness
+        d = self.distance
         p = c*(mu - 1)
         return n, np.array([[1, d], [p, d*p + mu]])
    

@@ -37,7 +37,7 @@ def try_get(line, columns, field, default=None):
 
 
 def system_from_array(data,
-        columns="type roc thickness diameter material".split(), shifts={},
+        columns="type roc distance diameter material".split(), shifts={},
         material_map={}, **kwargs):
     data = np.array(data)
     assert data.ndim == 2
@@ -59,7 +59,7 @@ def system_from_array(data,
                 curv = 1./roc
         if hasattr(el, "curvature"):
             el.curvature = curv
-        el.thickness = try_get(line, columns, "thickness", 0.)
+        el.distance = try_get(line, columns, "distance", 0.)
         el.radius = (try_get(line, columns, "radius", 0.) or
                 try_get(line, columns, "diameter", 0.)/2.)
         if typ == "O":
@@ -118,7 +118,7 @@ def system_from_oslo(fil):
         elif cmd in ("NXT", "END"):
             s.append(e)
             e = Spheroid()
-            e.thickness = th
+            e.distance = th
         elif cmd in ("//", "DES", "EBR", "GIH", "DLRS", "WW", "WV"):
             pass
         else:
@@ -146,7 +146,7 @@ def system_from_zemax(fil):
         elif cmd == "NAME":
             s.description = args.strip("\"")
         elif cmd == "SURF":
-            e = Spheroid(thickness=next_pos)
+            e = Spheroid(distance=next_pos)
             e.material = air
             s.insert(-1, e)
         elif cmd == "CURV":
@@ -202,7 +202,7 @@ def system_from_zemax(fil):
     s.object.radius = s[1].radius
     del s[1]
     s.image.radius = s[-2].radius
-    s.image.thickness = s[-2].thickness
+    s.image.distance = s[-2].distance
     del s[-2]
     s.aperture.radius = s[s.aperture_index-1].radius
     return s

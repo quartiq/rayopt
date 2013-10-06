@@ -89,7 +89,7 @@ class ParaxialTrace(Trace):
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
     def propagate(self, start=1, stop=None):
-        self.z = np.cumsum([e.thickness for e in self.system])
+        self.z = np.cumsum([e.distance for e in self.system])
         init = start - 1
         yu, n = np.array((self.y[init], self.u[init])).T, self.n[init]
         els = self.system[start:stop or self.length]
@@ -343,7 +343,7 @@ class ParaxialTrace(Trace):
         self.propagate()
 
     def refocus(self):
-        self.system.image.thickness -= self.y[-1, 0]/self.u[-1, 0]
+        self.system.image.distance -= self.y[-1, 0]/self.u[-1, 0]
         self.propagate()
        
 
@@ -375,7 +375,7 @@ class GaussianTrace(Trace):
         self.q[0] = q
 
     def propagate(self, start=1, stop=None):
-        self.z = np.cumsum([e.thickness for e in self.system])
+        self.z = np.cumsum([e.distance for e in self.system])
         init = start - 1
         q, n = self.q[init], self.n[init]
         els = self.system[start:stop or self.length]
@@ -484,7 +484,7 @@ class GaussianTrace(Trace):
             e.radius = y*waists
 
     def refocus(self):
-        self.system.image.thickness += self.waist_position[-1]
+        self.system.image.distance += self.waist_position[-1]
         self.propagate()
 
     def plot(self, ax, npoints=101, waist_position=False,
@@ -536,7 +536,7 @@ class FullTrace(Trace):
         self.n[0] = self.system.object.refractive_index(l)
 
     def propagate(self, start=1, stop=None, clip=False):
-        self.z = np.cumsum([e.thickness for e in self.system])
+        self.z = np.cumsum([e.distance for e in self.system])
         init = start - 1
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
         for i, e in enumerate(self.system[start:stop or self.length]):
@@ -552,7 +552,7 @@ class FullTrace(Trace):
         y, u = (y - y.mean(0)).ravel(), (u - u.mean(0)).ravel()
         # solution of sum((y+tu-sum(y+tu)/n)**2) == min
         t = -np.dot(y, u)/np.dot(u, u)
-        self.system.image.thickness += t
+        self.system.image.distance += t
         self.propagate()
 
     def opd(self, chief=0, radius=None, after=-2, resample=4):
@@ -597,7 +597,7 @@ class FullTrace(Trace):
         return x, y, t
 
     def psf(self, chief=0, pad=4, resample=4, **kwargs):
-        radius = self.system.image.thickness
+        radius = self.system.image.distance
         x, y, o = self.opd(chief, resample=resample, radius=radius,
                 **kwargs)
         good = np.isfinite(o)

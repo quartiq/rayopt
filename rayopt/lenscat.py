@@ -100,7 +100,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
             i = int(cmd[2])
             s.aspherics[i] = sfloat(args[0])
         elif cmd == "NXT":
-            s = Spheroid(material=AllGlasses["air"], thickness=th)
+            s = Spheroid(material=AllGlasses["air"], distance=th)
             sys.append(s)
         else:
             print("unhandled", cmd, args)
@@ -109,7 +109,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
 
 def default_sys_from_elem(ele):
     obj = Object(finite=False, radius=.1, material=AllGlasses["air"])
-    ap = Aperture(thickness=1., radius=max(e.radius for e in ele))
+    ap = Aperture(distance=1., radius=max(e.radius for e in ele))
     img = Image()
     sys = System([obj, ap] + ele + [img])
     return sys

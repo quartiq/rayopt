@@ -75,10 +75,10 @@ class System(list):
         self[:] = self[::-1]
         for e in self:
             e.reverse()
-        # shift thicknesses forwards
+        # shift distances forwards
         d = 0.
         for e in self:
-            d, e.thickness = e.thickness, d
+            d, e.distance = e.distance, d
         # shift materials backwards
         m = None
         for e in self[::-1]:
@@ -117,7 +117,7 @@ class System(list):
             except:
                 n = nd
             yield "%2i %1s %10.5g %10.4g %10.5g %10s %10.3f %10.3f %10.2f" % (
-                    i, e.typ, e.thickness, roc, rad*2, mat, n, nd, vd)
+                    i, e.typ, e.distance, roc, rad*2, mat, n, nd, vd)
 
     def resize_convex(self):
         """ensure convex surfaces are at least as large as their
@@ -147,7 +147,7 @@ class System(list):
         z0 = 0.
         pending = None
         for e in self:
-            z0 += e.thickness
+            z0 += e.distance
             xyz = e.transform_from(e.surface_cut(axis, points))
             x, z = xyz[:, axis], xyz[:, 2]
             z += z0
@@ -184,7 +184,7 @@ class System(list):
             ax.set_yticks(())
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(z, x, **kwargs)
-        ax.plot((0, sum(e.thickness for e in self)), (0, 0), "k--")
+        ax.plot((0, sum(e.distance for e in self)), (0, 0), "k--")
 
     def paraxial_matrices(self, l, start=1, stop=None):
         n = self[start - 1].refractive_index(l)
