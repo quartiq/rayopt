@@ -21,14 +21,14 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 
 from .elements import Object, Image, Aperture
-from .material import lambda_d, lambda_C, lambda_F
+from .material import fraunhofer
 
 
 class System(list):
     def __init__(self, elements=[], description="", scale=1e-3,
-            wavelengths=[lambda_d, lambda_C, lambda_F]):
+            wavelengths=[fraunhofer[i] for i in "dCF"]):
         if elements is None:
-            elements = [Object(), Aperture(), Image()]
+            elements = [Object(finite=False), Aperture(), Image()]
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
@@ -71,21 +71,17 @@ class System(list):
             self.append(value)
 
     def reverse(self):
-        o, i = self.object, self.image
-        # swap i/o radii
-        o.radius, i.radius = i.radius, o.radius
         # reverse surface order
-        self[1:-1] = self[-2:0:-1]
-        # shift thicknesses forward
+        self[:] = self[::-1]
         for e in self:
             e.reverse()
         # shift thicknesses forwards
-        d = i.thickness
-        for e in self[1:]:
+        d = 0.
+        for e in self:
             d, e.thickness = e.thickness, d
         # shift materials backwards
-        m = o.material
-        for e in self[-2::-1]:
+        m = None
+        for e in self[::-1]:
             if hasattr(e, "material"):
                 # material is old preceeding material
                 m, e.material = e.material, m
@@ -106,18 +102,22 @@ class System(list):
         yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.wavelengths)
         yield "Surfaces:"
-        yield "%2s %1s %10s %10s %10s %10s %5s %5s" % (
+        yield "%2s %1s %10s %10s %10s %10s %10s %10s %10s" % (
                 "#", "T", "Thickness", "Rad Curv", "Diameter", 
-                "Material", "n", "V")
+                "Material", "n", "nd", "Vd")
         for i,e in enumerate(self):
             curv = getattr(e, "curvature", 0)
             roc = curv == 0 and np.inf or 1./curv
-            mat = getattr(e, "material", None)
-            n = getattr(mat, "nd", np.nan)
-            v = getattr(mat, "vd", np.nan)
-            yield "%2i %1s %10.5g %10.4g %10.5g %10s %5.3f %5.2f" % (
-                    i, e.typ, e.thickness, roc,
-                    e.radius*2, mat or "-", n, v)
+            mat = getattr(e, "material", "")
+            rad = e.radius if e.finite else e.angular_radius
+            nd = getattr(mat, "nd", np.nan)
+            vd = getattr(mat, "vd", np.nan)
+            try:
+                n = mat.refractive_index(self.wavelengths[0])
+            except:
+                n = nd
+            yield "%2i %1s %10.5g %10.4g %10.5g %10s %10.3f %10.3f %10.2f" % (
+                    i, e.typ, e.thickness, roc, rad*2, mat, n, nd, vd)
 
     def resize_convex(self):
         """ensure convex surfaces are at least as large as their
@@ -178,26 +178,21 @@ class System(list):
         kwargs.setdefault("color", "black")
         if adjust:
             ax.set_aspect("equal")
-            ax.spines["right"].set_visible(False)
-            ax.spines["left"].set_visible(False)
-            ax.spines["top"].set_visible(False)
-            ax.spines["bottom"].set_visible(False)
-            #ax.spines["bottom"].set_position("zero")
-            #ax.spines["bottom"].set_smart_bounds(True)
-            #ax.xaxis.set_ticks_position("bottom")
-            #ax.set_xticklabels(())
+            for s in ax.spines.values():
+                s.set_visible(False)
             ax.set_xticks(())
             ax.set_yticks(())
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(z, x, **kwargs)
         ax.plot((0, sum(e.thickness for e in self)), (0, 0), "k--")
 
-    def paraxial_matrices(self, l, start=0, stop=None, n=None):
+    def paraxial_matrices(self, l, start=1, stop=None):
+        n = self[start - 1].refractive_index(l)
         for e in self[start:stop or len(self)]:
             n, m = e.paraxial_matrix(n, l)
             yield n, m
 
-    def paraxial_matrix(self, l, start=0, stop=None, n0=None):
+    def paraxial_matrix(self, l, start=1, stop=None):
         m = np.eye(2)
         for n, mi in self.paraxial_matrices(l, start, stop):
             m = np.dot(mi, m)

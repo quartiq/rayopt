@@ -84,10 +84,36 @@ class TransformMixin(object):
 class Primitive(NameMixin, TransformMixin):
     typ = "P"
 
-    def __init__(self, thickness=0., radius=np.inf, **kwargs):
+    def __init__(self, thickness=0., radius=np.inf, finite=True,
+            angular_radius=np.inf, **kwargs):
         super(Primitive, self).__init__(**kwargs)
         self.radius = radius
         self.thickness = thickness
+        self.finite = finite
+        self.angular_radius = angular_radius
+        # angular radius is tan(u) as sin(u) is ambiguous
+        # sin(pi/2 + eps) = sin(pi/2 - eps)
+
+    def to_pupil(self, yo, yp, pupil_distance, pupil_height):
+        ro = self.radius if self.finite else self.angular_radius
+        yo, yp, ro, rp = np.broadcast_arrays(yo, yp, ro, pupil_height)
+        if self.finite:
+            y = -yo*ro
+            u = sinarctan((yp*rp - y)/pupil_distance)
+        else:
+            u = sinarctan(yo*ro)
+            y = yp*rp - pupil_distance*tanarcsin(u)
+        return y, u
+
+    def from_pupil(self, y, u, pupil_distance, pupil_height):
+        ro = self.radius if self.finite else self.angular_radius
+        y, u, ro, rp = np.broadcast_arrays(y, u, ro, pupil_height)
+        yp = (y + pupil_distance*tanarcsin(u))/rp
+        if self.finite:
+            yo = -y/ro
+        else:
+            yo = tanarcsin(y/ro)
+        return yo, yp
 
     def intercept(self, y, u):
         # ray length to intersection with element
@@ -98,6 +124,8 @@ class Primitive(NameMixin, TransformMixin):
         return s
 
     def clip(self, y, u):
+        if not np.isfinite(self.radius):
+            return
         r2 = y[:, 0]**2 + y[:, 1]**2
         u[:, 2] = np.where(r2 > self.radius**2, np.nan, u[:, 2])
 
@@ -129,19 +157,19 @@ class Primitive(NameMixin, TransformMixin):
         return y, u, n0, t*n0
 
     def reverse(self):
-        self.offset[1:] *= -1
+        if self.offset is not None:
+            self.offset[1:] *= -1
         self.update()
 
     def rescale(self, scale):
-        self.offset *= scale
+        if self.offset is not None:
+            self.offset *= scale
         self.update()
         self.thickness *= scale
         self.radius *= scale
 
     def surface_cut(self, axis, points):
-        rad = self.radius
-        if not np.isfinite(rad):
-            rad = 1
+        rad = self.radius if np.isfinite(self.radius) else 0.
         xyz = np.zeros((points, 3))
         xyz[:, axis] = np.linspace(-rad, rad, points)
         return xyz
@@ -153,12 +181,25 @@ class Primitive(NameMixin, TransformMixin):
         return 0
 
 
+class Aperture(Primitive):
+    typ = "A"
+
+    def surface_cut(self, axis, points):
+        r = self.radius if np.isfinite(self.radius) else 0.
+        xyz = np.zeros((5, 3))
+        xyz[:, axis] = np.array([-r*1.5, -r, np.nan, r, r*1.5])
+        return xyz
+
+
 class Element(Primitive):
     typ = "E"
 
     def __init__(self, material=None, **kwargs):
         super(Element, self).__init__(**kwargs)
         self.material = material
+
+    def refractive_index(self, wavelength):
+        return self.material.refractive_index(wavelength)
 
     def paraxial_matrix(self, n0, l):
         n, m = super(Element, self).paraxial_matrix(n0, l)
@@ -244,8 +285,8 @@ class Spheroid(Interface):
         if aspherics is not None:
             aspherics = np.array(aspherics)
         self.aspherics = aspherics
-        #if self.curvature and self.radius:
-        #    assert self.radius**2 < 1/(self.conic*self.curvature**2)
+        if self.curvature and np.isfinite(self.radius):
+            assert self.radius**2 < 1/(self.conic*self.curvature**2)
 
     def shape_func(self, xyz):
         x, y, z = xyz.T
@@ -293,7 +334,10 @@ class Spheroid(Interface):
         c = self.curvature
         if self.aspherics is not None:
             c += 2*self.aspherics[0]
-        n = self.material.refractive_index(l)
+        if self.material is not None:
+            n = self.material.refractive_index(l)
+        else:
+            n = n0
         mu = n0/n
         d = self.thickness
         p = c*(mu - 1)
@@ -321,65 +365,5 @@ class Spheroid(Interface):
         return c
 
 
-class Object(Element):
-    typ = "O"
-
-    def __init__(self, infinite=True, **kwargs):
-        super(Object, self).__init__(**kwargs)
-        self.infinite = infinite
-
-    def rescale(self, scale):
-        super(Object, self).rescale(scale)
-        if self.infinite: # undo
-            self.radius /= scale
-
-    def paraxial_matrix(self, n0, l):
-        n = self.material.refractive_index(l)
-        return n, np.eye(2)
-    
-    def propagate(self, y0, u0, n0, l, clip=True):
-        n = self.material.refractive_index(l)
-        t = np.zeros_like(l) # could use distance to ref sphere here
-        return y0, u0, n, t
-
-    def to_pupil(self, height, pupil, distance, radius):
-        yo, yp, radius = np.broadcast_arrays(height, pupil, radius)
-        r = self.radius
-        if self.infinite:
-            u = sinarctan(yo*r)
-            y = yp*radius - distance*tanarcsin(u)
-        else:
-            y = -yo*r
-            u = sinarctan((yp*radius - y)/distance)
-        return y, u
-
-    def from_pupil(self, y, u, distance, radius):
-        y, u, radius = np.broadcast_arrays(y, u, radius)
-        r = self.radius
-        yp = (y + distance*tanarcsin(u))/radius
-        yo = -y/r
-        if self.infinite:
-            yo = tanarcsin(-yo)
-        return yo, yp
-
-    def pupil_distance(self, y, u, axis=1):
-        return -y[axis]/tanarcsin(u)[axis]
-
-    def pupil_height(self, y, u, pupil_distance, axis=1):
-        return y[axis] + pupil_distance*tanarcsin(u)[axis]
-
-
-class Aperture(Primitive):
-    typ = "A"
-
-    def surface_cut(self, axis, points):
-        r = self.radius
-        if not np.isfinite(r):
-            r = 1
-        xyz = np.zeros((5, 3))
-        xyz[:, axis] = np.array([-r*1.5, -r, np.nan, r, r*1.5])
-        return xyz
-
-
-class Image(Spheroid):
-    typ = "I"
+Object = Spheroid
+Image = Spheroid

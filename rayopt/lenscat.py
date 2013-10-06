@@ -108,7 +108,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
 
 
 def default_sys_from_elem(ele):
-    obj = Object(infinite=True, radius=.1, material=AllGlasses["air"])
+    obj = Object(finite=False, radius=.1, material=AllGlasses["air"])
     ap = Aperture(thickness=1., radius=max(e.radius for e in ele))
     img = Image()
     sys = System([obj, ap] + ele + [img])

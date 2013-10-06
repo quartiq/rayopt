@@ -62,6 +62,8 @@ def system_from_array(data,
         el.thickness = try_get(line, columns, "thickness", 0.)
         el.radius = (try_get(line, columns, "radius", 0.) or
                 try_get(line, columns, "diameter", 0.)/2.)
+        if typ == "O":
+            el.finite, el.angular_radius, el.radius = False, el.radius, np.inf
         if hasattr(el, "material"):
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)
@@ -73,7 +75,7 @@ def system_from_array(data,
                 try:
                     m = Material.from_string(mat)
                 except (ValueError, TypeError):
-                    m = air
+                    m = None
             el.material = m
         s.append(el)
     return s
@@ -126,7 +128,7 @@ def system_from_oslo(fil):
 
 
 def system_from_zemax(fil):
-    s = System([Object(material=air), Image()])
+    s = System([Object(material=air, finite=False), Image()])
     next_pos = 0.
     a = None
     for line in fil.readlines():
@@ -162,7 +164,7 @@ def system_from_zemax(fil):
                     e.material = Material.from_string(t)
                 except:
                     print "material not found: %s" % name
-                    e.material = air
+                    e.material = None
         elif cmd == "DIAM":
             e.radius = float(args.split()[0])/2
         elif cmd == "STOP":

@@ -76,19 +76,21 @@ class ParaxialTrace(Trace):
     def rays(self):
         y, u = self.y, self.u
         l = self.system.wavelengths[0]
+        self.n[0] = self.system.object.refractive_index(l)
         ai = self.system.aperture_index
         m = self.system.paraxial_matrix(l, stop=ai + 1)
         mi = np.linalg.inv(m)
         r = self.system[ai].radius
-        c = self.system.object.radius
-        if not self.system.object.infinite:
-            y, u, mi, c, r = u, y, -mi[::-1], -c, -r
+        c = self.system.object.angular_radius
+        if self.system.object.finite:
+            c = -self.system.object.radius
+            y, u, mi, r = u, y, -mi[::-1], -r
         y[0, 0], u[0, 0] = r*mi[0, 0] - r*mi[0, 1]*mi[1, 0]/mi[1, 1], 0
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
-    def propagate(self, start=0, stop=None):
+    def propagate(self, start=1, stop=None):
         self.z = np.cumsum([e.thickness for e in self.system])
-        init = start - 1 if start else 0
+        init = start - 1
         yu, n = np.array((self.y[init], self.u[init])).T, self.n[init]
         els = self.system[start:stop or self.length]
         for i, el in enumerate(els):
@@ -364,16 +366,17 @@ class GaussianTrace(Trace):
         # q = z + i*z0
         # z0 = pi*n*w0**2/lambda
         if q is None:
-            # assert not self.system.object.infinite # let it slip
+            # assert self.system.object.finite # let it slip
             self.l = self.system.wavelengths[0]
             obj = self.system.object
             n = obj.material.refractive_index(self.l)
             q = 1j*np.pi*n*obj.radius**2/self.l*self.system.scale
+        self.n[0] = self.system.object.refractive_index(self.l)
         self.q[0] = q
 
-    def propagate(self, start=0, stop=None):
+    def propagate(self, start=1, stop=None):
         self.z = np.cumsum([e.thickness for e in self.system])
-        init = start - 1 if start else 0
+        init = start - 1
         q, n = self.q[init], self.n[init]
         els = self.system[start:stop or self.length]
         for i, el in enumerate(els):
@@ -530,10 +533,11 @@ class FullTrace(Trace):
         self.u[0, :, :] = 0
         self.u[0, :, :u.shape[1]] = u
         self.u[0, :, 2] = np.sqrt(1 - np.square(self.u[0, :, :2]).sum(1))
+        self.n[0] = self.system.object.refractive_index(l)
 
-    def propagate(self, start=0, stop=None, clip=False):
+    def propagate(self, start=1, stop=None, clip=False):
         self.z = np.cumsum([e.thickness for e in self.system])
-        init = start - 1 if start else 0
+        init = start - 1
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
         for i, e in enumerate(self.system[start:stop or self.length]):
             i += start
@@ -553,7 +557,7 @@ class FullTrace(Trace):
 
     def opd(self, chief=0, radius=None, after=-2, resample=4):
         t = self.t[:after + 1].sum(0)
-        if self.system.object.infinite:
+        if not self.system.object.finite:
             # input reference sphere is a tilted plane
             # u0 * (y0 - y - t*u) == 0
             tj = np.dot(self.u[0, chief], (self.y[0, chief] - self.y[0]).T)
@@ -633,7 +637,7 @@ class FullTrace(Trace):
         changing angle (in case of finite object) or
         position in case of infinite object"""
         self.rays_given(y, u, l)
-        var = self.y if self.system.object.infinite else self.u
+        var = self.u if self.system.object.finite else self.y
         assert var.shape[1] == 1
         v0 = var[0, 0, axis].copy()
 
@@ -671,6 +675,14 @@ class FullTrace(Trace):
         var[0, 0, axis] = a0*v0
         return self.y[0, 0, :2], self.u[0, 0, :2]
 
+    def pupil_distance(self, y, u, axis=1):
+        # given real chief ray
+        return -y[axis]/tanarcsin(u)[axis]
+
+    def pupil_height(self, y, u, pupil_distance, axis=1):
+        # given real marginal ray
+        return y[axis] + pupil_distance*tanarcsin(u)[axis]
+
     def aim_pupil(self, height, pupil_distance, pupil_height,
             l=None, axis=(0, 1), **kwargs):
         yo = (0, height)
@@ -681,14 +693,14 @@ class FullTrace(Trace):
             yp = (0, 0)
             y, u = self.system.object.to_pupil(yo, yp, pd, ph[1])
             y, u = self.aim(y, u, l, axis=1, target=0)
-            pd = self.system.object.pupil_distance(y, u)
+            pd = self.pupil_distance(y, u)
             # rescale apparent pupil height (improve guess)
             ph *= pd/pupil_distance
         for ax in axis:
             yp = (0, 1) if ax else (1, 0)
             y, u = self.system.object.to_pupil(yo, yp, pd, ph[ax])
             y, u = self.aim(y, u, l, axis=ax, target=1)
-            ph[ax] = self.system.object.pupil_height(y, u, pd, axis=ax)
+            ph[ax] = self.pupil_height(y, u, pd, axis=ax)
         return pd, ph
 
     @staticmethod
@@ -829,12 +841,12 @@ class FullTrace(Trace):
                     pass
         e = np.zeros((3, 1, 2)) # pupil
         e[(1, 2), :, (1, 0)] = eps*pupil_height # meridional, sagittal
-        if self.system.object.infinite:
-            y = (y + e).reshape(-1, 2)
-            u = np.tile(u, (3, 1))
-        else:
+        if self.system.object.finite:
             y = np.tile(y, (3, 1))
             u = (u + e/pupil_distance).reshape(-1, 2)
+        else:
+            y = (y + e).reshape(-1, 2)
+            u = np.tile(u, (3, 1))
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
 
