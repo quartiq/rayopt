@@ -103,7 +103,7 @@ class System(list):
                     for w in self.wavelengths)
         yield "Surfaces:"
         yield "%2s %1s %10s %10s %10s %10s %10s %10s %10s" % (
-                "#", "T", "Thickness", "Rad Curv", "Diameter", 
+                "#", "T", "Distance", "Rad Curv", "Diameter", 
                 "Material", "n", "nd", "Vd")
         for i,e in enumerate(self):
             curv = getattr(e, "curvature", 0)
