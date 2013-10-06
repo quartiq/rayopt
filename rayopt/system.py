@@ -101,7 +101,7 @@ class System(list):
         yield "Scale: %s mm" % (self.scale/1e-3)
         yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.wavelengths)
-        yield "Surfaces:"
+        yield "Elements:"
         yield "%2s %1s %10s %10s %10s %10s %10s %10s %10s" % (
                 "#", "T", "Distance", "Rad Curv", "Diameter", 
                 "Material", "n", "nd", "Vd")

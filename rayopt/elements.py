@@ -81,12 +81,12 @@ class TransformMixin(object):
         return (y, u) + ret[2:]
 
 
-class Primitive(NameMixin, TransformMixin):
+class Element(NameMixin, TransformMixin):
     typ = "P"
 
     def __init__(self, distance=0., radius=np.inf, finite=True,
             angular_radius=np.inf, **kwargs):
-        super(Primitive, self).__init__(**kwargs)
+        super(Element, self).__init__(**kwargs)
         self.radius = radius
         self.distance = distance
         self.finite = finite
@@ -181,7 +181,7 @@ class Primitive(NameMixin, TransformMixin):
         return 0
 
 
-class Aperture(Primitive):
+class Aperture(Element):
     typ = "A"
 
     def surface_cut(self, axis, points):
@@ -191,7 +191,7 @@ class Aperture(Primitive):
         return xyz
 
 
-class Interface(Primitive):
+class Interface(Element):
     typ = "F"
 
     def __init__(self, material=None, **kwargs):
