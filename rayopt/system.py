@@ -97,12 +97,12 @@ class System(list):
         return "\n".join(self.text())
 
     def text(self):
-        yield "System: %s" % self.description
-        yield "Scale: %s mm" % (self.scale/1e-3)
-        yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
+        yield u"System: %s" % self.description
+        yield u"Scale: %s mm" % (self.scale/1e-3)
+        yield u"Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.wavelengths)
-        yield "Elements:"
-        yield "%2s %1s %10s %10s %10s %10s %10s %10s %10s" % (
+        yield u"Elements:"
+        yield u"%2s %1s %10s %10s %10s %10s %10s %10s %10s" % (
                 "#", "T", "Distance", "Rad Curv", "Diameter", 
                 "Material", "n", "nd", "Vd")
         for i,e in enumerate(self):
@@ -116,7 +116,7 @@ class System(list):
                 n = mat.refractive_index(self.wavelengths[0])
             except:
                 n = nd
-            yield "%2i %1s %10.5g %10.4g %10.5g %10s %10.3f %10.3f %10.2f" % (
+            yield u"%2i %1s %10.5g %10.4g %10.5g %10s %10.3f %10.3f %10.2f" % (
                     i, e.typ, e.distance, roc, rad*2, mat, n, nd, vd)
 
     def resize_convex(self):
@@ -193,7 +193,7 @@ class System(list):
             yield n, m
 
     def paraxial_matrix(self, l, start=1, stop=None):
-        m = np.eye(2)
+        m = np.eye(4)
         for n, mi in self.paraxial_matrices(l, start, stop):
             m = np.dot(mi, m)
         return m

@@ -134,15 +134,16 @@ class Element(NameMixin, TransformMixin):
         yu = np.dot(yu0, m.T)
         return yu, n
 
-    def propagate_gaussian(self, q0, n0, l):
+    def propagate_gaussian(self, q0i, n0, l):
         n, m = self.paraxial_matrix(n0, l)
-        q = np.dot((q0, 1), m.T)
-        q = q[0]/q[1]
-        return q, n
+        a, b, c, d = m[:2, :2], m[:2, 2:], m[2:, :2], m[2:, 2:]
+        qi = np.dot(c + np.dot(d, q0i), np.linalg.inv(a + np.dot(b, q0i)))
+        return qi, n
 
     def paraxial_matrix(self, n0, l):
-        d = self.distance
-        return n0, np.array([[1, d], [0, 1]])
+        m = np.eye(4)
+        m[0, 2] = m[1, 3] = self.distance
+        return n0, m
 
     def propagate(self, y0, u0, n0, l, clip=True):
         # length up to surface
@@ -333,10 +334,28 @@ class Spheroid(Interface):
             n = self.material.refractive_index(l)
         else:
             n = n0
+
         mu = n0/n
         d = self.distance
+        theta = 0.
         p = c*(mu - 1)
-        return n, np.array([[1, d], [p, d*p + mu]])
+        
+        m = np.eye(4)
+        m[0, 2] = m[1, 3] = d
+        m[2, 0] = m[3, 1] = p
+        m[2, 2] = m[3, 3] = d*p + mu
+
+        if self.angles is not None:
+            # rotation around optical axis
+            # makes simple astigmatic general astigmatic
+            phi = self.angles[2]
+            cphi, sphi = np.cos(phi), np.sin(phi)
+            r1 = np.array([[cphi, -sphi], [sphi, -cphi]])
+            r = np.eye(4)
+            r[:2, :2] = r[2:, 2:] = r
+            m = np.dot(r, np.dot(m, r.T))
+
+        return n, m
    
     def reverse(self):
         super(Spheroid, self).reverse()

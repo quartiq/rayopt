@@ -52,11 +52,11 @@ class Trace(object):
 
 
 class ParaxialTrace(Trace):
-    def __init__(self, system, aberration_orders=3):
+    def __init__(self, system, aberration_orders=3, axis=1):
         super(ParaxialTrace, self).__init__(system)
         self.allocate(aberration_orders)
-        self.rays()
-        self.propagate()
+        self.rays(axis=axis)
+        self.propagate(axis=axis)
         self.aberrations()
 
     def allocate(self, k):
@@ -73,12 +73,13 @@ class ParaxialTrace(Trace):
         self.c = np.empty((n, 2, 2, k, k, k))
         self.d = np.empty_like(self.c)
 
-    def rays(self):
+    def rays(self, axis=1):
         y, u = self.y, self.u
         l = self.system.wavelengths[0]
         self.n[0] = self.system.object.refractive_index(l)
         ai = self.system.aperture_index
         m = self.system.paraxial_matrix(l, stop=ai + 1)
+        m = m[axis::2, axis::2]
         mi = np.linalg.inv(m)
         r = self.system[ai].radius
         c = self.system.object.angular_radius
@@ -88,21 +89,25 @@ class ParaxialTrace(Trace):
         y[0, 0], u[0, 0] = r*mi[0, 0] - r*mi[0, 1]*mi[1, 0]/mi[1, 1], 0
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
-    def propagate(self, start=1, stop=None):
+    def propagate(self, start=1, stop=None, axis=1):
         self.z = np.cumsum([e.distance for e in self.system])
         init = start - 1
-        yu, n = np.array((self.y[init], self.u[init])).T, self.n[init]
+        yu = np.vstack((self.y[init], self.y[init],
+            self.u[init], self.u[init])).T
+        n = self.n[init]
         els = self.system[start:stop or self.length]
         for i, el in enumerate(els):
             i += start
             yu, n = el.propagate_paraxial(yu, n, self.l)
-            (self.y[i], self.u[i]), self.n[i] = yu.T, n
+            self.y[i], self.u[i] = np.vsplit(yu[:, axis::2].T, 2)
+            self.n[i] = n
 
-    def aberrations(self, start=0, stop=None):
+    def aberrations(self, start=1, stop=None):
         els = self.system[start:stop or self.length]
+        self.c[start - 1] = self.v[start - 1] = 0
         for i, el in enumerate(els):
+            i += start
             self.v[i] = el.dispersion(self.lmin, self.lmax)
-            # ignore i == 0 case, object handles it
             self.c[i] = el.aberration(self.y[i], self.u[i - 1],
                     self.n[i - 1], self.n[i], self.c.shape[-1])
         self.extrinsic_aberrations()
@@ -112,7 +117,7 @@ class ParaxialTrace(Trace):
         st = self.system.aperture_index
         t, s = 0, 1
         kmax = self.d.shape[-1]
-        r = np.zeros_like(self.d)
+        r = np.empty_like(self.d)
         for k in range(1, kmax - 1):
             for j in range(k + 1):
                 for i in range(k - j + 1):
@@ -124,7 +129,7 @@ class ParaxialTrace(Trace):
                     b[1:, t] = np.cumsum(b[:-1, t], axis=0)
                     r[:, t, :, k - j - i, j, i] = b[:, t]
                     r[:, s, :, k - j - i, j, i] = b[:, s]
-            for i in range(self.length):
+            for i in range(1, self.length):
                 aberration_extrinsic(self.c[i], r[i], self.d[i], k + 1)
 
     @property
@@ -356,55 +361,108 @@ class GaussianTrace(Trace):
 
     def allocate(self):
         super(GaussianTrace, self).allocate()
-        self.q = np.empty((self.length,), dtype=np.complex_)
+        self.qi = np.empty((self.length, 2, 2), dtype=np.complex_)
         self.l = 1.
         self.z = np.empty(self.length)
         self.n = np.empty_like(self.z)
 
-    def rays(self, q=None):
+    def make_qi(self, l, n, waist, position=(0, 0.), angle=0.):
+        z0 = np.pi*n*np.array(waist)**2*self.system.scale/l
+        z = np.array(position)
+        qi = 1/(z + 1j*z0)
+        qq = np.eye(2)*qi
+        ca, sa = np.cos(angle), np.sin(angle)
+        a = np.array([[ca, -sa], [sa, ca]])
+        qq = np.dot(a.T, np.dot(qq, a))
+        return qq
+
+    def rays(self, qi=None, l=None):
         # 1/q = 1/R - i*lambda/(pi*n*w**2)
         # q = z + i*z0
         # z0 = pi*n*w0**2/lambda
-        if q is None:
-            # assert self.system.object.finite # let it slip
-            self.l = self.system.wavelengths[0]
+        if l is None:
+            l = self.system.wavelengths[0]
+        n = self.system.object.refractive_index(l)
+        if qi is None:
             obj = self.system.object
-            n = obj.material.refractive_index(self.l)
-            q = 1j*np.pi*n*obj.radius**2/self.l*self.system.scale
-        self.n[0] = self.system.object.refractive_index(self.l)
-        self.q[0] = q
+            assert obj.finite # otherwise need pupil
+            qi = self.make_qi(l, n, obj.radius)
+        assert np.allclose(qi.T, qi), qi
+        self.l = l
+        self.n[0] = n
+        self.qi[0] = qi
 
     def propagate(self, start=1, stop=None):
         self.z = np.cumsum([e.distance for e in self.system])
         init = start - 1
-        q, n = self.q[init], self.n[init]
+        qi, n = self.qi[init], self.n[init]
         els = self.system[start:stop or self.length]
         for i, el in enumerate(els):
             i += start
-            q, n = el.propagate_gaussian(q, n, self.l)
-            self.q[i], self.n[i] = q, n
+            qi, n = el.propagate_gaussian(qi, n, self.l)
+            self.qi[i], self.n[i] = qi, n
 
-    def qn_at(self, z=None):
+    def qin_at(self, z=None):
         if z is None:
-            return self.q, self.n
+            return self.qi, self.n
         else:
-            # q[i] is valid after element i
-            # element indices for self.z[i-1] < z < self.z[i]
+            # qi[i] is valid after element i
+            # element indices for z[i-1] <= z < z[i]
+            # returns the qi right after element i if z == z[i]
             i = np.searchsorted(self.z, z) - 1
+            i = np.where(i < 0, 0, i)
             dz = z - self.z[i, :]
-            q = self.q[i, :] + dz
+            qi = self.qi[i, :]
+            # have to do full freespace propagation here
+            # simple astigmatic have just q = q0 + dz
+            qixx, qixy, qiyy = qi[:, 0, 0], qi[:, 0, 1], qi[:, 1, 1]
+            qixy2 = qixy**2
+            n = 1/((1 + dz*qixx)*(1 + dz*qiyy) - dz**2*qixy2)
+            qi1 = np.empty_like(qi)
+            qi1[:, 0, 0] = n*(qixx*(1 + dz*qiyy) - dz*qixy2)
+            qi1[:, 1, 0] = qi1[:, 0, 1] = n*qixy
+            qi1[:, 1, 1] = n*(qiyy*(1 + dz*qixx) - dz*qixy2)
             n = self.n[i, :]
-            return q, n
+            return qi1, n
 
-    def spot_radius_at(self, z):
-        q, n = self.qn_at(z)
-        r = (-1/(1/q).imag*self.l/self.system.scale/np.pi/n)**.5
-        return r
+    def angle(self, qi):
+        qixx, qixy, qiyy = qi[:, 0, 0], qi[:, 0, 1], qi[:, 1, 1]
+        if np.iscomplexobj(qi):
+            a = np.arctan(2*qixy/(qixx - qiyy))/2
+            #a = np.where(np.isnan(a), 0, a)
+        else:
+            a = np.arctan2(2*qixy, qixx - qiyy)/2
+        return a
 
-    def curvature_radius_at(self, z):
-        q, n = self.qn_at(z)
-        r = 1/(1/q).real
-        return r
+    def normal(self, qi):
+        a = self.angle(qi)
+        ca, sa = np.cos(a), np.sin(a)
+        o = np.array([[ca, -sa], [sa, ca]]).transpose(2, 0, 1)
+        #qi = np.where(np.isnan(qi), 0, qi)
+        qi = np.einsum("ikj,ikl,ilm->ijm", o, qi, o)
+        assert np.allclose(qi[:, 0, 1], 0), qi
+        assert np.allclose(qi[:, 1, 0], 0), qi
+        return np.diagonal(qi, 0, 1, 2), a
+
+    def spot_radius_at(self, z, normal=False):
+        qi, n = self.qin_at(z)
+        c = -self.l/self.system.scale/np.pi/n[:, None]
+        if normal:
+            r, a = self.normal(qi.imag)
+            r = np.sqrt(c/r)
+            return r, a
+        else:
+            r = np.diagonal(qi.imag, 0, 1, 2)
+            return np.sqrt(c/r)
+
+    def curvature_radius_at(self, z, normal=False):
+        qi, n = self.qin_at(z)
+        if normal:
+            r, a = self.normal(qi.real)
+            return 1/r, a
+        else:
+            r = np.diagonal(qi.real, 0, 1, 2)
+            return 1/r
 
     @property
     def curvature_radius(self): # on element
@@ -416,15 +474,19 @@ class GaussianTrace(Trace):
 
     @property
     def waist_position(self): # after element relative to element
-        return -self.q.real
+        w = -(1/np.diagonal(self.qi, 0, 1, 2)).real
+        return w
 
     @property
     def rayleigh_range(self): # after element
-        return self.q.imag
+        z = (1/np.diagonal(self.qi, 0, 1, 2)).imag
+        return z
 
     @property
     def waist_radius(self): # after element
-        return (self.q.imag/np.pi/self.n*self.l/self.system.scale)**.5
+        n = self.n[:, None]
+        r = self.rayleigh_range/np.pi/n*self.l/self.system.scale
+        return r**.5
 
     @property
     def diverging(self):
@@ -438,16 +500,39 @@ class GaussianTrace(Trace):
     def intensity_max(self, lambd):
         return (2/np.pi)**.5/self.waist_radius
 
+    def is_stigmatic(self, m):
+        return np.allclose(m[::2, ::2], m[1::2, 1::2])
+
+    def is_simple_astigmatic(self, m):
+        # does not mix the two axes
+        return np.allclose(m[(0, 0, 1, 1, 2, 2, 3, 3),
+            (1, 3, 0, 2, 1, 3, 0, 2)], 0)
+
     @property
-    def eigenmodes(self):
-        a, b, c, d = self.system.paraxial_matrix(self.l).flat
-        q = np.roots((c, d - a, -b))
-        return q
+    def eigenmodes(self): # FIXME
+        m = self.system.paraxial_matrix(self.l)
+        # only know how to do this for simple astigmatic matrices
+        # otherwise, solve qi*b*qi + qi*a - d*qi - c = 0
+        assert self.is_simple_astigmatic(m)
+        q = []
+        for axis in (0, 1):
+            a, b, c, d = m[axis::2, axis::2].flat
+            q.append(np.roots((c, d - a, -b)))
+        return 1/np.array(q).T # mode, axis
+
+    def is_proper(self): # Nemes checks
+        m = self.system.paraxial_matrix(self.l)
+        a, b, c, d = m[:2, :2], m[:2, 2:], m[2:, :2], m[2:, 2:]
+        assert np.allclose(np.dot(a, d.T) - np.dot(b, c.T), np.eye(2))
+        assert np.allclose(np.dot(a, b.T), np.dot(b, a.T))
+        assert np.allclose(np.dot(c, d.T), np.dot(d, c.T))
 
     @property
     def m(self):
-        a, b, c, d = self.system.paraxial_matrix(self.l).flat
-        m = (a + d)/2
+        m = self.system.paraxial_matrix(self.l)
+        assert self.is_simple_astigmatic(m)
+        a0, a1, d0, d1 = np.diag(m)
+        m = np.array([a0 + d0, a1 + d1])/2
         return m
 
     @property
@@ -457,7 +542,7 @@ class GaussianTrace(Trace):
         return m + m1, m - m1
 
     @property
-    def real(self):
+    def real(self): # 
         return (self.m**2).imag == 0
 
     @property
@@ -467,11 +552,15 @@ class GaussianTrace(Trace):
     # TODO: sagittal, meridional, angled, make_complete
 
     def print_trace(self):
-        c = np.c_[self.z, self.curvature_radius, self.spot_radius,
-                self.waist_position, self.waist_radius]
+        #c, rc = self.curvature_radius_at(z=None, normal=True)
+        s, rs = self.spot_radius_at(z=None, normal=True)
+        sa, sb = s.T
+        wpx, wpy = self.waist_position.T # assumes simple astig
+        wrx, wry = self.waist_radius.T # assumes simple astig
+        c = np.c_[self.z, sa, sb, np.rad2deg(rs), wpx, wpy, wrx, wry]
         return self.print_coeffs(c,
-                "track/curv rad/spot rad/waist pos/waist rad".split("/"),
-                sum=False)
+                "track/spot a/spot b/spot ang/waistx dz/waisty dz/"
+                "waist x/waist y".split("/"), sum=False)
 
     def __str__(self):
         t = itertools.chain(
@@ -480,34 +569,32 @@ class GaussianTrace(Trace):
         return "\n".join(t)
 
     def resize(self, waists=3):
-        for e, y in zip(self.system[1:], self.spot_radius[1:]):
+        w, a = self.spot_radius_at(z=None, normal=True)
+        for e, y in zip(self.system[1:], w.max(1)[1:]):
             e.radius = y*waists
 
-    def refocus(self):
-        self.system.image.distance += self.waist_position[-1]
+    def refocus(self, axis=1):
+        self.system.image.distance += self.waist_position[-1, axis]
         self.propagate()
 
     def plot(self, ax, npoints=101, waist_position=False,
             rayleigh_range=False, **kwargs):
         kwargs.setdefault("color", "black")
         z = np.linspace(min(self.z), max(self.z), npoints)
-        w = self.spot_radius_at(z)
-        ax.plot(z, w, **kwargs)
-        ax.plot(z, -w, **kwargs)
-        if waist_position:
-            p = self.waist_position + self.z
-            h = self.waist_radius*([-1], [1])
-            p, h = np.broadcast_arrays(p, h)
-            ax.plot(p, h, **kwargs)
-        if rayleigh_range:
-            # [lr, tb, i]
-            r = self.rayleigh_range
-            p = (self.waist_position + self.z + (-r, r))
-            h = (self.waist_radius*2**.5*([-1], [1]))
-            p, h = np.broadcast_arrays(p[:, None], h)
-            p = p.reshape(2, -1)
-            h = h.reshape(2, -1)
-            ax.plot(p, h, **kwargs)
+        wx, wy = self.spot_radius_at(z).T
+        ax.plot(z, wx, "--", z, -wx, "--", **kwargs)
+        ax.plot(z, wy, "-", z, -wy, "-", **kwargs)
+        if waist_position or rayleigh_range:
+            p = self.waist_position.T + self.z
+            w = self.waist_radius.T
+            r = self.rayleigh_range.T
+            for pi, wi, ri, ci in zip(p, w, r, ("--", "-")):
+                if waist_position:
+                    ax.plot((pi, pi), (-wi, wi), ci, **kwargs)
+                if rayleigh_range:
+                    for zi in pi - ri, pi + ri:
+                        ax.plot((zi, zi), (-wi*2**.5, wi*2**.5),
+                                ci, **kwargs)
 
 
 class FullTrace(Trace):
