@@ -315,10 +315,14 @@ class ParaxialTrace(Trace):
     def plot(self, ax, principals=False, pupils=False, focals=False,
             nodals=False, **kwargs):
         kwargs.setdefault("color", "black")
+        # FIXME this assumes that the outgoing oa of an element
+        # coincides with the incoming of the next
         y = self.y[:, :, None] * np.ones(3)
-        y[:, :, 2] = 0
-        y = self.origins[:, None, :] + [el.from_axis(yi)
-                for el, yi in zip(self.system, y)]
+        y[:-1, :, 2] = np.array([-el.distance for el in
+            self.system[1:]])[:, None]
+        # y is after elem in output rot
+        y = self.origins[1:, None, :] + [el.from_axis(yi)
+                for el, yi in zip(self.system[1:], y[:-1])]
         ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
         return # FIXME
         for p, flag in [
@@ -449,9 +453,9 @@ class GaussianTrace(Trace):
     def normal(self, qi):
         a = self.angle(qi)
         ca, sa = np.cos(a), np.sin(a)
-        o = np.array([[ca, -sa], [sa, ca]]).transpose(2, 0, 1)
+        o = np.array([[ca, -sa], [sa, ca]])
         #qi = np.where(np.isnan(qi), 0, qi)
-        qi = np.einsum("ikj,ikl,ilm->ijm", o, qi, o)
+        qi = np.einsum("jki,ikl,lmi->ijm", o, qi, o)
         assert np.allclose(qi[:, 0, 1], 0), qi
         assert np.allclose(qi[:, 1, 0], 0), qi
         return np.diagonal(qi, 0, 1, 2), a
@@ -530,14 +534,18 @@ class GaussianTrace(Trace):
         for axis in (0, 1):
             a, b, c, d = m[axis::2, axis::2].flat
             q.append(np.roots((c, d - a, -b)))
-        return 1/np.array(q).T # mode, axis
+        q = np.eye(2)[None, :]/np.array(q).T[:, :, None] # mode, axis
+        return q
 
     def is_proper(self): # Nemes checks
         m = self.system.paraxial_matrix(self.l)
         a, b, c, d = m[:2, :2], m[:2, 2:], m[2:, :2], m[2:, 2:]
-        assert np.allclose(np.dot(a, d.T) - np.dot(b, c.T), np.eye(2))
-        assert np.allclose(np.dot(a, b.T), np.dot(b, a.T))
-        assert np.allclose(np.dot(c, d.T), np.dot(d, c.T))
+        for i, (v1, v2) in enumerate([
+                (np.dot(a, d.T) - np.dot(b, c.T), np.eye(2)),
+                (np.dot(a, b.T), np.dot(b, a.T)),
+                (np.dot(c, d.T), np.dot(d, c.T)),
+                ]):
+            assert np.allclose(v1, v2), (i, v1, v2)
 
     @property
     def m(self):
@@ -605,6 +613,7 @@ class GaussianTrace(Trace):
                 ax.plot(zi, wxi, **kwargs)
             else:
                 ax.plot(zi, wyi, **kwargs)
+        return # FIXME
         if waist_position or rayleigh_range:
             p = self.waist_position.T + self.z
             w = self.waist_radius.T
@@ -635,12 +644,13 @@ class FullTrace(Trace):
             l = self.system.wavelengths[0]
         self.allocate(max(y.shape[0], u.shape[0]))
         self.l = l
-        self.y[0, :, :] = 0
+        self.y[0] = 0
         self.y[0, :, :y.shape[1]] = y
-        self.u[0, :, :] = 0
+        self.u[0] = 0
         self.u[0, :, :u.shape[1]] = u
         self.u[0, :, 2] = np.sqrt(1 - np.square(self.u[0, :, :2]).sum(1))
         self.n[0] = self.system.object.refractive_index(l)
+        self.t[0] = 0
 
     def propagate(self, start=1, stop=None, clip=False):
         self.z = np.cumsum([e.distance for e in self.system])
@@ -732,6 +742,7 @@ class FullTrace(Trace):
         return p, q, psf
 
     def rays_paraxial(self, paraxial):
+        # FIXME: rotate
         y = np.zeros((2, 2))
         y[:, 1] = paraxial.y[0]
         u = np.zeros((2, 2))

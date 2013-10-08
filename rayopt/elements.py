@@ -95,9 +95,11 @@ class TransformMixin(object):
         self.update(self._distance, self._direction, angles)
 
     def update(self, distance, direction, angles):
-        self._distance = d = np.fabs(distance)
         self._direction = u = np.array(direction)
         u /= np.linalg.norm(u)
+        if distance < 0:
+            u *= -1
+        self._distance = d = abs(distance)
         self._offset = o = d*u
         self.normal = angles is None or np.allclose(angles, 0)
         self.straight = np.allclose(u, (0, 0, 1))
@@ -112,6 +114,8 @@ class TransformMixin(object):
             rang = np.arcsin(np.linalg.norm(rdir))
             if u[2] < 0: # FIXME
                 rang += np.pi
+            if np.allclose(rdir, 0):
+                rdir = (1., 0, 0)
             self.rot_axis = r1 = rotation_matrix(rang, rdir)[:3, :3]
             r = np.dot(r, r1)
         if not self.normal:
@@ -204,7 +208,7 @@ class Element(NameMixin, TransformMixin):
 
     def paraxial_matrix(self, n0, l):
         m = np.eye(4)
-        d = self.distance*np.sign(n0)
+        d = self.distance
         m[0, 2] = m[1, 3] = d
         return n0, m
 
@@ -255,12 +259,12 @@ class Interface(Element):
         self.material = material
 
     def refractive_index(self, wavelength):
-        return self.material.refractive_index(wavelength)
+        return abs(self.material.refractive_index(wavelength))
 
     def paraxial_matrix(self, n0, l):
         n, m = super(Interface, self).paraxial_matrix(n0, l)
         if self.material is not None:
-            n = self.material.refractive_index(l)
+            n = self.refractive_index(l)
         return n, m
 
     def refract(self, y, u0, mu):
@@ -274,8 +278,9 @@ class Interface(Element):
             self.clip(y, u)
         n = n0
         if self.material is not None:
-            n = self.material.refractive_index(l)
-            u = self.refract(y, u, n0/n)
+            n = self.refractive_index(l)
+            mu = -n0/n if self.material.mirror else n0/n
+            u = self.refract(y, u, mu)
         return y, u, n, t*n0
 
     def dispersion(self, lmin, lmax):
@@ -389,34 +394,32 @@ class Spheroid(Interface):
         c = self.curvature
         if self.aspherics is not None:
             c += 2*self.aspherics[0]
-        if self.material is not None:
-            n = self.material.refractive_index(l)
-        else:
-            n = n0
+        d = self.distance
+        md = np.eye(4)
+        md[0, 2] = md[1, 3] = d
 
-        d = self.distance*np.sign(n0)
         theta = self.angles[0] if self.angles is not None else 0.
-        mu = n/n0
-        #p = np.sqrt(mu**2 - np.sin(theta)**2)
-        #costheta = np.cos(theta)
-        mu = n0/n
-        p = c*(mu - 1)
-        
+        costheta = np.cos(theta)
+        n = n0
         m = np.eye(4)
-        #m[1, 1] = p/(mu*costheta)
-        #m[2, 0] = c*(costheta - p)/mu
-        #m[3, 1] = c*(costheta - p)/(costheta*p)
-        #m[2, 2] = 1/mu
-        #m[3, 3] = costheta/p
-        #md = np.eye(4)
-        #md[0, 2] = m[1, 3] = d
-        #m = np.dot(m, d)
-        m[0, 2] = m[1, 3] = d
-        m[2, 0] = m[3, 1] = p
-        m[2, 2] = m[3, 3] = d*p + mu
+        if self.material is not None:
+            if self.material.mirror:
+                m[2, 0] = 2*c*costheta
+                m[3, 1] = 2*c/costheta
+                m = -m
+            else:
+                n = self.refractive_index(l)
+                mu = n/n0
+                p = np.sqrt(mu**2 - np.sin(theta)**2)
+                m[1, 1] = p/(mu*costheta)
+                m[2, 0] = c*(costheta - p)/mu
+                m[3, 1] = c*(costheta - p)/(costheta*p)
+                m[2, 2] = 1./mu
+                m[3, 3] = costheta/p
+        m = np.dot(m, md)
 
         if self.angles is not None:
-            # rotation around optical axis
+            # rotation around optical axis # FIXME
             # makes simple astigmatic general astigmatic
             phi = self.angles[2]
             cphi, sphi = np.cos(phi), np.sin(phi)
