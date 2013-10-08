@@ -144,13 +144,13 @@ class System(list):
 
     def surfaces_cut(self, axis, points):
         """yields cut outlines of surfaces. solids are closed"""
-        z0 = 0.
+        # FIXME: not really a global cut, but a local one
+        pos = np.zeros(3)
         pending = None
         for e in self:
-            z0 += e.distance
-            xyz = e.transform_from(e.surface_cut(axis, points))
+            pos += e.offset
+            xyz = pos + e.from_normal(e.surface_cut(axis, points))
             x, z = xyz[:, axis], xyz[:, 2]
-            z += z0
             if getattr(e, "material", None) is None:
                 yield x, z
                 continue
@@ -184,7 +184,8 @@ class System(list):
             ax.set_yticks(())
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(z, x, **kwargs)
-        ax.plot((0, sum(e.distance for e in self)), (0, 0), "k--")
+        o = np.cumsum([e.offset for e in self], axis=0)
+        ax.plot(o[:, 2], o[:, axis], "k--")
 
     def paraxial_matrices(self, l, start=1, stop=None):
         n = self[start - 1].refractive_index(l)

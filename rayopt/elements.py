@@ -21,74 +21,136 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 from scipy.optimize import newton
 
-from .transformations import (euler_matrix, translation_matrix,
-        concatenate_matrices)
+from .transformations import (euler_matrix, euler_from_matrix, 
+        translation_matrix, rotation_matrix, concatenate_matrices)
 from .name_mixin import NameMixin
 from .aberration_orders import aberration_intrinsic
-from .utils import sinarctan, tanarcsin
+from .utils import sinarctan, tanarcsin, eps_double
 
 
 class TransformMixin(object):
-    def __init__(self, offset=None, angles=None):
-        self.offset = offset
-        self.angles = angles
-        self.update()
+    def __init__(self, distance=0., direction=(0, 0, 1.), angles=None):
+        self.update(distance, direction, angles)
+        # offset = distance*direction: in lab system, relative to last
+        # element (thus cumulative in lab system)
+        # angles: relative to unit offset (-incidence angle)
+        # excidence: excidence angles for axial ray (snell)
 
-    def update(self):
-        if self.offset is None and self.angles is None:
-            self.at_origin = True
+    @property
+    def offset(self):
+        return self._offset
+
+    @offset.setter
+    def offset(self, offset):
+        d = np.linalg.norm(offset)
+        self.update(d, offset/d, self._angles)
+
+    @property
+    def angles(self):
+        return self._angles
+
+    @angles.setter
+    def angles(self, angles):
+        self.update(self._distance, self._direction, angles)
+
+    @property
+    def distance(self):
+        return self._distance
+
+    @distance.setter
+    def distance(self, distance):
+        self.update(distance, self._direction, self._angles)
+
+    @property
+    def direction(self):
+        return self._direction
+
+    @direction.setter
+    def direction(self, direction):
+        self.update(self._distance, direction, self._angles)
+
+    @property
+    def incidence(self):
+        # of the optical axis onto the surface
+        return self.transform_to(self._direction, angle=True)
+
+    @property
+    def excidence(self, mu):
+        raise NotImplementedError
+        e = self.incidence * (mu, mu, 0)
+        e[2] = np.sqrt(1 - np.square(e).sum())
+        e = i/np.linalg.unit_vector(i)
+        return e
+
+    def aim(self, direction, mu):
+        """orient such that direction is excidence"""
+        raise NotImplementedError
+        e = np.array(direction)
+        e /= np.linalg.norm(e)
+        i = self.incidence
+        rdir = np.cross(i, e)
+        ang = np.arcsin(np.linalg.norm(rdir))
+        r = rotation_matrix(ang/2, rdir)
+        angles = euler_from_matrix(r, "rxyz")
+        self.update(self._distance, self._direction, angles)
+
+    def update(self, distance, direction, angles):
+        self._distance = d = np.fabs(distance)
+        self._direction = u = np.array(direction)
+        u /= np.linalg.norm(u)
+        self._offset = o = d*u
+        self.normal = angles is None or np.allclose(angles, 0)
+        self.straight = np.allclose(u, (0, 0, 1))
+        self._angles = a = None if self.normal else np.array(angles)
+        self.rotated = not (self.normal and self.straight)
+        if not self.rotated:
+            self.rot_axis = self.rot_normal = None
             return
-        self.at_origin = (np.allclose(self.angles, 0) and
-                np.allclose(self.offset, 0))
-        self.rotation = euler_matrix(axes="rxyz", *self.angles)
-        self.inverse_rotation = np.linalg.inv(self.rotation)
-        translation = translation_matrix(self.offset)
-        self.transformation = concatenate_matrices(translation,
-                self.rotation)
-        self.inverse_transformation = np.linalg.inv(self.transformation)
+        r = np.eye(3)
+        if not self.straight:
+            rdir = np.cross((0, 0, 1.), u)
+            rang = np.arcsin(np.linalg.norm(rdir))
+            if u[2] < 0: # FIXME
+                rang += np.pi
+            self.rot_axis = r1 = rotation_matrix(rang, rdir)[:3, :3]
+            r = np.dot(r, r1)
+        if not self.normal:
+            r1 = euler_matrix(axes="rxyz", *tuple(a))[:3, :3]
+            r = np.dot(r, r1)
+        self.rot_normal = r
 
-    def transform_to(self, y, angle=False):
-        y = np.atleast_2d(y)
-        if self.at_origin:
-            return y
-        if y.shape[1] == 4:
-            y = np.dot(y, self.inverse_transformation.T)
+    def _do_rotate(self, r, t, f, y):
+        if f:
+            if t:
+                r = r.T
+            y = (np.dot(yi, r) for yi in y)
         else:
-            if not angle:
-                y = y - self.offset
-            y = np.dot(y, self.inverse_rotation.T[:3, :3])
+            y = (yi.copy() for yi in y)
+        y = tuple(y)
+        if len(y) == 1:
+            y = y[0]
         return y
 
-    def transform_from(self, y, angle=False):
-        y = np.atleast_2d(y)
-        if self.at_origin:
-            return y
-        if y.shape[1] == 4:
-            y = np.dot(y, self.transformation.T)
-        else:
-            y = np.dot(y, self.rotation.T[:3, :3])
-            if not angle:
-                y += self.offset
-        return y
+    def from_axis(self, *y):
+        return self._do_rotate(self.rot_axis, False, not self.straight, y)
 
-    def transformed_yu(self, fun, y0, u0, *args, **kwargs):
-        y0 = self.transform_to(y0)
-        u0 = self.transform_to(u0, angle=True)
-        ret = fun(y0, u0, *args, **kwargs)
-        y, u = ret[:2]
-        y = self.transform_from(y)
-        u = self.transform_from(u, angle=True)
-        return (y, u) + ret[2:]
+    def to_axis(self, *y):
+        return self._do_rotate(self.rot_axis, True, not self.straight, y)
+
+    def from_normal(self, *y):
+        return self._do_rotate(self.rot_normal, False, self.rotated, y)
+
+    def to_normal(self, *y):
+        return self._do_rotate(self.rot_normal, True, self.rotated, y)
 
 
 class Element(NameMixin, TransformMixin):
     typ = "P"
 
-    def __init__(self, distance=0., radius=np.inf, finite=True,
+    def __init__(self, radius=np.inf, finite=True,
             angular_radius=np.inf, **kwargs):
         super(Element, self).__init__(**kwargs)
         self.radius = radius
-        self.distance = distance
         self.finite = finite
         self.angular_radius = angular_radius
         # angular radius is tan(u) as sin(u) is ambiguous
@@ -142,30 +204,23 @@ class Element(NameMixin, TransformMixin):
 
     def paraxial_matrix(self, n0, l):
         m = np.eye(4)
-        m[0, 2] = m[1, 3] = self.distance
+        d = self.distance*np.sign(n0)
+        m[0, 2] = m[1, 3] = d
         return n0, m
 
     def propagate(self, y0, u0, n0, l, clip=True):
-        # length up to surface
-        y = y0 - [0, 0, self.distance]
-        t = self.intercept(y, u0)
-        # new transverse position
-        y += t[:, None]*u0
-        u = u0
+        y, u = self.to_normal(y0 - self.offset, u0)
+        t = self.intercept(y, u)
+        y += t[:, None]*u
         if clip:
-            u = u.copy()
             self.clip(y, u)
-        return y, u, n0, t*n0
+        n = n0
+        return y, u, n, t*n0
 
     def reverse(self):
-        if self.offset is not None:
-            self.offset[1:] *= -1
-        self.update()
+        pass
 
     def rescale(self, scale):
-        if self.offset is not None:
-            self.offset *= scale
-        self.update()
         self.distance *= scale
         self.radius *= scale
 
@@ -212,12 +267,16 @@ class Interface(Element):
         return u0
 
     def propagate(self, y0, u0, n0, l, clip=True):
-        y, u, n, t = super(Interface, self).propagate(
-                y0, u0, n0, l, clip)
+        y, u = self.to_normal(y0 - self.offset, u0)
+        t = self.intercept(y, u)
+        y += t[:, None]*u
+        if clip:
+            self.clip(y, u)
+        n = n0
         if self.material is not None:
             n = self.material.refractive_index(l)
             u = self.refract(y, u, n0/n)
-        return y, u, n, t
+        return y, u, n, t*n0
 
     def dispersion(self, lmin, lmax):
         v = 0.
@@ -335,12 +394,23 @@ class Spheroid(Interface):
         else:
             n = n0
 
+        d = self.distance*np.sign(n0)
+        theta = self.angles[0] if self.angles is not None else 0.
+        mu = n/n0
+        #p = np.sqrt(mu**2 - np.sin(theta)**2)
+        #costheta = np.cos(theta)
         mu = n0/n
-        d = self.distance
-        theta = 0.
         p = c*(mu - 1)
         
         m = np.eye(4)
+        #m[1, 1] = p/(mu*costheta)
+        #m[2, 0] = c*(costheta - p)/mu
+        #m[3, 1] = c*(costheta - p)/(costheta*p)
+        #m[2, 2] = 1/mu
+        #m[3, 3] = costheta/p
+        #md = np.eye(4)
+        #md[0, 2] = m[1, 3] = d
+        #m = np.dot(m, d)
         m[0, 2] = m[1, 3] = d
         m[2, 0] = m[3, 1] = p
         m[2, 2] = m[3, 3] = d*p + mu
@@ -352,7 +422,7 @@ class Spheroid(Interface):
             cphi, sphi = np.cos(phi), np.sin(phi)
             r1 = np.array([[cphi, -sphi], [sphi, -cphi]])
             r = np.eye(4)
-            r[:2, :2] = r[2:, 2:] = r
+            r[:2, :2] = r[2:, 2:] = r1
             m = np.dot(r, np.dot(m, r.T))
 
         return n, m

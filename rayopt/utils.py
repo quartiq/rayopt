@@ -19,6 +19,8 @@
 import numpy as np
 
 
+eps_double = np.finfo(np.double).eps
+
 def dir_to_angles(r):
     return r/np.linalg.norm(r)
 

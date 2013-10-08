@@ -56,7 +56,7 @@ class ParaxialTrace(Trace):
         super(ParaxialTrace, self).__init__(system)
         self.allocate(aberration_orders)
         self.rays(axis=axis)
-        self.propagate(axis=axis)
+        self.propagate()
         self.aberrations()
 
     def allocate(self, k):
@@ -75,6 +75,7 @@ class ParaxialTrace(Trace):
 
     def rays(self, axis=1):
         y, u = self.y, self.u
+        self.axis = axis
         l = self.system.wavelengths[0]
         self.n[0] = self.system.object.refractive_index(l)
         ai = self.system.aperture_index
@@ -89,9 +90,11 @@ class ParaxialTrace(Trace):
         y[0, 0], u[0, 0] = r*mi[0, 0] - r*mi[0, 1]*mi[1, 0]/mi[1, 1], 0
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
-    def propagate(self, start=1, stop=None, axis=1):
+    def propagate(self, start=1, stop=None):
         self.z = np.cumsum([e.distance for e in self.system])
+        self.origins = np.cumsum([e.offset for e in self.system], axis=0)
         init = start - 1
+        # FIXME not really round for gen astig...
         yu = np.vstack((self.y[init], self.y[init],
             self.u[init], self.u[init])).T
         n = self.n[init]
@@ -99,7 +102,7 @@ class ParaxialTrace(Trace):
         for i, el in enumerate(els):
             i += start
             yu, n = el.propagate_paraxial(yu, n, self.l)
-            self.y[i], self.u[i] = np.vsplit(yu[:, axis::2].T, 2)
+            self.y[i], self.u[i] = np.vsplit(yu[:, self.axis::2].T, 2)
             self.n[i] = n
 
     def aberrations(self, start=1, stop=None):
@@ -312,7 +315,12 @@ class ParaxialTrace(Trace):
     def plot(self, ax, principals=False, pupils=False, focals=False,
             nodals=False, **kwargs):
         kwargs.setdefault("color", "black")
-        ax.plot(self.z, self.y, **kwargs)
+        y = self.y[:, :, None] * np.ones(3)
+        y[:, :, 2] = 0
+        y = self.origins[:, None, :] + [el.from_axis(yi)
+                for el, yi in zip(self.system, y)]
+        ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
+        return # FIXME
         for p, flag in [
                 (self.principal_distance, principals),
                 (self.focal_distance, focals),
@@ -328,6 +336,10 @@ class ParaxialTrace(Trace):
             h = self.pupil_height
             x = np.array([-1.5, -1, np.nan, 1, 1.5])[:, None]
             ax.plot(p*np.ones((5, 1)), h*x, **kwargs)
+
+    def plot_yybar(self, ax, **kwargs):
+        kwargs.setdefault("color", "black")
+        ax.plot(self.y[:, 0], self.y[:, 1], **kwargs)
 
     # TODO introduce aperture at argmax(abs(y_axial)/radius)
     # or at argmin(abs(u_axial))
@@ -363,8 +375,7 @@ class GaussianTrace(Trace):
         super(GaussianTrace, self).allocate()
         self.qi = np.empty((self.length, 2, 2), dtype=np.complex_)
         self.l = 1.
-        self.z = np.empty(self.length)
-        self.n = np.empty_like(self.z)
+        self.n = np.empty(self.length)
 
     def make_qi(self, l, n, waist, position=(0, 0.), angle=0.):
         z0 = np.pi*n*np.array(waist)**2*self.system.scale/l
@@ -394,6 +405,7 @@ class GaussianTrace(Trace):
 
     def propagate(self, start=1, stop=None):
         self.z = np.cumsum([e.distance for e in self.system])
+        self.origins = np.cumsum([e.offset for e in self.system], axis=0)
         init = start - 1
         qi, n = self.qi[init], self.n[init]
         els = self.system[start:stop or self.length]
@@ -577,13 +589,22 @@ class GaussianTrace(Trace):
         self.system.image.distance += self.waist_position[-1, axis]
         self.propagate()
 
-    def plot(self, ax, npoints=101, waist_position=False,
+    def plot(self, ax, axis=1, npoints=201, waist_position=False,
             rayleigh_range=False, **kwargs):
         kwargs.setdefault("color", "black")
-        z = np.linspace(min(self.z), max(self.z), npoints)
+        z = np.linspace(self.z[0], self.z[-1], npoints)
         wx, wy = self.spot_radius_at(z).T
-        ax.plot(z, wx, "--", z, -wx, "--", **kwargs)
-        ax.plot(z, wy, "-", z, -wy, "-", **kwargs)
+        i = np.searchsorted(z, self.z) # z-index of element
+        for s in 1, -1:
+            y = np.vsplit(np.c_[s*wx, s*wy, z], i)
+            y = [el.from_axis(yi - [0, 0, zi]) + oi for el, yi, zi, oi
+                    in zip(self.system, y, self.z, self.origins)
+                    if yi.ndim == 2]
+            wxi, wyi, zi = np.vstack(y).T
+            if axis == 0:
+                ax.plot(zi, wxi, **kwargs)
+            else:
+                ax.plot(zi, wyi, **kwargs)
         if waist_position or rayleigh_range:
             p = self.waist_position.T + self.z
             w = self.waist_radius.T
@@ -604,8 +625,7 @@ class FullTrace(Trace):
         self.y = np.empty((self.length, nrays, 3))
         self.u = np.empty_like(self.y)
         self.l = 1.
-        self.z = np.empty(self.length)
-        self.n = np.empty_like(self.z)
+        self.n = np.empty(self.length)
         self.t = np.empty((self.length, nrays))
 
     def rays_given(self, y, u, l=None):
@@ -624,12 +644,15 @@ class FullTrace(Trace):
 
     def propagate(self, start=1, stop=None, clip=False):
         self.z = np.cumsum([e.distance for e in self.system])
+        self.origins = np.cumsum([e.offset for e in self.system], axis=0)
         init = start - 1
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
+        y, u = self.system[init].from_normal(y, u)
         for i, e in enumerate(self.system[start:stop or self.length]):
             i += start
-            y, u, n, t = e.transformed_yu(e.propagate, y, u, n, l, clip)
+            y, u, n, t = e.propagate(y, u, n, l, clip)
             self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
+            y, u = e.from_normal(y, u)
 
     def refocus(self):
         y = self.y[-1, :, :2]
@@ -949,9 +972,9 @@ class FullTrace(Trace):
 
     def plot(self, ax, axis=1, **kwargs):
         kwargs.setdefault("color", "green")
-        y = self.y[:, :, axis]
-        z = self.y[:, :, 2] + self.z[:, None]
-        ax.plot(z, y, **kwargs)
+        y = np.array([el.from_normal(yi) + oi for el, yi, oi
+            in zip(self.system, self.y, self.origins)])
+        ax.plot(y[:, :, 2], y[:, :, axis], **kwargs)
 
     def print_trace(self):
         for i in range(self.nrays):

@@ -77,7 +77,7 @@ class Analysis(object):
             self.paraxial.resize()
             self.system.fix_sizes()
         self.system.image.radius = abs(self.paraxial.height[1])
-        if self.trace_gaussian:
+        if self.trace_gaussian and self.system.object.finite:
             self.gaussian = GaussianTrace(self.system)
         if self.print_gaussian:
             self.text.append(unicode(self.gaussian))
