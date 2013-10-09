@@ -246,9 +246,7 @@ class Analysis(object):
                 # plot transverse image plane versus entrance pupil
                 # coordinates
                 y = t.y[-1, :, :2] - t.y[-1, ref, :2]
-                u0 = self.system[0].from_normal(t.u[0])
-                u0 = self.system[1].to_normal(u0)
-                py = t.y[1, :, :2] + p*tanarcsin(u0)
+                py = t.y[1, :, :2] + p*tanarcsin(t.i[1])
                 py -= py[ref]
                 axm.plot(py[:ref, 1], y[:ref, 1], "-%s" % ci, label="%s" % wi)
                 axsm.plot(py[ref:, 0], y[ref:, 1], "-%s" % ci, label="%s" % wi)
@@ -285,9 +283,7 @@ class Analysis(object):
                         clip=True)
                 # plot transverse image plane hit pattern (ray spot)
                 y = t.y[-1, :, :2] - t.y[-1, ref, :2]
-                u = self.system[-2].from_normal(t.u[-2])
-                u = self.system[-1].to_normal(u)
-                u = tanarcsin(u)
+                u = tanarcsin(t.i[-1])
                 for axij, zi in zip(axi, z):
                     axij.add_patch(mpl.patches.Circle((0, 0), r, edgecolor=ci,
                         facecolor="none"))
@@ -390,9 +386,7 @@ class Analysis(object):
             t = FullTrace(self.system)
             t.rays_paraxial_line(paraxial, height, wi, nrays=nrays)
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
-            u = self.system[-2].from_normal(t.u[-2])
-            u = self.system[-1].to_normal(u)
-            p, q, r = np.split(tanarcsin(u).T, (nrays, 2*nrays), axis=1)
+            p, q, r = np.split(tanarcsin(t.i[-1]).T, (nrays, 2*nrays), axis=1)
             if i == 0:
                 xd = (a[1] - h)/h
                 xd[0] = np.nan
@@ -408,12 +402,8 @@ class Analysis(object):
             t.rays_paraxial_point(paraxial, 0., wi, nrays=nrays,
                     distribution="half-meridional")
             p = paraxial.pupil_distance[0]
-            u = self.system[0].from_normal(t.u[0])
-            u = self.system[1].to_normal(u)
-            py = t.y[1, :, 1] + p*tanarcsin(u)[:, 1]
-            u = self.system[-2].from_normal(t.u[-2])
-            u = self.system[-1].to_normal(u)
-            z = -t.y[-1, :, 1]/tanarcsin(u)[:, 1]
+            py = t.y[1, :, 1] + p*tanarcsin(t.i[1])[:, 1]
+            z = -t.y[-1, :, 1]/tanarcsin(t.i[-1])[:, 1]
             axs.plot(py, z, ci+"-", label="%s" % wi)
         wl, wu = min(wavelengths), max(wavelengths)
         ww = np.linspace(wl - (wu - wl)/4, wu + (wu - wl)/4, nrays)
@@ -424,9 +414,7 @@ class Analysis(object):
             y, u = self.system.object.to_pupil((0, 0), (0, 1e-3), ph, pd)
             t.rays_given(y, u, wwi)
             t.propagate(clip=False)
-            u = self.system[-2].from_normal(t.u[-2])
-            u = self.system[-1].to_normal(u)
-            zc.append(-t.y[-1, 0, 1]/tanarcsin(u)[0, 1])
+            zc.append(-t.y[-1, 0, 1]/tanarcsin(t.i[-1, 0])[1])
         zc = np.array(zc[1:]) - zc[0]
         axa.plot(ww, zc, "-")
         for axi in ax:

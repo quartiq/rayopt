@@ -646,6 +646,7 @@ class FullTrace(Trace):
         self.nrays = nrays
         self.y = np.empty((self.length, nrays, 3))
         self.u = np.empty_like(self.y)
+        self.i = np.empty_like(self.y)
         self.l = 1.
         self.n = np.empty(self.length)
         self.t = np.empty((self.length, nrays))
@@ -662,6 +663,7 @@ class FullTrace(Trace):
         self.u[0] = 0
         self.u[0, :, :u.shape[1]] = u
         self.u[0, :, 2] = np.sqrt(1 - np.square(self.u[0, :, :2]).sum(1))
+        self.i[0] = self.u[0]
         self.n[0] = self.system.object.refractive_index(l)
         self.t[0] = 0
 
@@ -674,13 +676,14 @@ class FullTrace(Trace):
         for i, e in enumerate(self.system[start:stop or self.length]):
             i += start
             y, u = e.to_normal(y - e.offset, u)
+            self.i[i] = u
             y, u, n, t = e.propagate(y, u, n, l, clip)
             self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
             y, u = e.from_normal(y, u)
 
     def refocus(self):
         y = self.y[-1, :, :2]
-        u = tanarcsin(self.u[-1])
+        u = tanarcsin(self.i[-1])
         good = np.all(np.isfinite(u), axis=1)
         y, u = y[good], u[good]
         y, u = (y - y.mean(0)).ravel(), (u - u.mean(0)).ravel()
@@ -689,7 +692,7 @@ class FullTrace(Trace):
         self.system.image.distance += t
         self.propagate()
 
-    def opd(self, chief=0, radius=None, after=-2, resample=4):
+    def opd(self, chief=0, radius=None, after=-2, image=-1, resample=4):
         t = self.t[:after + 1].sum(0)
         if not self.system.object.finite:
             # input reference sphere is a tilted plane
@@ -697,17 +700,14 @@ class FullTrace(Trace):
             tj = np.dot(self.u[0, chief], (self.y[0, chief] - self.y[0]).T)
             t -= tj*self.n[0]
         if radius is None:
-            radius = self.z[-1] - self.z[after]
-            #axis=1
-            #if np.fabs(self.u[-1, chief, axis]) > 1e-6:
-            #    radius = self.y[-1, chief, axis]/self.u[-1, chief, axis]
+            radius = self.z[image] - self.z[after]
         # center sphere on chief image
         y = self.system[after].from_normal(self.y[after])
-        y -= self.origins[-1] - self.origins[after]
-        y = self.system[-1].to_normal(y)
-        y -= self.y[-1, chief]
+        y -= self.origins[image] - self.origins[after]
+        y = self.system[image].to_normal(y)
+        y -= self.y[image, chief]
         u = self.system[after].from_normal(self.u[after])
-        u = self.system[-1].to_normal(u)
+        u = self.system[image].to_normal(u)
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
         #u = -y/np.sqrt(np.square(y).sum(1))[:, None]
@@ -964,7 +964,7 @@ class FullTrace(Trace):
         return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
     def rays_line(self, height, pupil_distance, pupil_height,
-            wavelength=None, nrays=21, aim=True, eps=1e-3, clip=False):
+            wavelength=None, nrays=21, aim=True, eps=1e-2, clip=False):
         yi = np.c_[np.zeros(nrays), np.linspace(0, height, nrays)]
         y, u = self.system.object.to_pupil(yi, (0, 0.), pupil_distance,
                 pupil_height)
