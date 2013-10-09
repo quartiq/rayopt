@@ -379,10 +379,10 @@ class ParaxialTrace(Trace):
             n0, n1 = self.n[i:i + 2]
             e0, e1 = self.system[i:i + 2]
             mu = n1/n0
-            if hasattr(el0, "material"):
-                if el0.material.mirror:
+            if hasattr(e0, "material"):
+                if e0.material.mirror:
                     mu = -1.
-            el0.aim(el1.direction, mu)
+            e0.aim(e1.direction, mu)
 
 
 class GaussianTrace(Trace):

@@ -84,13 +84,15 @@ class TransformMixin(object):
 
     def aim(self, direction, mu):
         """orient such that direction is excidence"""
-        raise NotImplementedError
         e = np.array(direction)
-        e /= np.linalg.norm(e)
-        i = self.incidence
-        rdir = np.cross(i, e)
-        ang = np.arcsin(np.linalg.norm(rdir))
-        r = rotation_matrix(ang/2, rdir)
+        i = -self.direction
+        r = i - mu*e # snell
+        r /= np.linalg.norm(r)
+        rdir = np.cross((0, 0, 1.), r)
+        rang = np.arcsin(np.linalg.norm(rdir))
+        if np.allclose(rdir, 0):
+            rdir = (1., 0, 0)
+        r = rotation_matrix(rang, rdir)
         angles = euler_from_matrix(r, "rxyz")
         self.update(self._distance, self._direction, angles)
 
