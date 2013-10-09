@@ -61,20 +61,30 @@ def simple_cache(f):
 
 
 class Material(object):
-    def __init__(self, name="", solid=True, mirror=False, sellmeier=None,
-            nd=1., vd=np.inf, thermal=None):
+    def __init__(self, name="-", solid=True, mirror=False):
         self.name = name
         self.solid = solid
         self.mirror = mirror
-        self.thermal = thermal
-        if sellmeier is not None:
-            self.sellmeier = np.atleast_2d(sellmeier)
-            self.nd = self.refractive_index(lambda_d)
-            self.vd = self.dispersion(lambda_F, lambda_d, lambda_C)
-        else:
-            self.sellmeier = None
-            self.nd = nd
-            self.vd = vd
+
+    def __str__(self):
+        return self.name
+
+    @simple_cache
+    def refractive_index(self, wavelength):
+        return 1.
+
+    def dispersion(self, short, mid, long):
+        return (self.refractive_index(mid) - 1)/self.delta_n(short, long)
+
+    def delta_n(self, short, long):
+        return (self.refractive_index(short) - self.refractive_index(long))
+
+ 
+class ModelMaterial(Material):
+    def __init__(self, nd=1., vd=np.inf, **kwargs):
+        super(ModelMaterial, self).__init__(**kwargs)
+        self.nd = nd
+        self.vd = vd
 
     @classmethod
     def from_string(cls, txt, name=None):
@@ -88,16 +98,28 @@ class Material(object):
             raise ValueError
         if name is None:
             name = "-"
-        return cls(name=name, solid=nd>1, nd=nd, vd=vd)
+        return cls(name=name, nd=nd, vd=vd)
 
-    def __str__(self):
-        return self.name
-
-    def n_from_nd_vd(self, wavelength):
+    @simple_cache
+    def refractive_index(self, wavelength):
         return (self.nd + (wavelength - lambda_d)/(lambda_C - lambda_F)
                 *(1 - self.nd)/self.vd)
 
-    def n_from_sellmeier(self, wavelength):
+
+class SellmeierMaterial(Material):
+    def __init__(self, sellmeier, thermal=None, nd=None, vd=None, **kwargs):
+        super(SellmeierMaterial, self).__init__(**kwargs)
+        self.sellmeier = np.atleast_2d(sellmeier)
+        if nd is None:
+            nd = self.refractive_index(lambda_d)
+        self.nd = nd
+        if vd is None:
+            vd = self.dispersion(lambda_F, lambda_d, lambda_C)
+        self.vd = vd
+        self.thermal = thermal
+
+    @simple_cache
+    def refractive_index(self, wavelength):
         w2 = (wavelength/1e-6)**2
         c0 = self.sellmeier[:, 0]
         c1 = self.sellmeier[:, 1]
@@ -106,19 +128,6 @@ class Material(object):
         if self.mirror:
             n = -n
         return n
-
-    @simple_cache
-    def refractive_index(self, wavelength):
-        if self.sellmeier is not None:
-            return self.n_from_sellmeier(wavelength)
-        else:
-            return self.n_from_nd_vd(wavelength)
-
-    def dispersion(self, short, mid, long):
-        return (self.refractive_index(mid) - 1)/self.delta_n(short, long)
-
-    def delta_n(self, short, long):
-        return (self.refractive_index(short) - self.refractive_index(long))
 
     def dn_thermal(self, t, n, wavelength):
         d0, d1, d2, e0, e1, tref, lref = self.thermal
@@ -129,11 +138,12 @@ class Material(object):
         return dn
 
 
-class Gas(Material):
-    def __init__(self, solid=False, **kwargs):
-        super(Gas, self).__init__(solid=solid, **kwargs)
+class GasMaterial(SellmeierMaterial):
+    def __init__(self, **kwargs):
+        super(GasMaterial, self).__init__(solid=False, **kwargs)
 
-    def n_from_sellmeier(self, wavelength):
+    @simple_cache
+    def refractive_index(self, wavelength):
         w2 = (wavelength/1e-6)**2
         c0 = self.sellmeier[:, 0]
         c1 = self.sellmeier[:, 1]
@@ -144,13 +154,14 @@ class Gas(Material):
             n = -n
         return n
 
-# http://refractiveindex.info
-vacuum = Gas(name="vacuum", nd=1., vd=np.inf)
-vacuum_mirror = Gas(name="vacuum_mirror", mirror=True, nd=-1., vd=np.inf)
-air = Gas(name="air", sellmeier=[[5792105E-8, 238.0185], [167917E-8, 57.362]])
-air_mirror = Gas(name="air_mirror", mirror=True, sellmeier=air.sellmeier)
 
-basics = dict((m.name, m) for m in (vacuum, vacuum_mirror, air, air_mirror))
+# http://refractiveindex.info
+vacuum = ModelMaterial(name="VACUUM", nd=1., vd=np.inf, solid=False)
+air = GasMaterial(name="AIR",
+        sellmeier=[[5792105E-8, 238.0185], [167917E-8, 57.362]])
+mirror = Material(name="MIRROR", mirror=True, solid=False)
+
+basics = dict((m.name, m) for m in (vacuum, air, mirror))
 
 
 def load_catalog_zemax(fil, name=None):
@@ -163,8 +174,8 @@ def load_catalog_zemax(fil, name=None):
                 pass # obj.name = args
             elif cmd == "NM":
                 args = args.split()
-                g = Material(name=args[0], nd=sfloat(args[3]),
-                        vd=sfloat(args[4]))
+                g = SellmeierMaterial(name=args[0], nd=sfloat(args[3]),
+                        vd=sfloat(args[4]), sellmeier=[])
                 g.glasscode = sfloat(args[2])
                 g.catalog = name
                 catalog[g.name] = g

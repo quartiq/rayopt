@@ -166,9 +166,9 @@ class System(list):
                     cu = px[-1], z[-1]
                 yield np.c_[(px, pz), cu, (x[::-1], z[::-1]), cl,
                         (px[0], pz[0])]
-            elif not e.material.solid:
+            elif not e.material.solid or e.material.mirror:
                 yield x, z
-            if e.material.solid:
+            if e.material.solid or (pending and e.material.mirror):
                 pending = x, z
             else:
                 pending = None

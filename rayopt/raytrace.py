@@ -321,7 +321,7 @@ class ParaxialTrace(Trace):
         y[:-1, :, 2] = np.array([-el.distance for el in
             self.system[1:]])[:, None]
         # y is after elem in output rot
-        y = self.origins[1:, None, :] + [el.from_axis(yi)
+        y = self.origins[1:, None] + [el.from_axis(yi)
                 for el, yi in zip(self.system[1:], y[:-1])]
         ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
         return # FIXME

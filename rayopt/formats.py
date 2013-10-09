@@ -21,7 +21,7 @@ import numpy as np
 
 from .system import System
 from .elements import Spheroid, Aperture, Image, Object
-from .material import (air, all_materials, Material, lambda_d, lambda_C,
+from .material import (air, all_materials, ModelMaterial, lambda_d, lambda_C,
         lambda_F)
 
 
@@ -68,12 +68,12 @@ def system_from_array(data,
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)
             if type(mat) is type(1.):
-                m = Material(name="%.5g" % mat, nd=mat)
+                m = ModelMaterial(nd=mat)
             elif mat in all_materials:
                 m = all_materials[mat]
             else:
                 try:
-                    m = Material.from_string(mat)
+                    m = ModelMaterial.from_string(mat)
                 except (ValueError, TypeError):
                     m = None
             el.material = m
@@ -161,7 +161,7 @@ def system_from_zemax(fil):
             else:
                 try:
                     t = "/".join(args[3:5])
-                    e.material = Material.from_string(t)
+                    e.material = ModelMaterial.from_string(t)
                 except:
                     print "material not found: %s" % name
                     e.material = None
