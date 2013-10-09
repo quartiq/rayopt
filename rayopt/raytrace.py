@@ -91,8 +91,8 @@ class ParaxialTrace(Trace):
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
     def propagate(self, start=1, stop=None):
-        self.z = np.cumsum([e.distance for e in self.system])
-        self.origins = np.cumsum([e.offset for e in self.system], axis=0)
+        self.z = self.system.track()
+        self.origins = self.system.origins()
         init = start - 1
         # FIXME not really round for gen astig...
         yu = np.vstack((self.y[init], self.y[init],
@@ -321,8 +321,11 @@ class ParaxialTrace(Trace):
         y[:-1, :, 2] = np.array([-el.distance for el in
             self.system[1:]])[:, None]
         # y is after elem in output rot
-        y = self.origins[1:, None] + [el.from_axis(yi)
+        y[:-1] = self.origins[1:, None] + [el.from_axis(yi)
                 for el, yi in zip(self.system[1:], y[:-1])]
+        y[-1, :, 2] = 0.
+        # FIXME for rotated image
+        y[-1] = self.origins[-1] + self.system.image.from_axis(y[-1])
         ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
         return # FIXME
         for p, flag in [
@@ -408,8 +411,8 @@ class GaussianTrace(Trace):
         self.qi[0] = qi
 
     def propagate(self, start=1, stop=None):
-        self.z = np.cumsum([e.distance for e in self.system])
-        self.origins = np.cumsum([e.offset for e in self.system], axis=0)
+        self.z = self.system.track()
+        self.origins = self.system.origins()
         init = start - 1
         qi, n = self.qi[init], self.n[init]
         els = self.system[start:stop or self.length]
@@ -653,8 +656,8 @@ class FullTrace(Trace):
         self.t[0] = 0
 
     def propagate(self, start=1, stop=None, clip=False):
-        self.z = np.cumsum([e.distance for e in self.system])
-        self.origins = np.cumsum([e.offset for e in self.system], axis=0)
+        self.z = self.system.track()
+        self.origins = self.system.origins()
         init = start - 1
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
         y, u = self.system[init].from_normal(y, u)
@@ -988,11 +991,11 @@ class FullTrace(Trace):
         ax.plot(y[:, :, 2], y[:, :, axis], **kwargs)
 
     def print_trace(self):
+        t = np.cumsum(self.t, axis=0) - self.z[:, None]
         for i in range(self.nrays):
             yield "ray %i" % i
             c = np.concatenate((self.n[:, None], self.z[:, None],
-                np.cumsum(self.t[:, i, None], axis=0)-self.z[:, None],
-                self.y[:, i, :], self.u[:, i, :]), axis=1)
+                t[:, i, None], self.y[:, i, :], self.u[:, i, :]), axis=1)
             for _ in self.print_coeffs(c, "n/track z/rel path/"
                     "height x/height y/height z/angle x/angle y/angle z"
                     .split("/"), sum=False):

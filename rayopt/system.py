@@ -198,3 +198,9 @@ class System(list):
         for n, mi in self.paraxial_matrices(l, start, stop):
             m = np.dot(mi, m)
         return m
+
+    def origins(self):
+        return np.cumsum([el.offset for el in self], axis=0)
+
+    def track(self):
+        return np.cumsum([el.distance for el in self])
