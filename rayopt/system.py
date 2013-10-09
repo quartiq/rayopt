@@ -112,9 +112,9 @@ class System(list):
             rad = e.radius if e.finite else e.angular_radius
             nd = getattr(mat, "nd", np.nan)
             vd = getattr(mat, "vd", np.nan)
-            try:
+            if mat:
                 n = mat.refractive_index(self.wavelengths[0])
-            except:
+            else:
                 n = nd
             yield u"%2i %1s %10.5g %10.4g %10.5g %10s %10.3f %10.3f %10.2f" % (
                     i, e.typ, e.distance, roc, rad*2, mat, n, nd, vd)

@@ -18,14 +18,14 @@
 
 from __future__ import print_function, absolute_import, division
 
-import shelve, os.path, cPickle as pickle
+import shelve, anydbm, os.path, cPickle as pickle
 
 import numpy as np
 
 from .utils import sfloat
 from .elements import Spheroid, Object, Aperture, Image
 from .system import System
-from .material import AllGlasses
+from .material import AllGlasses, air
 
 
 def oslo_lenscat(prefix, name):
@@ -39,8 +39,11 @@ def oslo_lenscat(prefix, name):
     name_name = os.path.join(prefix, "%s.nam" % name)
     name_lens = {}
     if os.access(name_name, os.R_OK):
-        name = np.loadtxt(name_name, delimiter=",", skiprows=1,
+        try:
+            name = np.loadtxt(name_name, delimiter=",", skiprows=1,
                       dtype="S64,S128", ndmin=1)
+        except IndexError:
+            name = []
         # abbrev, description
         for k, n in name:
             name_lens.setdefault(len(k), {})[k] = n.strip("\"")
@@ -61,7 +64,6 @@ def oslo_lenscat(prefix, name):
 
 
 oslo_glass_map = {
-    "AIR": "air",
     }
 
 
@@ -84,10 +86,10 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
             mat = AllGlasses.get(mat)
             if not mat:
                 #print("mat not found", cmd, args)
-                mat = AllGlasses["air"]
+                mat = air
             s.material = mat
         elif cmd == "TH":
-            th = sfloat(args[0])
+            th = sfloat(args[0]) or 0.
             # used on nxt and last
         elif cmd in "AP CVX APN AY1 AY2 AX1 AX2 ATP AAC".split():
             pass # cylindrical
@@ -100,7 +102,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
             i = int(cmd[2])
             s.aspherics[i] = sfloat(args[0])
         elif cmd == "NXT":
-            s = Spheroid(material=AllGlasses["air"], distance=th)
+            s = Spheroid(material=air, distance=th)
             sys.append(s)
         else:
             print("unhandled", cmd, args)
@@ -108,7 +110,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
 
 
 def default_sys_from_elem(ele):
-    obj = Object(finite=False, radius=.1, material=AllGlasses["air"])
+    obj = Object(finite=False, radius=.1, material=air)
     ap = Aperture(distance=1., radius=max(e.radius for e in ele))
     img = Image()
     sys = System([obj, ap] + ele + [img])
@@ -121,16 +123,16 @@ def load_catalogs(all, prefix, catalogs):
         db = shelve.open(all, "r", **kw)
         if not db.keys():
             db.close()
-            raise
-    except:
+            raise anydbm.error
+    except anydbm.error:
         # keeping it open writeable corrupts it
         db = shelve.open(all, "c", **kw)
         for f in catalogs:
             try:
                 cf = oslo_lenscat(prefix, f)
                 db[f] = cf
-            except:
-                pass
+            except Exception as e:
+                print("failed to parse catalog", prefix, f, e)
         db.close()
         db = shelve.open(all, "r", **kw)
     return db
@@ -145,3 +147,4 @@ for n in os.listdir(catpath):
 all = os.path.join(catpath, "all.shelve")
 all_lenses = load_catalogs(all, catpath, cats)
 AllLenses = all_lenses
+print(len(all_lenses))

@@ -16,6 +16,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import print_function, absolute_import, division
 
 import numpy as np
 
@@ -122,7 +123,7 @@ def system_from_oslo(fil):
         elif cmd in ("//", "DES", "EBR", "GIH", "DLRS", "WW", "WV"):
             pass
         else:
-            print cmd, "not handled", args
+            print(cmd, "not handled", args)
             continue
     return s
 
@@ -162,8 +163,8 @@ def system_from_zemax(fil):
                 try:
                     t = "/".join(args[3:5])
                     e.material = ModelMaterial.from_string(t)
-                except:
-                    print "material not found: %s" % name
+                except Exception as e:
+                    print("material not found", name, e)
                     e.material = None
         elif cmd == "DIAM":
             e.radius = float(args.split()[0])/2
@@ -196,7 +197,7 @@ def system_from_zemax(fil):
                      ):
             pass
         else:
-            print cmd, "not handled", args
+            print(cmd, "not handled", args)
             continue
     # the first element is the object, the last is the image, convert them
     s.object.radius = s[1].radius

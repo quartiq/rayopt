@@ -18,7 +18,7 @@
 
 from __future__ import print_function, absolute_import, division
 
-import shelve, os.path, cPickle as pickle
+import shelve, anydbm, os.path, cPickle as pickle
 
 import numpy as np
 
@@ -258,8 +258,8 @@ def load_catalogs(all, catalogs):
         db = shelve.open(all, "r", **kw)
         if not db.keys():
             db.close()
-            raise
-    except:
+            raise anydbm.error
+    except anydbm.error:
         # keeping it open writeable corrupts it
         db = shelve.open(all, "c", **kw)
         for f in catalogs:
