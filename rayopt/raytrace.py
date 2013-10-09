@@ -374,6 +374,16 @@ class ParaxialTrace(Trace):
         self.system.image.distance -= self.y[-1, 0]/self.u[-1, 0]
         self.propagate()
        
+    def aim(self):
+        for i in range(self.length - 1):
+            n0, n1 = self.n[i:i + 2]
+            e0, e1 = self.system[i:i + 2]
+            mu = n1/n0
+            if hasattr(el0, "material"):
+                if el0.material.mirror:
+                    mu = -1.
+            el0.aim(el1.direction, mu)
+
 
 class GaussianTrace(Trace):
     # qi[i] is valid after the ith element perpendicular to/along
