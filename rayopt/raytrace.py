@@ -52,6 +52,10 @@ class Trace(object):
 
 
 class ParaxialTrace(Trace):
+    # y[i] is ray height after the ith element perpendicular to the
+    # excidence direction (assumes excidence and offset of the
+    # next element coincide: use el.aim())
+    # u[i] is tan(u) angle after the ith element
     def __init__(self, system, aberration_orders=3, axis=1):
         super(ParaxialTrace, self).__init__(system)
         self.allocate(aberration_orders)
@@ -372,6 +376,8 @@ class ParaxialTrace(Trace):
        
 
 class GaussianTrace(Trace):
+    # qi[i] is valid after the ith element perpendicular to/along
+    # the excidence direction (assumes that excidence is offset of next)
     def __init__(self, system):
         super(GaussianTrace, self).__init__(system)
         self.allocate()
@@ -631,6 +637,10 @@ class GaussianTrace(Trace):
 
 
 class FullTrace(Trace):
+    # y[i] is the intercept in the normal coordinate system 
+    # of the ith element (relative to its vertex)
+    # u[i] is outgoing/excidence direction in the normal coordinate
+    # system of the ith element
     def allocate(self, nrays):
         super(FullTrace, self).allocate()
         self.nrays = nrays
@@ -663,13 +673,14 @@ class FullTrace(Trace):
         y, u = self.system[init].from_normal(y, u)
         for i, e in enumerate(self.system[start:stop or self.length]):
             i += start
+            y, u = e.to_normal(y - e.offset, u)
             y, u, n, t = e.propagate(y, u, n, l, clip)
             self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
             y, u = e.from_normal(y, u)
 
     def refocus(self):
         y = self.y[-1, :, :2]
-        u = tanarcsin(self.u[-2])
+        u = tanarcsin(self.u[-1])
         good = np.all(np.isfinite(u), axis=1)
         y, u = y[good], u[good]
         y, u = (y - y.mean(0)).ravel(), (u - u.mean(0)).ravel()
@@ -688,12 +699,15 @@ class FullTrace(Trace):
         if radius is None:
             radius = self.z[-1] - self.z[after]
             #axis=1
-            #if np.fabs(self.u[-2, chief, axis]) > 1e-6:
-            #    radius = self.y[-1, chief, axis]/self.u[-2, chief, axis]
+            #if np.fabs(self.u[-1, chief, axis]) > 1e-6:
+            #    radius = self.y[-1, chief, axis]/self.u[-1, chief, axis]
         # center sphere on chief image
-        y = self.y[after] - self.y[-1, chief]
-        y[:, 2] -= self.z[-1] - self.z[after]
-        u = self.u[after]
+        y = self.system[after].from_normal(self.y[after])
+        y -= self.origins[-1] - self.origins[after]
+        y = self.system[-1].to_normal(y)
+        y -= self.y[-1, chief]
+        u = self.system[after].from_normal(self.u[after])
+        u = self.system[-1].to_normal(u)
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
         #u = -y/np.sqrt(np.square(y).sum(1))[:, None]

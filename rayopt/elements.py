@@ -25,7 +25,7 @@ from .transformations import (euler_matrix, euler_from_matrix,
         translation_matrix, rotation_matrix, concatenate_matrices)
 from .name_mixin import NameMixin
 from .aberration_orders import aberration_intrinsic
-from .utils import sinarctan, tanarcsin, eps_double
+from .utils import sinarctan, tanarcsin
 
 
 class TransformMixin(object):
@@ -191,9 +191,10 @@ class Element(NameMixin, TransformMixin):
 
     def clip(self, y, u):
         if not np.isfinite(self.radius):
-            return
-        bad = (y[:, 0]**2 + y[:, 1]**2) > self.radius**2
-        u[:, 2] = np.where(bad, np.nan, u[:, 2])
+            return u
+        bad = np.square(y[:, :2]).sum(1) > self.radius**2
+        u = np.where(bad[:, None], np.nan, u)
+        return u
 
     def propagate_paraxial(self, yu0, n0, l):
         n, m = self.paraxial_matrix(n0, l)
@@ -213,13 +214,12 @@ class Element(NameMixin, TransformMixin):
         return n0, m
 
     def propagate(self, y0, u0, n0, l, clip=True):
-        y, u = self.to_normal(y0 - self.offset, u0)
-        t = self.intercept(y, u)
-        y += t[:, None]*u
+        t = self.intercept(y0, u0)
+        y = y0 + t[:, None]*u0
         if clip:
-            self.clip(y, u)
+            u0 = self.clip(y, u0)
         n = n0
-        return y, u, n, t*n0
+        return y, u0, n, t*n0
 
     def reverse(self):
         pass
@@ -271,16 +271,19 @@ class Interface(Element):
         return u0
 
     def propagate(self, y0, u0, n0, l, clip=True):
-        y, u = self.to_normal(y0 - self.offset, u0)
-        t = self.intercept(y, u)
-        y += t[:, None]*u
+        t = self.intercept(y0, u0)
+        y = y0 + t[:, None]*u0
         if clip:
-            self.clip(y, u)
+            u0 = self.clip(y, u0)
+        u = u0
         n = n0
         if self.material is not None:
-            n = self.refractive_index(l)
-            mu = -n0/n if self.material.mirror else n0/n
-            u = self.refract(y, u, mu)
+            if self.material.mirror:
+                mu = -1.
+            else:
+                n = self.refractive_index(l)
+                mu = n0/n
+            u = self.refract(y, u0, mu)
         return y, u, n, t*n0
 
     def dispersion(self, lmin, lmax):
@@ -445,12 +448,14 @@ class Spheroid(Interface):
     def aberration(self, y, u, n0, n, kmax):
         y, yb = y
         u, ub = u
-        f, g = (self.curvature*y + u)*n0, (self.curvature*yb + ub)*n0
-        c = np.zeros((2, 2, kmax, kmax, kmax))
-        aberration_intrinsic(self.curvature, f, g, y, yb, 1/n0, 1/n,
-                c, kmax - 1)
-        return c
+        c = self.curvature
+        f, g = (c*y + u)*n0, (c*yb + ub)*n0
+        if self.material is not None and self.material.mirror:
+            n = -n # FIXME
+        a = np.zeros((2, 2, kmax, kmax, kmax))
+        aberration_intrinsic(c, f, g, y, yb, 1/n0, 1/n, a, kmax - 1)
+        return a
 
-# just aliases as Spheroid has all features
+# aliases as Spheroid has all features
 Object = Spheroid
 Image = Spheroid
