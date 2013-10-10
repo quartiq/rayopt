@@ -241,8 +241,9 @@ class ParaxialTrace(Trace):
 
     @property
     def f_number(self):
-        na = self.numerical_aperture
-        return self.n[(0, -2), :]/(2*na)
+        return np.fabs(self.focal_length/(2*self.pupil_height))
+        #na = self.numerical_aperture
+        #return self.n[(0, -2), :]/(2*na)
 
     @property
     def airy_radius(self):
@@ -378,12 +379,10 @@ class ParaxialTrace(Trace):
         n0 = self.n[0]
         for i, (el, n) in enumerate(zip(self.system[:-1], self.n[:-1])):
             mu = n0/n
-            if hasattr(el, "material"):
-                if el.material.mirror:
-                    mu = -1.
             el.aim(self.system[i + 1].direction, mu)
             n0 = n
         self.system[-1].angles = 0, 0, 0.
+        self.propagate()
 
 
 class GaussianTrace(Trace):
@@ -468,6 +467,7 @@ class GaussianTrace(Trace):
             #a = np.where(np.isnan(a), 0, a)
         else:
             a = np.arctan2(2*qixy, qixx - qiyy)/2
+        a = (a + np.pi/4) % (np.pi/2) - np.pi/4
         return a
 
     def normal(self, qi):
@@ -482,13 +482,13 @@ class GaussianTrace(Trace):
 
     def spot_radius_at(self, z, normal=False):
         qi, n = self.qin_at(z)
-        c = -self.l/self.system.scale/np.pi/n[:, None]
+        c = self.l/self.system.scale/np.pi/n[:, None]
         if normal:
-            r, a = self.normal(qi.imag)
+            r, a = self.normal(-qi.imag)
             r = np.sqrt(c/r)
             return r, a
         else:
-            r = np.diagonal(qi.imag, 0, 1, 2)
+            r = np.diagonal(-qi.imag, 0, 1, 2)
             return np.sqrt(c/r)
 
     def curvature_radius_at(self, z, normal=False):

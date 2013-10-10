@@ -206,3 +206,8 @@ class System(list):
 
     def track(self):
         return np.cumsum([el.distance for el in self])
+
+    def close(self, index=-1):
+        """close of the system such that image is at object using
+        element at index"""
+        self[index].offset -= self.origins()[-1]

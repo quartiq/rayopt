@@ -84,21 +84,20 @@ class TransformMixin(object):
 
     def aim(self, direction, mu):
         """orient such that direction is excidence"""
-        e = np.array(direction)
         i = self.direction
-        r = e/np.linalg.norm(e) - abs(mu)*i # snell
-        if mu > 1:
+        r = mu*i - direction # snell
+        if mu < 1:
             r *= -1
         if np.allclose(r, 0):
-            r = 0, 0, -1.
+            r = 0, 0, 1.
         r /= np.linalg.norm(r)
         rdir = np.cross(i, r)
         rang = np.arcsin(np.linalg.norm(rdir))
         if np.allclose(rdir, 0):
             rdir = 1., 0, 0
-        r = rotation_matrix(rang, rdir)
-        angles = euler_from_matrix(r, "rxyz")
-        self.update(self._distance, self._direction, angles)
+        rot = rotation_matrix(rang, rdir).T
+        angles = euler_from_matrix(rot, "rxyz")
+        self.update(self.distance, self.direction, angles)
 
     def update(self, distance, direction, angles):
         self._direction = u = np.array(direction)
@@ -116,12 +115,12 @@ class TransformMixin(object):
             return
         r = np.eye(3)
         if not self.straight:
-            rdir = np.cross((0, 0, 1.), u)
+            rdir = np.cross(u, (0, 0, 1.))
             rang = np.arcsin(np.linalg.norm(rdir))
-            if u[2] < 0: # FIXME
-                rang += np.pi
+            if u[2] < 0: # == np.dot((0, 0, 1), u)
+                rang = np.pi - rang
             if np.allclose(rdir, 0):
-                rdir = (1., 0, 0)
+                rdir = 1., 0, 0
             self.rot_axis = r1 = rotation_matrix(rang, rdir)[:3, :3]
             r = np.dot(r, r1)
         if not self.normal:

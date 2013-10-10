@@ -41,6 +41,8 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 class Analysis(object):
     figwidth = 12.
     resize = True
+    aim = True
+    close = None
     refocus_paraxial = True
     trace_gaussian = True
     print_gaussian = False
@@ -70,7 +72,11 @@ class Analysis(object):
             self.run()
 
     def run(self):
+        if self.close is not None:
+            self.system.close(self.close)
         self.paraxial = ParaxialTrace(self.system)
+        if self.aim:
+            self.paraxial.aim()
         if self.refocus_paraxial:
             self.paraxial.refocus()
         if self.resize:
@@ -404,6 +410,7 @@ class Analysis(object):
             p = paraxial.pupil_distance[0]
             py = t.y[1, :, 1] + p*tanarcsin(t.i[1])[:, 1]
             z = -t.y[-1, :, 1]/tanarcsin(t.i[-1])[:, 1]
+            z[0] = np.nan
             axs.plot(py, z, ci+"-", label="%s" % wi)
         wl, wu = min(wavelengths), max(wavelengths)
         ww = np.linspace(wl - (wu - wl)/4, wu + (wu - wl)/4, nrays)
