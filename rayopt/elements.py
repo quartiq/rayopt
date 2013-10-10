@@ -406,6 +406,9 @@ class Spheroid(Interface):
         md = np.eye(4)
         md[0, 2] = md[1, 3] = d
 
+        # FIXME angles is incomplete:
+        # rotate to meridional/sagittal then compute total incidence
+        # angle, matrix, then rotate back
         theta = self.angles[0] if self.angles is not None else 0.
         costheta = np.cos(theta)
         n = n0
@@ -427,8 +430,6 @@ class Spheroid(Interface):
         m = np.dot(m, md)
 
         if self.angles is not None:
-            # rotation around optical axis # FIXME
-            # makes simple astigmatic general astigmatic
             phi = self.angles[2]
             cphi, sphi = np.cos(phi), np.sin(phi)
             r1 = np.array([[cphi, -sphi], [sphi, -cphi]])
@@ -456,7 +457,7 @@ class Spheroid(Interface):
         c = self.curvature
         f, g = (c*y + u)*n0, (c*yb + ub)*n0
         if self.material is not None and self.material.mirror:
-            n = -n # FIXME
+            n = -n # FIXME appear incorrect
         a = np.zeros((2, 2, kmax, kmax, kmax))
         aberration_intrinsic(c, f, g, y, yb, 1/n0, 1/n, a, kmax - 1)
         return a

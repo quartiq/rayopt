@@ -242,8 +242,11 @@ class ParaxialTrace(Trace):
     @property
     def f_number(self):
         return np.fabs(self.focal_length/(2*self.pupil_height))
-        #na = self.numerical_aperture
-        #return self.n[(0, -2), :]/(2*na)
+
+    @property
+    def working_f_number(self):
+        na = self.numerical_aperture
+        return self.n[(0, -2), :]/(2*na)
 
     @property
     def airy_radius(self):
@@ -296,7 +299,8 @@ class ParaxialTrace(Trace):
         yield "entry, exit pupil distance: %s" % self.pupil_distance
         yield "entry, exit pupil height: %s" % self.pupil_height
         yield "front, back numerical aperture: %s" % self.numerical_aperture
-        yield "front, back working f number: %s" % self.f_number
+        yield "front, back f number: %s" % self.f_number
+        yield "front, back working f number: %s" % self.working_f_number
         yield "front, back airy radius: %s" % self.airy_radius
         yield "transverse, angular magnification: %s" % self.magnification
 
@@ -320,8 +324,8 @@ class ParaxialTrace(Trace):
     def plot(self, ax, principals=False, pupils=False, focals=False,
             nodals=False, **kwargs):
         kwargs.setdefault("color", "black")
-        # FIXME this assumes that the outgoing oa of an element
-        # coincides with the incoming of the next
+        # this assumes that the outgoing oa of an element
+        # coincides with the incoming of the next, use aim()
         y = self.y[:, :, None] * np.ones(3)
         y[:-1, :, 2] = np.array([-el.distance for el in
             self.system[1:]])[:, None]
@@ -329,7 +333,7 @@ class ParaxialTrace(Trace):
         y[:-1] = self.origins[1:, None] + [el.from_axis(yi)
                 for el, yi in zip(self.system[1:], y[:-1])]
         y[-1, :, 2] = 0.
-        # FIXME for rotated image
+        # assumes unrotated image, use aim()
         y[-1] = self.origins[-1] + self.system.image.from_axis(y[-1])
         ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
         return # FIXME
@@ -545,9 +549,9 @@ class GaussianTrace(Trace):
             (1, 3, 0, 2, 1, 3, 0, 2)], 0)
 
     @property
-    def eigenmodes(self): # FIXME
+    def eigenmodes(self):
         m = self.system.paraxial_matrix(self.l)
-        # only know how to do this for simple astigmatic matrices
+        # FIXME only know how to do this for simple astigmatic matrices
         # otherwise, solve qi*b*qi + qi*a - d*qi - c = 0
         assert self.is_simple_astigmatic(m)
         q = []
@@ -629,6 +633,7 @@ class GaussianTrace(Trace):
                     in zip(self.system, y, self.z, self.origins)
                     if yi.ndim == 2]
             wxi, wyi, zi = np.vstack(y).T
+            # FIXME: plot both axes in either plot
             if axis == 0:
                 ax.plot(zi, wxi, **kwargs)
             else:
