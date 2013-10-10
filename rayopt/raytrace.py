@@ -375,14 +375,15 @@ class ParaxialTrace(Trace):
         self.propagate()
        
     def aim(self):
-        for i in range(self.length - 1):
-            n0, n1 = self.n[i:i + 2]
-            e0, e1 = self.system[i:i + 2]
-            mu = n1/n0
-            if hasattr(e0, "material"):
-                if e0.material.mirror:
+        n0 = self.n[0]
+        for i, (el, n) in enumerate(zip(self.system[:-1], self.n[:-1])):
+            mu = n0/n
+            if hasattr(el, "material"):
+                if el.material.mirror:
                     mu = -1.
-            e0.aim(e1.direction, mu)
+            el.aim(self.system[i + 1].direction, mu)
+            n0 = n
+        self.system[-1].angles = 0, 0, 0.
 
 
 class GaussianTrace(Trace):
@@ -681,9 +682,10 @@ class FullTrace(Trace):
         self.z = self.system.track()
         self.origins = self.system.origins()
         init = start - 1
+        stop = stop or self.length
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
         y, u = self.system[init].from_normal(y, u)
-        for i, e in enumerate(self.system[start:stop or self.length]):
+        for i, e in enumerate(self.system[start:stop]):
             i += start
             y, u = e.to_normal(y - e.offset, u)
             self.i[i] = u

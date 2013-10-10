@@ -172,6 +172,8 @@ class System(list):
                 pending = x, z
             else:
                 pending = None
+        if pending:
+            yield pending
 
     def plot(self, ax, axis=1, npoints=31, adjust=True, **kwargs):
         kwargs.setdefault("linestyle", "-")

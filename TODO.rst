@@ -1,5 +1,4 @@
 * fix aiming for microscope
-* add xy paraxial matrices with angled elements (ring resonators)
 * fix extrinsic aberrations
 * fix >180 fov
 * implement afocal infinte last conjugate
