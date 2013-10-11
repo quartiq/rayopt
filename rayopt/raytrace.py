@@ -295,6 +295,13 @@ class ParaxialTrace(Trace):
         return 4*self.lagrange**2/self.l**2
 
     @property
+    def petzval_curvature(self):
+        c = [getattr(el, "curvature", 0) for el in self.system]
+        n = self.n
+        p = c[1:-1]*(n[1:-1] - n[0:-2])/(n[1:-1]*n[0:-2])
+        return p.sum()
+
+    @property
     def eigenrays(self):
         e, v = np.linalg.eig(self.system.paraxial_matrix(self.l))
         return e, v
@@ -317,6 +324,7 @@ class ParaxialTrace(Trace):
         yield "track length: %.5g" % self.track
         yield "object, image height: %s" % self.height
         yield "front, back focal length: %s" % self.focal_length
+        yield "petzval radius: %.5g" % (1/self.petzval_curvature)
         yield "front, back focal distance: %s" % self.focal_distance
         yield "front, back principal distance: %s" % self.principal_distance
         yield "front, back nodal distance: %s" % self.nodal_distance
