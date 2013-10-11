@@ -23,7 +23,8 @@ from .elements import Spheroid, Object, Aperture, Image
 from .system import System
 from .formats import (system_from_text, system_from_zemax,
     system_from_oslo)
-from .raytrace import FullTrace, ParaxialTrace, GaussianTrace
+from .raytrace import (GeometricTrace, ParaxialTrace, GaussianTrace,
+    FullTrace)
 from .analysis import Analysis
 #from .optimize import (Parameter, MaterialThickness, 
 #    demerit_rms_position, demerit_rms_angle, demerit_mean_angle,

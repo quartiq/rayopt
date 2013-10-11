@@ -41,6 +41,26 @@ class Trace(object):
     def allocate(self):
         self.length = len(self.system)
 
+    def propagate(self):
+        self.z = self.system.track
+        self.origins = self.system.origins
+
+    def from_axis(self, y, i=None, ref=0):
+        y = np.atleast_3d(y) # zi, rayi, xyz
+        if i is None:
+            i = np.searchsorted(y[:, ref, 2], self.z)
+        ys = []
+        for j, yi in enumerate(np.vsplit(y, i)):
+            if yi.ndim <= 1:
+                continue
+            j = min(self.length - 1, j)
+            zi, ei, oi = self.z[j], self.system[j], self.origins[j]
+            yj = yi.reshape(-1, 3)
+            yj = oi + ei.from_axis(yj - (0, 0, zi))
+            ys.append(yj.reshape(yi.shape))
+        ys = np.vstack(ys)
+        return ys
+
     def print_coeffs(self, coeff, labels, sum=True):
         yield (u"%2s %1s" + u"% 10s" * len(labels)) % (
                 (u"#", u"T") + tuple(labels))
@@ -95,8 +115,7 @@ class ParaxialTrace(Trace):
         y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
 
     def propagate(self, start=1, stop=None):
-        self.z = self.system.track()
-        self.origins = self.system.origins()
+        super(ParaxialTrace, self).propagate()
         init = start - 1
         # FIXME not really round for gen astig...
         yu = np.vstack((self.y[init], self.y[init],
@@ -119,7 +138,8 @@ class ParaxialTrace(Trace):
                     self.n[i - 1], self.n[i], self.c.shape[-1])
         self.extrinsic_aberrations()
 
-    def extrinsic_aberrations(self): # FIXME: wrong
+    def extrinsic_aberrations(self):
+        # FIXME: wrong
         self.d[:] = 0
         st = self.system.aperture_index
         t, s = 0, 1
@@ -327,31 +347,33 @@ class ParaxialTrace(Trace):
         # this assumes that the outgoing oa of an element
         # coincides with the incoming of the next, use aim()
         y = self.y[:, :, None] * np.ones(3)
-        y[:-1, :, 2] = np.array([-el.distance for el in
-            self.system[1:]])[:, None]
-        # y is after elem in output rot
-        y[:-1] = self.origins[1:, None] + [el.from_axis(yi)
-                for el, yi in zip(self.system[1:], y[:-1])]
-        y[-1, :, 2] = 0.
-        # assumes unrotated image, use aim()
-        y[-1] = self.origins[-1] + self.system.image.from_axis(y[-1])
+        y[:, :, 2] = self.z[:, None]
+        y = self.from_axis(y, range(1, self.length + 1))
         ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
-        return # FIXME
+        h = self.system.aperture.radius*1.5
         for p, flag in [
                 (self.principal_distance, principals),
                 (self.focal_distance, focals),
                 (self.nodal_distance, nodals),
                 ]:
             if flag:
-                p = p + self.z[(1, -2), :]
-                h = self.system.aperture.radius
-                x = np.array([-1, 1])[:, None]
-                ax.plot(p*np.ones((2, 1)), 1.5*h*x, **kwargs)
+                for i, pi, zi in zip((1, -1), p,
+                        (0, self.system[-1].distance)):
+                    y = self.origins[i] + self.system[i].from_axis(
+                            np.array([(h, h, pi-zi), (-h, -h, pi-zi)]))
+                    ax.plot(y[:, 2], y[:, self.axis], **kwargs)
         if pupils:
-            p = self.pupil_distance + self.z[(1, -2), :]
+            p = self.pupil_distance
             h = self.pupil_height
-            x = np.array([-1.5, -1, np.nan, 1, 1.5])[:, None]
-            ax.plot(p*np.ones((5, 1)), h*x, **kwargs)
+            for i, hi, pi, zi in zip((1, -1), h, p,
+                    (0, self.system[-1].distance)):
+                y = np.empty((4, 3))
+                y[:, 0] = y[:, 1] = -1.5, 1.5, -1, 1
+                y *= hi
+                y[:, 2] = pi - zi
+                y = self.origins[i] + self.system[i].from_axis(y)
+                y = y.reshape(2, 2, 3)
+                ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
 
     def plot_yybar(self, ax, **kwargs):
         kwargs.setdefault("color", "black")
@@ -431,8 +453,7 @@ class GaussianTrace(Trace):
         self.qi[0] = qi
 
     def propagate(self, start=1, stop=None):
-        self.z = self.system.track()
-        self.origins = self.system.origins()
+        super(GaussianTrace, self).propagate()
         init = start - 1
         qi, n = self.qi[init], self.n[init]
         els = self.system[start:stop or self.length]
@@ -621,44 +642,42 @@ class GaussianTrace(Trace):
         self.system.image.distance += self.waist_position[-1, axis]
         self.propagate()
 
-    def plot(self, ax, axis=1, npoints=201, waist_position=False,
-            rayleigh_range=False, **kwargs):
+    def plot(self, ax, axis=1, npoints=501, waist=True, scale=10, **kwargs):
         kwargs.setdefault("color", "black")
         z = np.linspace(self.z[0], self.z[-1], npoints)
-        wx, wy = self.spot_radius_at(z).T
-        i = np.searchsorted(z, self.z) # z-index of element
-        for s in 1, -1:
-            y = np.vsplit(np.c_[s*wx, s*wy, z], i)
-            y = [el.from_axis(yi - [0, 0, zi]) + oi for el, yi, zi, oi
-                    in zip(self.system, y, self.z, self.origins)
-                    if yi.ndim == 2]
-            wxi, wyi, zi = np.vstack(y).T
-            # FIXME: plot both axes in either plot
-            if axis == 0:
-                ax.plot(zi, wxi, **kwargs)
-            else:
-                ax.plot(zi, wyi, **kwargs)
-        return # FIXME
-        if waist_position or rayleigh_range:
-            p = self.waist_position.T + self.z
-            w = self.waist_radius.T
+        wx, wy = self.spot_radius_at(z).T*scale
+        y = np.array([
+            [wx, wx, z], [wy, wy, z], 
+            [-wx, -wx, z], [-wy, -wy, z],
+            ]).transpose(2, 0, 1)
+        y = self.from_axis(y)
+        for i, ci in zip((axis, 0 if axis else 1), ("-", "--")):
+            ax.plot(y[:, i::2, 2], y[:, i::2, axis], ci, **kwargs)
+        if waist:
+            p = self.waist_position.T
+            w = self.waist_radius.T*scale
             r = self.rayleigh_range.T
-            for pi, wi, ri, ci in zip(p, w, r, ("--", "-")):
-                if waist_position:
-                    ax.plot((pi, pi), (-wi, wi), ci, **kwargs)
-                if rayleigh_range:
-                    for zi in pi - ri, pi + ri:
-                        ax.plot((zi, zi), (-wi*2**.5, wi*2**.5),
-                                ci, **kwargs)
+            for i, ci in zip((axis, 0 if axis else 1), ("-", "--")):
+                for j, (el, oi) in enumerate(zip(self.system[1:],
+                        self.origins[1:])):
+                    for z, h, cj in [(0, w[i, j], ci),
+                            (r[i, j], 2**.5*w[i, j], ":"),
+                            (-r[i, j], 2**.5*w[i, j], ":"),
+                            ]:
+                        v = p[i, j] + z - el.distance
+                        if v >= -el.distance and v <= 0:
+                            y = np.array([[h, h, v], [-h, -h, v]])
+                            y = el.from_axis(y) + oi
+                            ax.plot(y[:, 2], y[:, axis], cj, **kwargs)
 
 
-class FullTrace(Trace):
+class GeometricTrace(Trace):
     # y[i] is the intercept in the normal coordinate system 
     # of the ith element (relative to its vertex)
     # u[i] is outgoing/excidence direction in the normal coordinate
     # system of the ith element
     def allocate(self, nrays):
-        super(FullTrace, self).allocate()
+        super(GeometricTrace, self).allocate()
         self.nrays = nrays
         self.y = np.empty((self.length, nrays, 3))
         self.u = np.empty_like(self.y)
@@ -684,8 +703,7 @@ class FullTrace(Trace):
         self.t[0] = 0
 
     def propagate(self, start=1, stop=None, clip=False):
-        self.z = self.system.track()
-        self.origins = self.system.origins()
+        super(GeometricTrace, self).propagate()
         init = start - 1
         stop = stop or self.length
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
@@ -1039,3 +1057,5 @@ class FullTrace(Trace):
                 )
         return "\n".join(t)
 
+# alias
+FullTrace = GeometricTrace

@@ -23,7 +23,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-from .raytrace import ParaxialTrace, FullTrace, GaussianTrace
+from .raytrace import ParaxialTrace, GeometricTrace, GaussianTrace
 from .utils import tanarcsin
 from .special_sums import polar_sum
 
@@ -88,12 +88,12 @@ class Analysis(object):
         if self.print_gaussian:
             self.text.append(unicode(self.gaussian))
         if self.resize_full:
-            t = FullTrace(self.system)
+            t = GeometricTrace(self.system)
             t.rays_paraxial(self.paraxial)
             t.resize()
             self.system.fix_sizes()
         if self.refocus_full:
-            t = FullTrace(self.system)
+            t = GeometricTrace(self.system)
             t.rays_paraxial_point(self.paraxial, 0.,
                     nrays=100, distribution="hexapolar", clip=True)
             t.refocus()
@@ -102,7 +102,7 @@ class Analysis(object):
             self.text.append(unicode(self.system))
         if self.print_paraxial:
             self.text.append(unicode(self.paraxial))
-        t = FullTrace(self.system)
+        t = GeometricTrace(self.system)
         t.rays_paraxial(self.paraxial)
         if self.print_full:
             self.text.append(unicode(t))
@@ -117,7 +117,7 @@ class Analysis(object):
         if self.plot_full:
             t.plot(ax)
         for h in 0, max(self.plot_heights):
-            t = FullTrace(self.system)
+            t = GeometricTrace(self.system)
             t.rays_paraxial_clipping(self.paraxial, h)
             t.plot(ax)
        
@@ -246,7 +246,7 @@ class Analysis(object):
                     transform=axm.transAxes,
                     verticalalignment="center")
             for wi, ci in zip(wavelengths, colors):
-                t = FullTrace(self.system)
+                t = GeometricTrace(self.system)
                 ref = t.rays_paraxial_point(paraxial, hi, wi,
                         nrays=nrays_line, distribution="tee", clip=True)
                 # plot transverse image plane versus entrance pupil
@@ -283,7 +283,7 @@ class Analysis(object):
         for hi, axi in zip(heights, ax):
             for wi, ci in zip(wavelengths, colors):
                 r = paraxial.airy_radius[1]/paraxial.l*wi
-                t = FullTrace(self.system)
+                t = GeometricTrace(self.system)
                 ref = t.rays_paraxial_point(paraxial, hi, wi,
                         nrays=nrays, distribution="hexapolar",
                         clip=True)
@@ -318,7 +318,7 @@ class Analysis(object):
             self.pre_setup_xyplot(axp)
             self.setup_axes(axe, "R", "E")
             self.setup_axes(axm, "F", "C")
-            t = FullTrace(self.system)
+            t = GeometricTrace(self.system)
             ref = t.rays_paraxial_point(paraxial, hi, wavelength,
                     nrays=nrays, distribution="hexapolar", clip=True)
             try:
@@ -389,7 +389,7 @@ class Analysis(object):
             self.setup_axes(axi, xl, yl, tl, yzero=False, xzero=False)
         h = np.linspace(0, height*paraxial.height[1], nrays)
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
-            t = FullTrace(self.system)
+            t = GeometricTrace(self.system)
             t.rays_paraxial_line(paraxial, height, wi, nrays=nrays)
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
             p, q, r = np.split(tanarcsin(t.i[-1]).T, (nrays, 2*nrays), axis=1)
@@ -404,7 +404,7 @@ class Analysis(object):
             axf.plot(a[1], xt, ci+"-", label="EZt %s" % wi)
             xs = -(c[0]-a[0])/(r[0]-p[0])
             axf.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
-            t = FullTrace(self.system)
+            t = GeometricTrace(self.system)
             t.rays_paraxial_point(paraxial, 0., wi, nrays=nrays,
                     distribution="half-meridional")
             p = paraxial.pupil_distance[0]
@@ -417,7 +417,7 @@ class Analysis(object):
         zc = []
         ph, pd = paraxial.pupil_distance[0], paraxial.pupil_height[0]
         for wwi in np.r_[wavelengths[0], ww]:
-            t = FullTrace(self.system)
+            t = GeometricTrace(self.system)
             y, u = self.system.object.to_pupil((0, 0), (0, 1e-3), ph, pd)
             t.rays_given(y, u, wwi)
             t.propagate(clip=False)
