@@ -31,7 +31,7 @@ from scipy.interpolate import griddata
 
 from .aberration_orders import aberration_extrinsic
 from .elements import Spheroid
-from .utils import sinarctan, tanarcsin
+from .utils import sinarctan, tanarcsin, simple_cache
 
 
 class Trace(object):
@@ -40,6 +40,7 @@ class Trace(object):
 
     def allocate(self):
         self.length = len(self.system)
+        self.n = np.empty(self.length)
 
     def propagate(self):
         self.z = self.system.track
@@ -70,11 +71,15 @@ class Trace(object):
         if sum:
             yield fmt % ((u" ∑", u"") + tuple(coeff.sum(0)))
 
+    def align(self):
+        self.system.align(self.n)
+        self.propagate()
+
 
 class ParaxialTrace(Trace):
     # y[i] is ray height after the ith element perpendicular to the
     # excidence direction (assumes excidence and offset of the
-    # next element coincide: use el.aim())
+    # next element coincide: use el.align())
     # u[i] is tan(u) angle after the ith element
     def __init__(self, system, aberration_orders=3, axis=1):
         super(ParaxialTrace, self).__init__(system)
@@ -93,7 +98,6 @@ class ParaxialTrace(Trace):
         self.y = np.empty((n, 2))
         self.u = np.empty((n, 2))
         self.v = np.empty(n)
-        self.n = np.empty(n)
         self.c = np.empty((n, 2, 2, k, k, k))
         self.d = np.empty_like(self.c)
 
@@ -345,7 +349,7 @@ class ParaxialTrace(Trace):
             nodals=False, **kwargs):
         kwargs.setdefault("color", "black")
         # this assumes that the outgoing oa of an element
-        # coincides with the incoming of the next, use aim()
+        # coincides with the incoming of the next, use align()
         y = self.y[:, :, None] * np.ones(3)
         y[:, :, 2] = self.z[:, None]
         y = self.from_axis(y, range(1, self.length + 1))
@@ -401,19 +405,10 @@ class ParaxialTrace(Trace):
         self.system.image.distance -= self.y[-1, 0]/self.u[-1, 0]
         self.propagate()
        
-    def aim(self):
-        n0 = self.n[0]
-        for i, (el, n) in enumerate(zip(self.system[:-1], self.n[:-1])):
-            mu = n0/n
-            el.aim(self.system[i + 1].direction, mu)
-            n0 = n
-        self.system[-1].angles = 0, 0, 0.
-        self.propagate()
-
 
 class GaussianTrace(Trace):
     # qi[i] is valid after the ith element perpendicular to/along
-    # the excidence direction (assumes that excidence is offset of next)
+    # the excidence direction (assumes aligned()
     def __init__(self, system):
         super(GaussianTrace, self).__init__(system)
         self.allocate()
@@ -424,7 +419,6 @@ class GaussianTrace(Trace):
         super(GaussianTrace, self).allocate()
         self.qi = np.empty((self.length, 2, 2), dtype=np.complex_)
         self.l = 1.
-        self.n = np.empty(self.length)
 
     def make_qi(self, l, n, waist, position=(0, 0.), angle=0.):
         z0 = np.pi*n*np.array(waist)**2*self.system.scale/l
@@ -672,10 +666,11 @@ class GaussianTrace(Trace):
 
 
 class GeometricTrace(Trace):
-    # y[i] is the intercept in the normal coordinate system 
-    # of the ith element (relative to its vertex)
-    # u[i] is outgoing/excidence direction in the normal coordinate
-    # system of the ith element
+    # y[i]: intercept
+    # i[i]: incoming/incidence direction
+    # u[i]: outgoing/excidence direction
+    # all in the normal coordinate system of the ith element (positions
+    # relative to the element vertex)
     def allocate(self, nrays):
         super(GeometricTrace, self).allocate()
         self.nrays = nrays
@@ -683,7 +678,6 @@ class GeometricTrace(Trace):
         self.u = np.empty_like(self.y)
         self.i = np.empty_like(self.y)
         self.l = 1.
-        self.n = np.empty(self.length)
         self.t = np.empty((self.length, nrays))
 
     def rays_given(self, y, u, l=None):
@@ -697,7 +691,8 @@ class GeometricTrace(Trace):
         self.y[0, :, :y.shape[1]] = y
         self.u[0] = 0
         self.u[0, :, :u.shape[1]] = u
-        self.u[0, :, 2] = np.sqrt(1 - np.square(self.u[0, :, :2]).sum(1))
+        ux, uy = self.u[0, :, 0], self.u[0, :, 1]
+        self.u[0, :, 2] = np.sqrt(1 - ux**2 - uy**2)
         self.i[0] = self.u[0]
         self.n[0] = self.system.object.refractive_index(l)
         self.t[0] = 0
@@ -737,12 +732,10 @@ class GeometricTrace(Trace):
         if radius is None:
             radius = self.z[image] - self.z[after]
         # center sphere on chief image
-        y = self.system[after].from_normal(self.y[after])
-        y -= self.origins[image] - self.origins[after]
-        y = self.system[image].to_normal(y)
-        y -= self.y[image, chief]
-        u = self.system[after].from_normal(self.u[after])
-        u = self.system[image].to_normal(u)
+        ea, ei = self.system[after], self.system[image]
+        y = ea.from_normal(self.y[after]) + self.origins[after]
+        y = ei.to_normal(y - self.origins[image]) - self.y[image, chief]
+        u = ei.to_normal(ea.from_normal(self.u[after]))
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
         #u = -y/np.sqrt(np.square(y).sum(1))[:, None]
@@ -776,13 +769,13 @@ class GeometricTrace(Trace):
         n = np.count_nonzero(good)
         o = np.where(good, np.exp(-2j*np.pi*o), 0)/n**.5
         if resample:
-            # FIXME resample assumes constant amplitude in exit pupil
+            # NOTE: resample assumes constant amplitude in exit pupil
             nx, ny = (i*pad for i in o.shape)
             apsf = np.fft.fft2(o, (nx, ny))
             psf = (apsf*apsf.conj()).real/apsf.size
             dx = x[1, 0] - x[0, 0]
             k = 1/(self.l/self.system.scale)
-            f = np.fft.fftfreq(nx, dx)*radius/k
+            f = np.fft.fftfreq(nx, dx*k/radius)
             p, q = np.broadcast_arrays(f[:, None], f)
         else:
             raise NotImplementedError
@@ -794,7 +787,6 @@ class GeometricTrace(Trace):
         return p, q, psf
 
     def rays_paraxial(self, paraxial):
-        # FIXME: rotate
         y = np.zeros((2, 2))
         y[:, 1] = paraxial.y[0]
         u = np.zeros((2, 2))
@@ -814,6 +806,7 @@ class GeometricTrace(Trace):
 
         if stop is -1: # return clipping ray
             radii = np.array([e.radius for e in self.system[1:-1]])
+            @simple_cache
             def distance(a):
                 var[0, 0, axis] = a*v0
                 self.propagate(stop=-1, clip=False)
@@ -823,6 +816,7 @@ class GeometricTrace(Trace):
             if stop is None:
                 stop = self.system.aperture_index
             target *= self.system[stop].radius
+            @simple_cache
             def distance(a):
                 var[0, 0, axis] = a*v0
                 self.propagate(stop=stop + 1, clip=False)
@@ -949,8 +943,7 @@ class GeometricTrace(Trace):
             pd, ph = self.aim_pupil(height, pd, ph[axis], wavelength,
                     axis=(), **kwargs)
         except RuntimeError:
-            print("chief failed", height)
-            pass
+            print("chief aim failed", height)
         y, u = self.system.object.to_pupil(yo, (0, 0), pd, ph[axis])
         ys, us = [y], [u]
         for t in -1, 1:
@@ -961,19 +954,11 @@ class GeometricTrace(Trace):
                 y, u = self.aim(y, u, wavelength, axis=axis, target=t, stop=-1)
             except RuntimeError:
                 print("clipping aim failed", height, t)
-                pass
             ys.append(y)
             us.append(u)
         y, u = np.vstack(ys), np.vstack(us)
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
-
-    def rays_paraxial_clipping(self, paraxial, height=1.,
-            wavelength=None, **kwargs):
-        # TODO: refactor rays_paraxial_*
-        zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = paraxial.pupil_height[0]
-        return self.rays_clipping(height, zp, rp, wavelength, **kwargs)
 
     def rays_point(self, height, pupil_distance, pupil_height,
             wavelength=None, nrays=11, distribution="meridional",
@@ -984,19 +969,14 @@ class GeometricTrace(Trace):
                         pupil_distance, pupil_height, wavelength, axis=aim)
             except RuntimeError:
                 print("pupil aim failed", height)
-                pass
         icenter, yp = self.pupil_distribution(distribution, nrays)
+        # NOTE: will not have same ray density in x and y if pupil is
+        # distorted
         y, u = self.system.object.to_pupil((0, height), yp,
                 pupil_distance, pupil_height)
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
         return icenter
-
-    def rays_paraxial_point(self, paraxial, height=1.,
-            wavelength=None, **kwargs):
-        zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = paraxial.pupil_height[0]
-        return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
     def rays_line(self, height, pupil_distance, pupil_height,
             wavelength=None, nrays=21, aim=True, eps=1e-2, clip=False):
@@ -1009,7 +989,6 @@ class GeometricTrace(Trace):
                     y[i], u[i] = self.aim(y[i], u[i], wavelength, axis=1)
                 except RuntimeError:
                     print("chief aim failed", i)
-                    pass
         e = np.zeros((3, 1, 2)) # pupil
         e[(1, 2), :, (1, 0)] = eps*pupil_height # meridional, sagittal
         if self.system.object.finite:
@@ -1021,6 +1000,19 @@ class GeometricTrace(Trace):
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
 
+    def rays_paraxial_clipping(self, paraxial, height=1.,
+            wavelength=None, **kwargs):
+        # TODO: refactor rays_paraxial_*
+        zp = paraxial.pupil_distance[0] + paraxial.z[1]
+        rp = paraxial.pupil_height[0]
+        return self.rays_clipping(height, zp, rp, wavelength, **kwargs)
+
+    def rays_paraxial_point(self, paraxial, height=1.,
+            wavelength=None, **kwargs):
+        zp = paraxial.pupil_distance[0] + paraxial.z[1]
+        rp = paraxial.pupil_height[0]
+        return self.rays_point(height, zp, rp, wavelength, **kwargs)
+
     def rays_paraxial_line(self, paraxial, height=1.,
             wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
@@ -1028,10 +1020,9 @@ class GeometricTrace(Trace):
         return self.rays_line(height, zp, rp, wavelength, **kwargs)
 
     def resize(self, fn=lambda a, b: a):
-        x, y = self.y[:, :, 0], self.y[:, :, 1]
-        r = np.hypot(x, y)
+        r = np.hypot(self.y[:, :, 0], self.y[:, :, 1])
         for e, ri in zip(self.system[1:], r[1:]):
-            e.radius = fn(ri, e.radius)
+            e.radius = fn(ri.max(), e.radius)
 
     def plot(self, ax, axis=1, **kwargs):
         kwargs.setdefault("color", "green")

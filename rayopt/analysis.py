@@ -41,7 +41,7 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 class Analysis(object):
     figwidth = 12.
     resize = True
-    aim = True
+    align = True
     close = None
     refocus_paraxial = True
     trace_gaussian = True
@@ -75,8 +75,8 @@ class Analysis(object):
         if self.close is not None:
             self.system.close(self.close)
         self.paraxial = ParaxialTrace(self.system)
-        if self.aim:
-            self.paraxial.aim()
+        if self.align:
+            self.paraxial.align()
         if self.refocus_paraxial:
             self.paraxial.refocus()
         if self.resize:

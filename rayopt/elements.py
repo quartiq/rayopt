@@ -22,7 +22,7 @@ import numpy as np
 from scipy.optimize import newton
 
 from .transformations import (euler_matrix, euler_from_matrix, 
-        translation_matrix, rotation_matrix, concatenate_matrices)
+        rotation_matrix)
 from .name_mixin import NameMixin
 from .aberration_orders import aberration_intrinsic
 from .utils import sinarctan, tanarcsin
@@ -72,17 +72,20 @@ class TransformMixin(object):
     @property
     def incidence(self):
         # of the optical axis onto the surface
-        return self.transform_to(self._direction, angle=True)
+        return self.to_normal(self._direction)
 
     @property
     def excidence(self, mu):
-        raise NotImplementedError
-        e = self.incidence * (mu, mu, 0)
-        e[2] = np.sqrt(1 - np.square(e).sum())
-        e = i/np.linalg.unit_vector(i)
+        i = self.incidence
+        if mu == 1:
+            return i
+        r = 0, 0, 1
+        a = abs(mu)*i[2]
+        g = -a + np.sign(mu)*np.sqrt(a**2 - mu**2 + 1)
+        e = abs(mu)*i + g*r
         return e
 
-    def aim(self, direction, mu):
+    def align(self, direction, mu):
         """orient such that direction is excidence"""
         i = self.direction
         r = mu*i - direction # snell
@@ -163,7 +166,7 @@ class Element(NameMixin, TransformMixin):
         self.finite = finite
         self.angular_radius = angular_radius
         # angular radius is tan(u) as sin(u) is ambiguous
-        # sin(pi/2 + eps) = sin(pi/2 - eps)
+        # sin(pi/2 + a) = sin(pi/2 - a)
 
     def to_pupil(self, yo, yp, pupil_distance, pupil_height):
         ro = self.radius if self.finite else self.angular_radius
@@ -197,7 +200,8 @@ class Element(NameMixin, TransformMixin):
     def clip(self, y, u):
         if not np.isfinite(self.radius):
             return u
-        bad = np.square(y[:, :2]).sum(1) > self.radius**2
+        x, y, z = y.T
+        bad = x**2 + y**2 > self.radius**2
         u = np.where(bad[:, None], np.nan, u)
         return u
 
@@ -333,7 +337,7 @@ class Interface(Element):
             u = u0 - 2*a[:, None]*r # reflection
         else:
             b = (mu**2 - 1)/r2
-            g = -a + np.sign(mu)*np.sqrt(a**2 - b)
+            g = -a + np.sign(mu)*np.sqrt(np.square(a) - b)
             u = muf*u0 + g[:, None]*r # refraction
         return u
 
@@ -383,18 +387,18 @@ class Spheroid(Interface):
         if self.aspherics is not None:
             return Interface.intercept(self, y, u) # expensive iterative
         # replace the newton-raphson with the analytic solution
-        c = self.curvature
+        c, k = self.curvature, self.conic
         if c == 0:
             return -y[:, 2]/u[:, 2] # flat
         ky, ku = y, u
-        if self.conic != 1:
+        if k != 1:
             ky, ku = ky.copy(), ku.copy()
-            ky[:, 2] *= self.conic
-            ku[:, 2] *= self.conic
+            ky[:, 2] *= k
+            ku[:, 2] *= k
         d = c*(u*ky).sum(1) - u[:, 2]
         e = c*(u*ku).sum(1)
         f = c*(y*ky).sum(1) - 2*y[:, 2]
-        s = (-d - np.sign(u[:, 2])*np.sqrt(d**2 - e*f))/e
+        s = -(d + np.sign(u[:, 2])*np.sqrt(d**2 - e*f))/e
         return s #np.where(s*np.sign(self.distance)>=0, s, np.nan)
 
     def paraxial_matrix(self, n0, l):

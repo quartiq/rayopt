@@ -19,22 +19,31 @@
 import numpy as np
 
 
-def dir_to_angles(r):
-    return r/np.linalg.norm(r)
+def simple_cache(f):
+    cache = {}
+    def wrapper(*args):
+        key = args
+        try:
+            return cache[key]
+        except KeyError:
+            cache[key] = v = f(*args)
+            return v
+    wrapper.cache = cache
+    return wrapper
 
 def tanarcsin(u):
     if u.ndim == 2 and u.shape[1] == 3:
         return u[:, :2]/u[:, 2:]
     u2 = np.square(u)
     if u.ndim == 2:
-        u2 = u2[:, :2].sum(axis=1)[:, None]
+        u2 = (u2[:, 0] + u2[:, 1])[:, None]
     return u/np.sqrt(1 - u2)
 
 def sinarctan(u):
     u2 = np.square(u)
     if u.ndim == 2:
         assert u.shape[1] < 3
-        u2 = u2[:, :2].sum(axis=1)[:, None]
+        u2 = (u2[:, 0] + u2[:, 1])[:, None]
     return u/np.sqrt(1 + u2)
 
 def sfloat(a):

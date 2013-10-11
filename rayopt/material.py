@@ -22,7 +22,7 @@ import shelve, anydbm, os.path, cPickle as pickle
 
 import numpy as np
 
-from .utils import sfloat, sint
+from .utils import sfloat, sint, simple_cache
 
 
 fraunhofer = dict(   # http://en.wikipedia.org/wiki/Abbe_number
@@ -45,19 +45,6 @@ fraunhofer = dict(   # http://en.wikipedia.org/wiki/Abbe_number
 lambda_F = fraunhofer["F"]
 lambda_d = fraunhofer["d"]
 lambda_C = fraunhofer["C"]
-
-
-def simple_cache(f):
-    cache = {}
-    def wrapper(self, *args):
-        key = self, args
-        try:
-            return cache[key]
-        except KeyError:
-            cache[key] = v = f(self, *args)
-            return v
-    wrapper.cache = cache
-    return wrapper
 
 
 class Material(object):

@@ -176,7 +176,6 @@ class System(list):
             yield pending
 
     def plot(self, ax, axis=1, npoints=31, adjust=True, **kwargs):
-        kwargs.setdefault("linestyle", "-")
         kwargs.setdefault("color", "black")
         if adjust:
             ax.set_aspect("equal")
@@ -187,7 +186,7 @@ class System(list):
         for x, z in self.surfaces_cut(axis, npoints):
             ax.plot(z, x, **kwargs)
         o = np.cumsum([e.offset for e in self], axis=0)
-        ax.plot(o[:, 2], o[:, axis], "k--")
+        ax.plot(o[:, 2], o[:, axis], ":", **kwargs)
 
     def paraxial_matrices(self, l, start=1, stop=None):
         n = self[start - 1].refractive_index(l)
@@ -213,3 +212,11 @@ class System(list):
     @property
     def track(self):
         return np.cumsum([el.distance for el in self])
+
+    def align(self, n):
+        n0 = n[0]
+        for i, (el, n) in enumerate(zip(self[:-1], n[:-1])):
+            mu = n0/n
+            el.align(self[i + 1].direction, mu)
+            n0 = n
+        self[-1].angles = 0, 0, 0.
