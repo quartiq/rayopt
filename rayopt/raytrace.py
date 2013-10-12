@@ -32,6 +32,7 @@ from scipy.interpolate import griddata
 from .aberration_orders import aberration_extrinsic
 from .elements import Spheroid
 from .utils import sinarctan, tanarcsin, simple_cache
+from .transformations import rotation_matrix
 
 
 class Trace(object):
@@ -81,6 +82,13 @@ class ParaxialTrace(Trace):
     # excidence direction (assumes excidence and offset of the
     # next element coincide: use el.align())
     # u[i] is tan(u) angle after the ith element
+    #
+    # calculations assume aplanatic (and not paraxial system
+    # oslo also assumes aplanatic). aplanatic is equivalent to the abbe
+    # sine condition, magnification is equal to optical input ray sine
+    # over optical output sine for all rays:
+    # m = n0 sin u0/ (nk sin uk) 
+    # "the paraxial u is tan u"
     def __init__(self, system, aberration_orders=3, axis=1):
         super(ParaxialTrace, self).__init__(system)
         self.allocate(aberration_orders)
@@ -391,8 +399,12 @@ class ParaxialTrace(Trace):
         kwargs.setdefault("color", "black")
         ax.plot(self.y[:, 0], self.y[:, 1], **kwargs)
 
-    # TODO introduce aperture at argmax(abs(y_axial)/radius)
-    # or at argmin(abs(u_axial))
+    # TODO
+    # * introduce aperture at argmax(abs(y_axial)/radius)
+    #   or at argmin(abs(u_axial))
+    # * setting any of (obj na, entrance radius, ax slope, image na,
+    # working fno), (field angle, obj height, image height), (obj dist,
+    # img dist, obj pp, img pp, mag) works
 
     def resize(self):
         for e, y in zip(self.system[1:], self.y[1:]):
@@ -808,15 +820,28 @@ class GeometricTrace(Trace):
         changing angle (in case of finite object) or
         position in case of infinite object"""
         self.rays_given(y, u, l)
-        var = self.u if self.system.object.finite else self.y
-        assert var.shape[1] == 1
-        v0 = var[0, 0, axis].copy()
+
+        if self.system.object.finite:
+            var = self.u[0, 0]
+            ax = np.zeros(3)
+            ax[0 if axis else 1] = 1
+            def vary(a):
+                #r = rotation_matrix(a, ax).T[:3, :3]
+                #var[:] = np.dot(v0, r)
+                var[:] = v0
+                var[axis] *= 1 + a
+                var[:] /= np.linalg.norm(var)
+        else:
+            var = self.y[0, 0]
+            def vary(a):
+                var[axis] = v0[axis]*(1 + a)
+        v0 = var.copy()
 
         if stop is -1: # return clipping ray
             radii = np.array([e.radius for e in self.system[1:-1]])
             @simple_cache
             def distance(a):
-                var[0, 0, axis] = a*v0
+                vary(a)
                 self.propagate(stop=-1, clip=False)
                 res = self.y[1:-1, 0, axis]*target
                 return max(res - radii)
@@ -826,7 +851,7 @@ class GeometricTrace(Trace):
             target *= self.system[stop].radius
             @simple_cache
             def distance(a):
-                var[0, 0, axis] = a*v0
+                vary(a)
                 self.propagate(stop=stop + 1, clip=False)
                 res = self.y[stop, 0, axis]
                 return res - target
@@ -835,17 +860,17 @@ class GeometricTrace(Trace):
             f0 = fun(a0)
             if not np.isnan(f0):
                 return a0, f0
-            for scale in np.logspace(.01, .3, 5):
-                for ai in a0*scale, a0/scale:
+            for scale in np.logspace(-1, 0, 5):
+                for ai in -scale, scale:
                     fi = fun(ai)
                     if not np.isnan(fi):
                         return ai, fi
             raise RuntimeError("no starting ray found")
 
-        a0, f0 = find_start(distance, 1.)
+        a, f0 = find_start(distance, 0.)
         if abs(f0 - target) > tol:
-            a0 = newton(distance, a0, tol=tol, maxiter=maxiter)
-        var[0, 0, axis] = a0*v0
+            a = newton(distance, a, tol=tol, maxiter=maxiter)
+        vary(a)
         return self.y[0, 0, :2], self.u[0, 0, :2]
 
     def pupil_distance(self, y, u, axis=1):

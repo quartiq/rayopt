@@ -22,11 +22,10 @@ import numpy as np
 def simple_cache(f):
     cache = {}
     def wrapper(*args):
-        key = args
         try:
-            return cache[key]
+            return cache[args]
         except KeyError:
-            cache[key] = v = f(*args)
+            cache[args] = v = f(*args)
             return v
     wrapper.cache = cache
     return wrapper
@@ -43,7 +42,7 @@ def sinarctan(u):
     u2 = np.square(u)
     if u.ndim == 2:
         assert u.shape[1] < 3
-        u2 = (u2[:, 0] + u2[:, 1])[:, None]
+        u2 = u2.sum(1)[:, None]
     return u/np.sqrt(1 + u2)
 
 def sfloat(a):

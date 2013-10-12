@@ -135,10 +135,7 @@ class TransformMixin(object):
         if f:
             if t:
                 r = r.T
-            y = (np.dot(yi, r) for yi in y)
-        else:
-            y = (yi.copy() for yi in y)
-        y = tuple(y)
+            y = tuple(np.dot(yi, r) for yi in y)
         if len(y) == 1:
             y = y[0]
         return y
@@ -284,8 +281,7 @@ class Interface(Element):
         y = y0 + t[:, None]*u0
         if clip:
             u0 = self.clip(y, u0)
-        u = u0
-        n = n0
+        u, n = u0, n0
         if self.material is not None:
             if self.material.mirror:
                 mu = -1.
