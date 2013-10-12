@@ -46,6 +46,7 @@ class Trace(object):
     def propagate(self):
         self.z = self.system.track
         self.origins = self.system.origins
+        self.mirrored = self.system.mirrored
 
     def from_axis(self, y, i=None, ref=0):
         y = np.atleast_3d(y) # zi, rayi, xyz
@@ -368,7 +369,7 @@ class ParaxialTrace(Trace):
         # coincides with the incoming of the next, use align()
         y = self.y[:, :, None] * np.ones(3)
         y[:, :, 2] = self.z[:, None]
-        y = self.from_axis(y, range(1, self.length + 1))
+        y = self.from_axis(y, range(self.length))
         ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
         h = self.system.aperture.radius*1.5
         for p, flag in [
@@ -659,7 +660,9 @@ class GaussianTrace(Trace):
     def plot(self, ax, axis=1, npoints=5001, waist=True, scale=10, **kwargs):
         kwargs.setdefault("color", "black")
         z = np.linspace(self.z[0], self.z[-1], npoints)
-        wx, wy = self.spot_radius_at(z).T*scale
+        i = np.searchsorted(self.z, z) - 1
+        m = self.mirrored[i, :]
+        wx, wy = self.spot_radius_at(z).T*scale*m
         y = np.array([
             [wx, wx, z], [wy, wy, z], 
             [-wx, -wx, z], [-wy, -wy, z],

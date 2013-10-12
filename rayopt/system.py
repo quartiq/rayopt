@@ -220,3 +220,8 @@ class System(list):
             el.align(self[i + 1].direction, mu)
             n0 = n
         self[-1].angles = 0, 0, 0.
+
+    @property
+    def mirrored(self):
+        return np.cumprod([-1 if getattr(getattr(el, "material", None),
+            "mirror", False) else 1 for el in self])
