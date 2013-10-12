@@ -343,11 +343,11 @@ class Interface(Element):
         return xyz
 
 
-class Spheroid(Interface):
+class StdSpheroid(Interface):
     typ = "S"
 
     def __init__(self, curvature=0., conic=1., aspherics=None, **kwargs):
-        super(Spheroid, self).__init__(**kwargs)
+        super(StdSpheroid, self).__init__(**kwargs)
         self.curvature = curvature
         self.conic = conic
         if aspherics is not None:
@@ -440,13 +440,13 @@ class Spheroid(Interface):
         return n, m
    
     def reverse(self):
-        super(Spheroid, self).reverse()
+        super(StdSpheroid, self).reverse()
         self.curvature *= -1
         if self.aspherics is not None:
             self.aspherics *= -1
 
     def rescale(self, scale):
-        super(Spheroid, self).rescale(scale)
+        super(StdSpheroid, self).rescale(scale)
         self.curvature /= scale
         if self.aspherics is not None:
             self.aspherics /= scale**(2*np.arange(self.aspherics.size) + 1)
@@ -461,6 +461,27 @@ class Spheroid(Interface):
         a = np.zeros((2, 2, kmax, kmax, kmax))
         aberration_intrinsic(c, f, g, y, yb, 1/n0, 1/n, a, kmax - 1)
         return a
+
+
+class FastSpheroid(StdSpheroid):
+    def propagate(self, y0, u0, n0, l, clip=True):
+        m = y0.shape[0]
+        y = np.empty((m, 3))
+        u = np.empty((m, 3))
+        t = np.empty((m,))
+        n = fast_propagate(self, y0, u0, n0, l, clip, y, u, t)
+        return y, u, n, t
+
+
+try:
+    # the numba version is three times faster for nrays=3 but ten times
+    # slower for nrays=1000...
+    raise ImportError
+    from .numba_elements import fast_propagate
+    Spheroid = FastSpheroid
+except ImportError:
+    Spheroid = StdSpheroid
+
 
 # aliases as Spheroid has all features
 Object = Spheroid
