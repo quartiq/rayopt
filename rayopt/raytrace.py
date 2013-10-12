@@ -88,7 +88,7 @@ class ParaxialTrace(Trace):
     # sine condition, magnification is equal to optical input ray sine
     # over optical output sine for all rays:
     # m = n0 sin u0/ (nk sin uk) 
-    # "the paraxial u is tan u"
+    # "the paraxial u is tan u"?
     def __init__(self, system, aberration_orders=3, axis=1):
         super(ParaxialTrace, self).__init__(system)
         self.allocate(aberration_orders)
@@ -656,7 +656,7 @@ class GaussianTrace(Trace):
         self.system.image.distance += self.waist_position[-1, axis]
         self.propagate()
 
-    def plot(self, ax, axis=1, npoints=501, waist=True, scale=10, **kwargs):
+    def plot(self, ax, axis=1, npoints=5001, waist=True, scale=10, **kwargs):
         kwargs.setdefault("color", "black")
         z = np.linspace(self.z[0], self.z[-1], npoints)
         wx, wy = self.spot_radius_at(z).T*scale

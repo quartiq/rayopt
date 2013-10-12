@@ -52,6 +52,7 @@ class Analysis(object):
     refocus_full = True
     print_full = False
     plot_paraxial = False
+    plot_gaussian = False
     plot_full = False
     plot_heights = [1., .707, 0.]
     plot_rays = 3
@@ -95,7 +96,7 @@ class Analysis(object):
         if self.refocus_full:
             t = GeometricTrace(self.system)
             t.rays_paraxial_point(self.paraxial, 0.,
-                    nrays=100, distribution="hexapolar", clip=True)
+                    nrays=500, distribution="hexapolar", clip=True)
             t.refocus()
             self.paraxial.propagate()
         if self.print_system:
@@ -114,6 +115,8 @@ class Analysis(object):
         self.system.plot(ax)
         if self.plot_paraxial:
             self.paraxial.plot(ax)
+        if self.plot_gaussian:
+            self.gaussian.plot(ax)
         if self.plot_full:
             t.plot(ax)
         for h in 0, max(self.plot_heights):
@@ -233,7 +236,7 @@ class Analysis(object):
                 labelbottom=False, labelleft=False)
 
     def transverse(self, fig, heights=[1., .707, 0.],
-            wavelengths=None, nrays_line=152,
+            wavelengths=None, nrays_line=602,
             colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
@@ -262,7 +265,7 @@ class Analysis(object):
                 self.post_setup_axes(axii)
 
     def spots(self, ax, heights=[1., .707, 0.],
-            wavelengths=None, nrays=200, colors="grbcmyk"):
+            wavelengths=None, nrays=500, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.wavelengths
@@ -295,13 +298,13 @@ class Analysis(object):
                         facecolor="none"))
                     yi = y + zi*u
                     axij.plot(yi[:, 0], yi[:, 1], ".%s" % ci,
-                            markersize=3, markeredgewidth=0, label="%s" % wi)
+                            markersize=2, markeredgewidth=0, label="%s" % wi)
         for axi in ax:
             for axii in axi:
                 self.post_setup_axes(axii)
 
     def opds(self, ax, heights=[1., .707, 0.],
-            wavelength=None, nrays=200, colors="grbcmyk"):
+            wavelength=None, nrays=1000, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelength is None:
             wavelength = self.system.wavelengths[0]
