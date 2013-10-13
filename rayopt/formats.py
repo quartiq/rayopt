@@ -64,7 +64,7 @@ def system_from_array(data,
         el.radius = (try_get(line, columns, "radius", 0.) or
                 try_get(line, columns, "diameter", 0.)/2.)
         if typ == "O":
-            el.finite, el.angular_radius, el.radius = False, el.radius, np.inf
+            el.angular_radius = el.radius
         if hasattr(el, "material"):
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)
@@ -129,7 +129,7 @@ def system_from_oslo(fil):
 
 
 def system_from_zemax(fil):
-    s = System([Object(material=air, finite=False), Image()])
+    s = System([Object(material=air, angular_radius=np.inf), Image()])
     next_pos = 0.
     a = None
     for line in fil.readlines():

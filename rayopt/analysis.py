@@ -418,10 +418,12 @@ class Analysis(object):
         wl, wu = min(wavelengths), max(wavelengths)
         ww = np.linspace(wl - (wu - wl)/4, wu + (wu - wl)/4, nrays)
         zc = []
-        ph, pd = paraxial.pupil_distance[0], paraxial.pupil_height[0]
+        pd = paraxial.pupil_distance[0]
+        ph = np.fabs(np.arctan2(paraxial.pupil_height[0], pd))
         for wwi in np.r_[wavelengths[0], ww]:
             t = GeometricTrace(self.system)
-            y, u = self.system.object.to_pupil((0, 0), (0, 1e-3), ph, pd)
+            y, u = self.system.object.to_pupil((0, 0), (0, 1e-3), pd, ph)
+            u = np.sin(u)
             t.rays_given(y, u, wwi)
             t.propagate(clip=False)
             zc.append(-t.y[-1, 0, 1]/tanarcsin(t.i[-1, 0])[1])

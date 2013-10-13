@@ -156,35 +156,64 @@ class TransformMixin(object):
 class Element(NameMixin, TransformMixin):
     typ = "P"
 
-    def __init__(self, radius=np.inf, finite=True,
-            angular_radius=np.inf, **kwargs):
+    def __init__(self, radius=np.inf, angular_radius=None, **kwargs):
         super(Element, self).__init__(**kwargs)
-        self.radius = radius
-        self.finite = finite
-        self.angular_radius = angular_radius
-        # angular radius is tan(u) as sin(u) is ambiguous
-        # sin(pi/2 + a) = sin(pi/2 - a)
+        if radius is not None:
+            self.radius = radius
+        if angular_radius is not None:
+            self.angular_radius = angular_radius
+        # angular radius is u as tan(u) and sin(u) are ambiguous
 
-    def to_pupil(self, yo, yp, pupil_distance, pupil_height):
-        ro = self.radius if self.finite else self.angular_radius
-        yo, yp, ro, rp = np.broadcast_arrays(yo, yp, ro, pupil_height)
+    @property
+    def radius(self):
+        return self._radius
+
+    @radius.setter
+    def radius(self, radius):
+        self.finite, self._radius = True, radius
+
+    @property
+    def angular_radius(self):
+        return self._angular_radius
+
+    @angular_radius.setter
+    def angular_radius(self, angular_radius):
+        self.finite, self._angular_radius = False, angular_radius
+
+    def field(self, z):
         if self.finite:
-            y = -yo*ro
-            u = sinarctan((yp*rp - y)/pupil_distance)
+            return np.arctan2(self._radius, z)
         else:
-            u = sinarctan(yo*ro)
-            y = yp*rp - pupil_distance*tanarcsin(u)
+            return self._angular_radius
+
+    def height(self, z):
+        if self.finite:
+            return self._radius
+        else:
+            return np.tan(self._angular_radius)*z
+
+    def to_pupil(self, yo, yp, z, a):
+        f = self.field(z)
+        yo, yp, z, f, a = np.broadcast_arrays(yo, yp, z, f, a)
+        yo, yp = -yo*f, yp*a
+        if self.finite:
+            y = np.tan(yo)*z
+            u = yp - yo
+        else:
+            y = np.tan(yo + yp)*z
+            u = -yo
         return y, u
 
-    def from_pupil(self, y, u, pupil_distance, pupil_height):
-        ro = self.radius if self.finite else self.angular_radius
-        y, u, ro, rp = np.broadcast_arrays(y, u, ro, pupil_height)
-        yp = (y + pupil_distance*tanarcsin(u))/rp
+    def from_pupil(self, y, u, z, a):
+        f = self.field(z)
+        y, u, z, f, a = np.broadcast_arrays(y, u, z, f, a)
         if self.finite:
-            yo = -y/ro
+            yo = np.arctan2(y, z)
+            yp = u + yo
         else:
-            yo = tanarcsin(y/ro)
-        return yo, yp
+            yo = -u
+            yp = np.arctan2(y, z) - yo
+        return -yo/f, yp/a
 
     def intercept(self, y, u):
         # ray length to intersection with element
