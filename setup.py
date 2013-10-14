@@ -41,7 +41,7 @@ setup(
         #dependency_links = [],
         packages = find_packages(),
         #namespace_packages = [],
-        #test_suite = "bullseye.tests.test_all",
+        test_suite = "rayopt.tests",
         ext_modules=[
                 Extension("rayopt._transformations",
                     sources=["rayopt/_transformations.c"],),

@@ -18,7 +18,8 @@
 
 from __future__ import print_function, absolute_import, division
 
-from .material import fraunhofer, AllGlasses
+from .material import (fraunhofer, AllGlasses, ModelMaterial,
+    SellmeierMaterial, GasMaterial, mirror)
 from .elements import Spheroid, Object, Aperture, Image
 from .system import System
 from .formats import (system_from_text, system_from_zemax,
