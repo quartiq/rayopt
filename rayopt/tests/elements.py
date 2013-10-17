@@ -31,6 +31,38 @@ from rayopt import Spheroid, Aperture, ModelMaterial, mirror
 from rayopt.utils import sinarctan, tanarcsin
 
 
+class TransformCase(unittest.TestCase):
+    def setUp(self):
+        self.s = Spheroid(distance=2., direction=(1, 3, 4.),
+                angles=(.3, .2, .1))
+
+    def test_offset(self):
+        nptest.assert_allclose(self.s.offset,
+                self.s.distance*self.s.direction)
+    
+    def test_from_to_axis(self, n=10):
+        x = np.random.randn(n, 3)
+        x1 = self.s.to_axis(x)
+        x2 = self.s.from_axis(x1)
+        nptest.assert_allclose(x, x2)
+
+    def test_from_to_normal(self, n=10):
+        x = np.random.randn(n, 3)
+        x1 = self.s.to_normal(x)
+        x2 = self.s.from_normal(x1)
+        nptest.assert_allclose(x, x2)
+
+    def test_rot(self):
+        self.s.angles = None
+        x = np.array([0., 0, 3])
+        x1 = self.s.from_normal(x)
+        nptest.assert_allclose(x1, self.s.direction*3)
+        self.s.direction = 0, 0, 1.
+        self.s.angles = .1, 0, 0
+        x1 = self.s.from_normal(x)
+        nptest.assert_allclose(x1, (0, 3*np.sin(.1), 3*np.cos(.1)))
+
+
 class ParaxialCase(unittest.TestCase):
     def setUp(self):
         self.mat = mat = ModelMaterial(nd=1.5, vd=np.inf)
@@ -69,6 +101,8 @@ class ParaxialCase(unittest.TestCase):
         d /= np.linalg.norm(d)
         mu = 1/self.s0.material.nd
         self.s0.align(d, mu)
+        e = self.s0.from_normal(self.s0.excidence(mu))
+        nptest.assert_allclose(e, d)
         y0, u0 = (1, 2), (.2, .0)
         yu, n = self.s0.propagate_paraxial(np.hstack((y0, u0)), 1., 1.)
         y, u = np.hsplit(yu, 2)
@@ -80,11 +114,13 @@ class ParaxialCase(unittest.TestCase):
 class ParaxToRealCase(unittest.TestCase):
     def setUp(self):
         self.mat = mat = ModelMaterial(nd=1.5, vd=np.inf)
-        d = np.random.randn(3)*1e-2 + (0, 0, 1.)
-        a = np.random.randn(3)*1e-4
+        d = np.random.randn(3)*1e-1 + (0, 0, 1.)
+        a = np.random.randn(3)*1e-8
         a[1:] = 0
-        self.s = Spheroid(curvature=.1, distance=3., material=mat,
+        self.s = Spheroid(curvature=.1, distance=.2, material=mat,
                 direction=d, angles=a)
+        de = self.s.excidence(1/self.s.material.nd)
+        self.sa = Spheroid(direction=de)
 
     def test_real_similar_to_parax(self, n=10, e=1e-8):
         y0p = np.random.randn(n, 2.)*e
@@ -94,7 +130,33 @@ class ParaxToRealCase(unittest.TestCase):
         u0r[:, 2] = np.sqrt(1 - np.square(u0p).sum(1))
         yup, np_ = self.s.propagate_paraxial(np.hstack((y0p, u0p)), 1., 1.)
         yp, up = np.hsplit(yup, 2)
+        #y0r, u0r = self.s.to_normal(y0r, u0r)
         yr, ur, nr, tr  = self.s.propagate(y0r, u0r, 1., 1.)
+        #yr, ur = self.s.from_normal(yr, ur)
+        yr, ur = self.sa.to_axis(yr, ur)
         nptest.assert_allclose(nr, np_)
         nptest.assert_allclose(yr[:, :2], yp)
-        nptest.assert_allclose(ur[:, :2], sinarctan(up))
+        nptest.assert_allclose(tanarcsin(ur), up)
+
+
+class PupilCase(unittest.TestCase):
+    def setUp(self):
+        self.sf = Spheroid(radius=2.)
+        self.si = Spheroid(angular_radius=np.deg2rad(60))
+        self.sl = Spheroid(angular_radius=np.deg2rad(105))
+        self.sn = Spheroid(distance=3., radius=4.)
+
+    def test_pupil(self):
+        z = self.sn.distance
+        h = self.sn.radius
+        yo = .8
+        yp = .9
+        sn = self.sn
+        for s in self.sf,: #, self.si, self.sl:
+            y, u = s.to_pupil([(yo, yo*.5)], [(yp, yp*.5)], z, h)
+            nptest.assert_allclose(y[0]/s.height(z)/(1, .5), yo)
+            y = np.hstack((y, [[-z]]))
+            u = np.hstack((u, np.sqrt(1 - (u**2).sum(1))[None, :]))
+            y1, u1, n1, t1 = sn.propagate(y, u, 1., 1.)
+            #nptest.assert_allclose(y1[0, :2]/sn.height(z)/(1, .5), yp)
+
