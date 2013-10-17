@@ -74,7 +74,6 @@ class TransformMixin(object):
         # of the optical axis onto the surface
         return self.to_normal(self._direction)
 
-    @property
     def excidence(self, mu):
         i = self.incidence
         if mu == 1:
@@ -82,7 +81,7 @@ class TransformMixin(object):
         r = 0, 0, 1
         a = abs(mu)*i[2]
         g = -a + np.sign(mu)*np.sqrt(a**2 - mu**2 + 1)
-        e = abs(mu)*i + g*r
+        e = abs(mu)*i + g[None]*r
         return e
 
     def align(self, direction, mu):
@@ -103,8 +102,10 @@ class TransformMixin(object):
         self.update(self.distance, self.direction, angles)
 
     def update(self, distance, direction, angles):
-        self._direction = u = np.array(direction)
-        u /= np.linalg.norm(u)
+        dlen = np.linalg.norm(direction)
+        if not dlen:
+            direction = 0, 0, 1.
+        self._direction = u = np.array(direction)/dlen
         if distance < 0:
             u *= -1
         self._distance = d = abs(distance)
@@ -192,27 +193,39 @@ class Element(NameMixin, TransformMixin):
         else:
             return np.tan(self._angular_radius)*z
 
-    def to_pupil(self, yo, yp, z, a):
-        f = self.field(z)
-        yo, yp, z, f, a = np.broadcast_arrays(yo, yp, z, f, a)
-        yo, yp = -yo*f, yp*a
+    def to_pupil(self, yo, yp, z, h):
+        # paraxial pupil height h implicitly 
+        # converted to numerical aperture
+        # (ignoring infinite conjugates)
+        yo, yp, z, h = np.broadcast_arrays(yo, yp, z, h)
         if self.finite:
-            y = np.tan(yo)*z
-            u = yp - yo
+            # object is y prop
+            # pupil is arcsin(u)-u0 prop: constant solid angle across obj
+            y = yo*self.radius
+            u0 = -np.arctan2(y, z)
+            u = np.sin(u0 + yp*np.arctan2(h, z))
         else:
-            y = np.tan(yo + yp)*z
-            u = -yo
+            # object is sin(u) prop (aplanatic)
+            # pupil is constant solid angle across obj (constant beam
+            # width)
+            a = self.angular_radius
+            u = yo*np.sin(a)
+            #if a > np.pi/2:
+            #    u = np.sin(yo*a)
+            y0 = -tanarcsin(u)*z
+            y = y0 + yp*h/np.cos(np.arcsin(u))
         return y, u
 
     def from_pupil(self, y, u, z, a):
+        raise NotImplementedError
         f = self.field(z)
         y, u, z, f, a = np.broadcast_arrays(y, u, z, f, a)
         if self.finite:
-            yo = np.arctan2(y, z)
+            yo = sinarctan(y/z)
             yp = u + yo
         else:
             yo = -u
-            yp = np.arctan2(y, z) - yo
+            yp = sinarctan(y/z) - yo
         return -yo/f, yp/a
 
     def intercept(self, y, u):
@@ -450,7 +463,7 @@ class StdSpheroid(Interface):
             else:
                 n = self.refractive_index(l)
                 mu = n/n0
-                p = np.sqrt(mu**2 - np.sin(theta)**2)
+                p = np.sqrt(mu**2 + costheta**2 - 1)
                 m[1, 1] = p/(mu*costheta)
                 m[2, 0] = c*(costheta - p)/mu
                 m[3, 1] = c*(costheta - p)/(costheta*p)
