@@ -193,41 +193,6 @@ class Element(NameMixin, TransformMixin):
         else:
             return np.tan(self._angular_radius)*z
 
-    def to_pupil(self, yo, yp, z, h):
-        # paraxial pupil height h implicitly 
-        # converted to numerical aperture
-        # (ignoring infinite conjugates)
-        yo, yp, z, h = np.broadcast_arrays(yo, yp, z, h)
-        if self.finite:
-            # object is y prop
-            # pupil is arcsin(u)-u0 prop: constant solid angle across obj
-            y = yo*self.radius
-            u0 = -np.arctan2(y, z)
-            u = np.sin(u0 + yp*np.arctan2(h, z))
-        else:
-            # object is sin(u) prop (aplanatic)
-            # pupil is constant solid angle across obj (constant beam
-            # width)
-            a = self.angular_radius
-            u = yo*np.sin(a)
-            #if a > np.pi/2:
-            #    u = np.sin(yo*a)
-            y0 = -tanarcsin(u)*z
-            y = y0 + yp*h/np.cos(np.arcsin(u))
-        return y, u
-
-    def from_pupil(self, y, u, z, a):
-        raise NotImplementedError
-        f = self.field(z)
-        y, u, z, f, a = np.broadcast_arrays(y, u, z, f, a)
-        if self.finite:
-            yo = sinarctan(y/z)
-            yp = u + yo
-        else:
-            yo = -u
-            yp = sinarctan(y/z) - yo
-        return -yo/f, yp/a
-
     def intercept(self, y, u):
         # ray length to intersection with element
         # only reference plane, overridden in subclasses
@@ -384,6 +349,53 @@ class Interface(Element):
         xyz[:, 2] = -self.shape_func(xyz)
         return xyz
 
+    def aim(self, yo, yp, z, a):
+        # yo 2d fractional object coordinate (object knows meaning)
+        # yp 2d fractional angular pupil coordinate (since object points
+        # emit into solid angles)
+        # z pupil distance from object apex (also infinite object)
+        # a pupil aperture (also for infinite object, then from z=0)
+        yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
+        n, m = yo.shape
+        uz = np.array((0, 0, z))
+        if self.finite:
+            # do not take yo as angular fractional as self.radius is
+            # not angular eigher. This does become problematic if object
+            # is finite and hyperhemispherical. But we want to solve
+            # that issue for Spheroids generically.
+            y = np.zeros((n, 3))
+            y[:, :m] = yo*self.radius
+            y[:, 2] = self.shape_func(y)
+            u = uz - y
+        else:
+            # lambert azimuthal equal area
+            yo = yo*(self.angular_radius/(np.pi/2)) # lambert planar 
+            yo2 = np.square(yo).sum(1)[:, None]
+            u = np.empty((n, 3))
+            u[:, :2] = np.sqrt(1 - yo2/4)*yo
+            u[:, 2] = 1 - yo2/2
+            y = uz - z*u # have rays start on sphere around pupil center
+        usag = np.cross(uz, u)
+        usagn = np.square(usag).sum(1)[:, None]
+        usag = np.where(usagn == 0, (1, 0, 0), usag/usagn)
+        umer = np.cross(u, usag)
+        # umer /= np.sqrt(np.square(umer).sum(1)) by construction
+        # lambert azimuthal equal area
+        yp = yp*(a/(np.pi/2)) # Lambert planar X and Y
+        yp2 = np.square(yp).sum(1)[:, None]
+        # unit vector to pupil point from (0, 0, 0)
+        #up = np.empty((n, 3))
+        #up[:, :2] = np.sqrt(1 - yp2/4)*yp
+        #up[:, 2] = 1 - yp2/2
+        yp[:, :2] *= np.sqrt(1 - yp2/4)*np.tan(a)*z
+        yp = usag*yp[:, 0, None] + umer*yp[:, 1, None]
+        if self.finite:
+            u += yp
+            u /= np.sqrt(np.square(u).sum(1))
+        else:
+            y += yp
+        return y, u
+
 
 class StdSpheroid(Interface):
     typ = "S"
@@ -400,6 +412,8 @@ class StdSpheroid(Interface):
 
     def shape_func(self, xyz):
         x, y, z = xyz.T
+        if not self.curvature:
+            return z
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
         e = c*r2/(1 + np.sqrt(1 - k*c**2*r2))
@@ -410,13 +424,15 @@ class StdSpheroid(Interface):
 
     def shape_func_deriv(self, xyz):
         x, y, z = xyz.T
+        q = np.ones_like(xyz)
+        if not self.curvature:
+            return q
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
         e = c/np.sqrt(1 - k*c**2*r2)
         if self.aspherics is not None:
             for i, ai in enumerate(self.aspherics):
                 e += 2*ai*(i + 2)*r2**(i + 1)
-        q = np.ones((e.size, 3))
         q[:, 0] = -x*e
         q[:, 1] = -y*e
         return q

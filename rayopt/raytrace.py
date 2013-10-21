@@ -829,7 +829,8 @@ class GeometricTrace(Trace):
         changing angle (in case of finite object) or
         position in case of infinite object"""
         # yo 2d fractional object coordinate (object knows meaning)
-        # yp 2d fractional angular pupil coordinate
+        # yp 2d fractional angular pupil coordinate (since object points
+        # emit into solid angles)
         # z pupil distance from object apex
         # a pupil angular half aperture (from z=0 even in infinite case)
         #
@@ -916,12 +917,10 @@ class GeometricTrace(Trace):
         if height:
             # can only determine pupil distance if chief is non-axial
             yp = (0, 0)
-            ph, pd = self.aim(yo, yp, pd, ph, l, axis=1)
+            _, pd = self.aim(yo, yp, pd, ph, l, axis=1)
         for ax in axis:
             yp = (0, 1) if ax else (1, 0)
-            y, u = self.system.object.to_pupil(yo, yp, pd, ph[ax])
-            y, u = self.aim(y, np.sin(u), l, axis=ax, target=1)
-            ph[ax] = self.pupil_height(y, u, pd, axis=ax)
+            ph[ax], _ = self.aim(yo, yp, pd, ph, l, axis=ax)
         return pd, ph
 
     @staticmethod
