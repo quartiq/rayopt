@@ -356,7 +356,7 @@ class Interface(Element):
         # z pupil distance from object apex (also infinite object)
         # a pupil aperture (also for infinite object, then from z=0)
         yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
-        n, m = yo.shape
+        n = yo.shape[0]
         uz = np.array((0, 0, z))
         if self.finite:
             # do not take yo as angular fractional as self.radius is
@@ -364,12 +364,12 @@ class Interface(Element):
             # is finite and hyperhemispherical. But we want to solve
             # that issue for Spheroids generically.
             y = np.zeros((n, 3))
-            y[:, :m] = yo*self.radius
+            y[:, :2] = -yo*self.radius
             y[:, 2] = self.shape_func(y)
             u = uz - y
         else:
             # lambert azimuthal equal area
-            yo = yo*(self.angular_radius/(np.pi/2)) # lambert planar 
+            yo = yo*(2*self.angular_radius/np.pi) # lambert planar 
             yo2 = np.square(yo).sum(1)[:, None]
             u = np.empty((n, 3))
             u[:, :2] = np.sqrt(1 - yo2/4)*yo
@@ -381,17 +381,17 @@ class Interface(Element):
         umer = np.cross(u, usag)
         # umer /= np.sqrt(np.square(umer).sum(1)) by construction
         # lambert azimuthal equal area
-        yp = yp*(a/(np.pi/2)) # Lambert planar X and Y
+        yp = yp*(2*a/np.pi) # lambert planar X and Y
         yp2 = np.square(yp).sum(1)[:, None]
         # unit vector to pupil point from (0, 0, 0)
         #up = np.empty((n, 3))
         #up[:, :2] = np.sqrt(1 - yp2/4)*yp
         #up[:, 2] = 1 - yp2/2
-        yp[:, :2] *= np.sqrt(1 - yp2/4)*np.tan(a)*z
+        yp *= np.sqrt(1 - yp2/4)*np.tan(a)*z
         yp = usag*yp[:, 0, None] + umer*yp[:, 1, None]
         if self.finite:
             u += yp
-            u /= np.sqrt(np.square(u).sum(1))
+            u /= np.sqrt(np.square(u).sum(1))[:, None]
         else:
             y += yp
         return y, u

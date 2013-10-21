@@ -917,7 +917,7 @@ class GeometricTrace(Trace):
         if height:
             # can only determine pupil distance if chief is non-axial
             yp = (0, 0)
-            _, pd = self.aim(yo, yp, pd, ph, l, axis=1)
+            _, pd = self.aim(yo, (0, 0), pd, ph, l, axis=1)
         for ax in axis:
             yp = (0, 1) if ax else (1, 0)
             ph[ax], _ = self.aim(yo, yp, pd, ph, l, axis=ax)
@@ -1008,7 +1008,7 @@ class GeometricTrace(Trace):
             y, u = self.system.object.to_pupil(yo, yp, pd, ph[axis])
             u = np.sin(u)
             try:
-                y, u = self.aim(y, u, wavelength, axis=axis, target=t, stop=-1)
+                y, u = self.aim(yo, yp, wavelength, axis=axis, target=t, stop=-1)
             except RuntimeError:
                 print("clipping aim failed", height, t)
             ys.append(y)
@@ -1031,7 +1031,7 @@ class GeometricTrace(Trace):
         # distorted
         y, u = self.system.object.to_pupil((0, height), yp,
                 pupil_distance, pupil_height)
-        self.rays_given(y, np.sin(u), wavelength)
+        self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
         return icenter
 
