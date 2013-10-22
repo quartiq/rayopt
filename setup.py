@@ -41,7 +41,7 @@ setup(
         #dependency_links = [],
         packages = find_packages(),
         #namespace_packages = [],
-        test_suite = "rayopt.tests",
+        test_suite = "nose.collector",
         ext_modules=[
                 Extension("rayopt._transformations",
                     sources=["rayopt/_transformations.c"],),

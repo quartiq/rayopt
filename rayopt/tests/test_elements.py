@@ -149,14 +149,19 @@ class PupilCase(unittest.TestCase):
     def test_pupil(self):
         z = self.sn.distance
         h = self.sn.radius
+        a = np.arctan2(h, z)
         yo = .8
         yp = .9
         sn = self.sn
         for s in self.sf,: #, self.si, self.sl:
-            y, u = s.to_pupil([(yo, yo*.5)], [(yp, yp*.5)], z, h)
-            nptest.assert_allclose(y[0]/s.height(z)/(1, .5), yo)
-            y = np.hstack((y, [[-z]]))
-            u = np.hstack((u, np.sqrt(1 - (u**2).sum(1))[None, :]))
+            y, u = s.aim([(yo, yo*.5)], [(yp, yp*.5)], z, a)
+            print(y, u)
+            nptest.assert_allclose(np.square(u).sum(1), 1)
+            if s.finite:
+                nptest.assert_allclose(-y[0, :2]/s.height(z)/(1, .5), yo)
+            y -= (0, 0, z)
             y1, u1, n1, t1 = sn.propagate(y, u, 1., 1.)
-            #nptest.assert_allclose(y1[0, :2]/sn.height(z)/(1, .5), yp)
+            nptest.assert_allclose(np.square(u).sum(1), 1)
+            print(y1, u1)
+            nptest.assert_allclose(y1[0, :2]/sn.height(z)/(1, .5), yp)
 
