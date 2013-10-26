@@ -141,27 +141,39 @@ class ParaxToRealCase(unittest.TestCase):
 
 class PupilCase(unittest.TestCase):
     def setUp(self):
-        self.sf = Spheroid(radius=2.)
+        self.sf = Spheroid(radius=3.)
         self.si = Spheroid(angular_radius=np.deg2rad(60))
         self.sl = Spheroid(angular_radius=np.deg2rad(105))
-        self.sn = Spheroid(distance=3., radius=4.)
+        self.sn = Spheroid(distance=2., radius=1.5)
 
-    def test_pupil(self):
+    def aim_prop(self, s, yo, yp):
         z = self.sn.distance
         h = self.sn.radius
         a = np.arctan2(h, z)
-        yo = .8
-        yp = .9
-        sn = self.sn
-        for s in self.sf,: #, self.si, self.sl:
-            y, u = s.aim([(yo, yo*.5)], [(yp, yp*.5)], z, a)
-            print(y, u)
-            nptest.assert_allclose(np.square(u).sum(1), 1)
-            if s.finite:
-                nptest.assert_allclose(-y[0, :2]/s.height(z)/(1, .5), yo)
-            y -= (0, 0, z)
-            y1, u1, n1, t1 = sn.propagate(y, u, 1., 1.)
-            nptest.assert_allclose(np.square(u).sum(1), 1)
-            print(y1, u1)
-            nptest.assert_allclose(y1[0, :2]/sn.height(z)/(1, .5), yp)
+        y, u = s.aim(yo, yp, z, a)
+        nptest.assert_allclose(np.square(u).sum(1), 1)
+        y1 = y - (0, 0, z)
+        y1, u1, n1, t1 = self.sn.propagate(y1, u, 1., 1.)
+        nptest.assert_allclose(np.square(u1).sum(1), 1)
+        if s.finite:
+            y[:, :2] /= s.radius
+            nptest.assert_allclose(np.sign(y[:, 2]),
+                    np.sign(s.curvature))
+        if self.sn.finite:
+            y1[:, :2] /= self.sn.radius
+            nptest.assert_allclose(np.sign(y1[:, 2]),
+                    np.sign(self.sn.curvature))
+        return y[0], u[0], y1[0], u1[0]
+
+    def test_pupil(self):
+        yo, yp = (0, .8), (0, 0)
+        y, u, y1, u1 = self.aim_prop(self.sf, yo, yp)
+        nptest.assert_allclose(-y[:2], yo)
+        nptest.assert_allclose(y1[:2], yp)
+
+        yo, yp = (0, .0), (0, 1.)
+        y, u, y1, u1 = self.aim_prop(self.sf, yo, yp)
+        nptest.assert_allclose(-y[:2], yo)
+        nptest.assert_allclose(y1[:2], yp)
+
 
