@@ -141,10 +141,10 @@ class ParaxToRealCase(unittest.TestCase):
 
 class PupilCase(unittest.TestCase):
     def setUp(self):
-        self.sf = Spheroid(radius=3.)
+        self.sf = Spheroid(radius=1.)
         self.si = Spheroid(angular_radius=np.deg2rad(60))
         self.sl = Spheroid(angular_radius=np.deg2rad(105))
-        self.sn = Spheroid(distance=2., radius=1.5)
+        self.sn = Spheroid(distance=3., radius=2.)
 
     def aim_prop(self, s, yo, yp):
         z = self.sn.distance
