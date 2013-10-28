@@ -75,6 +75,7 @@ class ModelMaterial(Material):
 
     @classmethod
     def from_string(cls, txt, name=None):
+        txt = str(txt)
         v = map(float, txt.split("/"))
         if len(v) == 1:
             nd, = v

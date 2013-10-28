@@ -70,8 +70,8 @@ def system_from_array(data,
             mat = material_map.get(mat, mat)
             if type(mat) is type(1.):
                 m = ModelMaterial(nd=mat)
-            elif mat in all_materials:
-                m = all_materials[mat]
+            elif str(mat) in all_materials:
+                m = all_materials[str(mat)]
             else:
                 try:
                     m = ModelMaterial.from_string(mat)

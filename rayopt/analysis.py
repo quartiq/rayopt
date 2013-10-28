@@ -422,8 +422,7 @@ class Analysis(object):
         ph = np.fabs(np.arctan2(paraxial.pupil_height[0], pd))
         for wwi in np.r_[wavelengths[0], ww]:
             t = GeometricTrace(self.system)
-            y, u = self.system.object.to_pupil((0, 0), (0, 1e-3), pd, ph)
-            u = np.sin(u)
+            y, u = self.system.object.aim((0, 0), (0, 1e-3), pd, ph)
             t.rays_given(y, u, wwi)
             t.propagate(clip=False)
             zc.append(-t.y[-1, 0, 1]/tanarcsin(t.i[-1, 0])[1])

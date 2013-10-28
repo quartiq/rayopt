@@ -153,7 +153,7 @@ class PupilCase(unittest.TestCase):
         y, u = s.aim(yo, yp, z, a)
         nptest.assert_allclose(np.square(u).sum(1), 1)
         y1 = y - (0, 0, z)
-        y1, u1, n1, t1 = self.sn.propagate(y1, u, 1., 1.)
+        y1, u1, n1, t1 = self.sn.propagate(y1, u, 1., 1., clip=False)
         nptest.assert_allclose(np.square(u1).sum(1), 1)
         if s.finite:
             y[:, :2] /= s.radius
@@ -176,4 +176,25 @@ class PupilCase(unittest.TestCase):
         nptest.assert_allclose(-y[:2], yo)
         nptest.assert_allclose(y1[:2], yp)
 
+        yo, yp = (0, 1.), (1., 0.)
+        y, u, y1, u1 = self.aim_prop(self.sf, yo, yp)
+        nptest.assert_allclose(-y[:2], yo)
+        nptest.assert_allclose(y1[:2], yp)
+
+        yo, yp = (1., 0), (1., 0.)
+        y, u, y1, u1 = self.aim_prop(self.sf, yo, yp)
+        nptest.assert_allclose(-y[:2], yo)
+        nptest.assert_allclose(-y1[1::-1], yp)
+
+        yo, yp = (0., 1.), (0., 0.)
+        y, u, y1, u1 = self.aim_prop(self.si, yo, yp)
+        nptest.assert_allclose(np.arcsin(u[:2])/
+                self.si.angular_radius, yo)
+        nptest.assert_allclose(-y1[1::-1], yp)
+
+        yo, yp = (0., 0.), (0., 1.)
+        y, u, y1, u1 = self.aim_prop(self.si, yo, yp)
+        nptest.assert_allclose(np.arcsin(u[:2])/
+                self.si.angular_radius, yo)
+        nptest.assert_allclose(y1[:2], yp)
 

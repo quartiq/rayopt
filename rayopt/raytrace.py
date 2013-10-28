@@ -710,7 +710,7 @@ class GeometricTrace(Trace):
         y, u = np.atleast_2d(y, u)
         y, u = np.broadcast_arrays(y, u)
         n, m = y.shape
-        if self.y.shape[0] != n:
+        if not hasattr(self, "y") or self.y.shape[0] != n:
             self.allocate(n)
         if l is None:
             l = self.system.wavelengths[0]
@@ -823,7 +823,7 @@ class GeometricTrace(Trace):
         self.rays_given(y, u)
         self.propagate(clip=False)
 
-    def aim(self, yo, yp, z, a, l=None, axis=1, stop=None,
+    def aim(self, yo, yp, z, p, l=None, axis=1, stop=None,
             tol=1e-3, maxiter=100):
         """aims ray at aperture center (or target)
         changing angle (in case of finite object) or
@@ -833,9 +833,6 @@ class GeometricTrace(Trace):
         # emit into solid angles)
         # z pupil distance from object apex
         # a pupil angular half aperture (from z=0 even in infinite case)
-        #
-        #    y, u = self.system.object.to_pupil(yo, yp, pd, ph[1])
-        #    pd = self.pupil_distance(y, u, axis=1)
 
         # get necessary y for finite object and u for infinite
         # get guess u0/y0
@@ -845,26 +842,29 @@ class GeometricTrace(Trace):
         # point or max(yi/target - radii) (if stop==-1)
         # find first, then minimize
         # return apparent z and a
+
+        y, u = self.system.object.aim(yo, yp, z, p)
         self.rays_given(y, u, l)
 
-        if self.system.object.finite:
-            var = self.u[0, 0]
-            ax = np.zeros(3)
-            ax[0 if axis else 1] = 1
+        if np.allclose(yp, 0):
             def vary(a):
-                #r = rotation_matrix(a, ax).T[:3, :3]
-                #var[:] = np.dot(v0, r)
-                var[:] = v0
-                var[axis] *= 1 + a
-                var[:] /= np.linalg.norm(var)
+                z1 = z*(1 + a)
+                y, u = self.system.object.aim(yo, yp, z1, p)
+                self.y[0, 0] = y
+                self.u[0, 0] = u
+                return z1
         else:
-            var = self.y[0, 0]
+            p1 = np.array(p) # copies
             def vary(a):
-                var[axis] = v0[axis]*(1 + a)
-        v0 = var.copy()
+                p1[axis] = p[axis]*(1 + a)
+                y, u = self.system.object.aim(yo, yp, z, p1)
+                self.y[0, 0] = y
+                self.u[0, 0] = u
+                return p1[axis]
 
         if stop is -1: # return clipping ray
             radii = np.array([e.radius for e in self.system[1:-1]])
+            target = np.sign(yp[axis])
             @simple_cache
             def distance(a):
                 vary(a)
@@ -874,7 +874,7 @@ class GeometricTrace(Trace):
         else: # return pupil ray
             if stop is None:
                 stop = self.system.aperture_index
-            target *= self.system[stop].radius
+            target = yp[axis]*self.system[stop].radius
             @simple_cache
             def distance(a):
                 vary(a)
@@ -896,8 +896,8 @@ class GeometricTrace(Trace):
         a, f0 = find_start(distance, 0.)
         if abs(f0 - target) > tol:
             a = newton(distance, a, tol=tol, maxiter=maxiter)
-        vary(a)
-        return self.y[0, 0, :2], self.u[0, 0, :2]
+        r = vary(a)
+        return r
 
     def pupil_distance(self, y, u, axis=1):
         # given real (non-axial) chief ray
@@ -917,10 +917,10 @@ class GeometricTrace(Trace):
         if height:
             # can only determine pupil distance if chief is non-axial
             yp = (0, 0)
-            _, pd = self.aim(yo, (0, 0), pd, ph, l, axis=1)
+            pd = self.aim(yo, yp, pd, ph, l, axis=1)
         for ax in axis:
-            yp = (0, 1) if ax else (1, 0)
-            ph[ax], _ = self.aim(yo, yp, pd, ph, l, axis=ax)
+            yp = [(1, 0), (0, 1)][ax]
+            ph[ax] = self.aim(yo, yp, pd, ph, l, axis=ax)
         return pd, ph
 
     @staticmethod
@@ -995,22 +995,19 @@ class GeometricTrace(Trace):
         pd = pupil_distance
         ph = np.ones(2)*pupil_height
         try:
-            pd, ph = self.aim_pupil(height, pd, ph[axis], wavelength,
-                    axis=(), **kwargs)
+            pd = self.aim(yo, (0, 0), pd, ph, wavelength, axis=1, **kwargs)
         except RuntimeError:
             print("chief aim failed", height)
-        y, u = self.system.object.to_pupil(yo, (0, 0), pd, ph[axis])
-        u = np.sin(u)
+        y, u = self.system.object.aim(yo, (0, 0), pd, ph)
         ys, us = [y], [u]
         for t in -1, 1:
             yp = [0, 0]
             yp[axis] = t
-            y, u = self.system.object.to_pupil(yo, yp, pd, ph[axis])
-            u = np.sin(u)
             try:
-                y, u = self.aim(yo, yp, wavelength, axis=axis, target=t, stop=-1)
+                ph[axis] = self.aim(yo, yp, pd, ph, wavelength, axis=axis, stop=-1)
             except RuntimeError:
                 print("clipping aim failed", height, t)
+            y, u = self.system.object.aim(yo, yp, pd, ph)
             ys.append(y)
             us.append(u)
         y, u = np.vstack(ys), np.vstack(us)
@@ -1029,7 +1026,7 @@ class GeometricTrace(Trace):
         icenter, yp = self.pupil_distribution(distribution, nrays)
         # NOTE: will not have same ray density in x and y if pupil is
         # distorted
-        y, u = self.system.object.to_pupil((0, height), yp,
+        y, u = self.system.object.aim((0, height), yp,
                 pupil_distance, pupil_height)
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
@@ -1038,23 +1035,26 @@ class GeometricTrace(Trace):
     def rays_line(self, height, pupil_distance, pupil_height,
             wavelength=None, nrays=21, aim=True, eps=1e-2, clip=False):
         yi = np.c_[np.zeros(nrays), np.linspace(0, height, nrays)]
-        y, u = self.system.object.to_pupil(yi, (0, 0.), pupil_distance,
-                pupil_height)
-        u = np.sin(u)
+        y = np.empty((nrays, 3))
+        u = np.empty_like(y)
         if aim:
-            for i in range(y.shape[0]):
+            for i in range(yi.shape[0]):
                 try:
-                    y[i], u[i] = self.aim(y[i], u[i], wavelength, axis=1)
+                    pdi = self.aim(yi[i], (0, 0), pupil_distance,
+                            pupil_height, wavelength, axis=1)
+                    y[i] = self.y[0, 0]
+                    u[i] = self.u[0, 0]
                 except RuntimeError:
                     print("chief aim failed", i)
-        e = np.zeros((3, 1, 2)) # pupil
+        e = np.zeros((3, 1, 3)) # pupil
         e[(1, 2), :, (1, 0)] = eps # meridional, sagittal
         if self.system.object.finite:
             y = np.tile(y, (3, 1))
-            u = (u + e*pupil_height).reshape(-1, 2)
+            u = (u + e*pupil_height).reshape(-1, 3)
+            u /= np.sqrt(np.square(u).sum(1))[:, None]
         else:
             yr = self.system.object.height(pupil_distance)
-            y = (y + e*yr).reshape(-1, 2)
+            y = (y + e*yr).reshape(-1, 3)
             u = np.tile(u, (3, 1))
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
@@ -1063,19 +1063,19 @@ class GeometricTrace(Trace):
             wavelength=None, **kwargs):
         # TODO: refactor rays_paraxial_*
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = paraxial.pupil_height[0]
+        rp = np.arctan2(paraxial.pupil_height[0], zp)
         return self.rays_clipping(height, zp, rp, wavelength, **kwargs)
 
     def rays_paraxial_point(self, paraxial, height=1.,
             wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = paraxial.pupil_height[0]
+        rp = np.arctan2(paraxial.pupil_height[0], zp)
         return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
     def rays_paraxial_line(self, paraxial, height=1.,
             wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = paraxial.pupil_height[0]
+        rp = np.arctan2(paraxial.pupil_height[0], zp)
         return self.rays_line(height, zp, rp, wavelength, **kwargs)
 
     def resize(self, fn=lambda a, b: a):

@@ -369,36 +369,38 @@ class Interface(Element):
             u = uz - y
         else:
             # lambert azimuthal equal area
-	    # planar coords
+            # planar coords
             yo = yo*2*np.sin(self.angular_radius/2)
-            yo2 = np.square(yo).sum(1)[:, None]
+            yo2 = np.square(yo).sum(1)
             u = np.empty((n, 3))
-            u[:, :2] = yo*np.sqrt(1 - yo2/4)
+            u[:, :2] = yo*np.sqrt(1 - yo2[:, None]/4)
             u[:, 2] = 1 - yo2/2
             y = uz - z*u # have rays start on sphere around pupil center
         usag = np.cross(u, uz)
         usagn = np.sqrt(np.square(usag).sum(1))[:, None]
-        usag = np.where(usagn == 0, (1, 0, 0), usag/usagn)
+        usag = np.where(usagn == 0, (1, 0, 0), usag)
+        usagn = np.where(usagn == 0, 1., usagn)
+        usag /= usagn
         umer = np.cross(u, usag)
         umer /= np.sqrt(np.square(umer).sum(1))[:, None]
         # umer /= np.sqrt(np.square(umer).sum(1)) by construction
         # lambert azimuthal equal area
-	# yp is relative planar X and Y pupil coords
+        # yp is relative planar X and Y pupil coords
+        #yp = yp*np.tan(a)*z
         yp = yp*2*np.sin(a/2)
         yp2 = np.square(yp).sum(1)[:, None]
         # unit vector to pupil point from (0, 0, 0)
         #up = np.empty((n, 3))
         #up[:, :2] = np.sqrt(1 - yp2/4)*yp
         #up[:, 2] = 1 - yp2/2
-        yp *= np.sqrt(1 - yp2/4)*z
+        yp *= np.sqrt(1 - yp2/4)/(1 - yp2/2)*z
         yp = usag*yp[:, 0, None] + umer*yp[:, 1, None]
-	print(yp)
         if self.finite:
-            u += yp # - uz
+            u += yp
             u /= np.sqrt(np.square(u).sum(1))[:, None]
         else:
             y += yp
-	    # u is normal
+            # u is normalized
         return y, u
 
 

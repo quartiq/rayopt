@@ -21,7 +21,7 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 
 from .elements import Object, Image, Aperture
-from .material import fraunhofer
+from .material import fraunhofer, air
 
 
 class System(list):
@@ -80,11 +80,12 @@ class System(list):
         for e in self:
             d, e.distance = e.distance, d
         # shift materials backwards
-        m = None
+        m = air
         for e in self[::-1]:
             if hasattr(e, "material"):
                 # material is old preceeding material
                 m, e.material = e.material, m
+        
 
     def rescale(self, scale=None):
         if scale is None:
