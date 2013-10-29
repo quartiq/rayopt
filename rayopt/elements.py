@@ -376,6 +376,9 @@ class Interface(Element):
             u[:, :2] = yo*np.sqrt(1 - yo2[:, None]/4)
             u[:, 2] = 1 - yo2/2
             y = uz - z*u # have rays start on sphere around pupil center
+        if z < 0:
+            u *= -1
+            uz *= -1
         usag = np.cross(u, uz)
         usagn = np.sqrt(np.square(usag).sum(1))[:, None]
         usag = np.where(usagn == 0, (1, 0, 0), usag)
