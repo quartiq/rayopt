@@ -122,4 +122,15 @@ I 0       42.95 .364 AIR
         g.rays_paraxial_point(p)
         g.rays_paraxial_line(p)
 
+    def test_aim_point(self):
+        p, g = self.traces()
+        i = self.s.aperture_index
+        r = np.array([el.radius for el in self.s[1:-1]])
+        g.rays_paraxial_clipping(p)
+        nptest.assert_allclose(g.y[i, 0, 1], 0, atol=1e-7)
+        nptest.assert_allclose(max(g.y[1:-1, 2, 1] - r), 0, atol=1e-7)
+        nptest.assert_allclose(min(g.y[1:-1, 1, 1] + r), 0, atol=1e-7)
+        g.rays_paraxial_point(p)
+        g.rays_paraxial_line(p)
+
 
