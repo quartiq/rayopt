@@ -436,6 +436,7 @@ class StdSpheroid(Interface):
         x, y, z = xyz.T
         q = np.ones_like(xyz)
         if not self.curvature:
+            q[:, :2] = 0
             return q
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
