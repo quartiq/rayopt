@@ -304,19 +304,19 @@ class Interface(Element):
             v = self.material.delta_n(lmin, lmax)
         return v
 
-    def shape_func(self, p):
+    def surface_sag(self, p):
         raise NotImplementedError
 
-    def shape_func_deriv(self, p):
+    def surface_normal(self, p):
         raise NotImplementedError
 
     def intercept(self, y, u):
         s = super(Interface, self).intercept(y, u)
         for i in range(y.shape[0]):
             yi, ui, si = y[i], u[i], s[i]
-            def func(si): return self.shape_func(yi + si*ui)
+            def func(si): return self.surface_sag(yi + si*ui)
             def fprime(si): return np.dot(
-                    self.shape_func_deriv(yi + si*ui), ui)
+                    self.surface_normal(yi + si*ui), ui)
             try:
                 s[i] = newton(func=func, fprime=fprime, x0=si,
                         tol=1e-7, maxiter=5)
@@ -331,7 +331,7 @@ class Interface(Element):
         # doi:10.1364/JOSA.52.000672
         if mu == 1:
             return u0
-        r = self.shape_func_deriv(y)
+        r = self.surface_normal(y)
         r2 = np.square(r).sum(1)
         muf = abs(mu)
         a = muf*(u0*r).sum(1)/r2
@@ -346,7 +346,7 @@ class Interface(Element):
 
     def surface_cut(self, axis, points):
         xyz = super(Interface, self).surface_cut(axis, points)
-        xyz[:, 2] = -self.shape_func(xyz)
+        xyz[:, 2] = -self.surface_sag(xyz)
         return xyz
 
     def aim(self, yo, yp, z, a):
@@ -365,7 +365,7 @@ class Interface(Element):
             # that issue for Spheroids generically.
             y = np.zeros((n, 3))
             y[:, :2] = -yo*self.radius
-            y[:, 2] = self.shape_func(y)
+            y[:, 2] = self.surface_sag(y)
             u = uz - y
         else:
             # lambert azimuthal equal area
@@ -420,7 +420,7 @@ class StdSpheroid(Interface):
         if self.curvature and np.isfinite(self.radius):
             assert self.radius**2 < 1/(self.conic*self.curvature**2)
 
-    def shape_func(self, xyz):
+    def surface_sag(self, xyz):
         x, y, z = xyz.T
         if not self.curvature:
             return z
@@ -432,7 +432,7 @@ class StdSpheroid(Interface):
                 e += ai*r2**(i + 2)
         return z - e
 
-    def shape_func_deriv(self, xyz):
+    def surface_normal(self, xyz):
         x, y, z = xyz.T
         q = np.ones_like(xyz)
         if not self.curvature:
