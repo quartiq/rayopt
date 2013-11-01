@@ -127,11 +127,21 @@ I 0       42.95 .364 AIR
         i = self.s.aperture_index
         r = np.array([el.radius for el in self.s[1:-1]])
         g.rays_paraxial_clipping(p)
+        if not self.s.object.finite:
+            nptest.assert_allclose(g.u[0, :, :], g.u[0,
+                (0,)*g.u.shape[1], :])
         nptest.assert_allclose(g.y[i, 0, 1], 0, atol=1e-7)
-        nptest.assert_allclose(max(g.y[1:-1, 2, 1] - r), 0, atol=1e-7)
         nptest.assert_allclose(min(g.y[1:-1, 1, 1] + r), 0, atol=1e-7)
-        g.rays_paraxial_point(p, 0., distribution="tee", nrays=5)
-        print(g.y[:, :, :2])
+        nptest.assert_allclose(max(g.y[1:-1, 2, 1] - r), 0, atol=1e-7)
+        g.rays_paraxial_point(p, 1., distribution="cross", nrays=5)
+        if not self.s.object.finite:
+            nptest.assert_allclose(g.u[0, :, :], g.u[0,
+                (0,)*g.u.shape[1], :])
+        nptest.assert_allclose(g.y[i, :3, 1]/self.s[i].radius,
+                [-1, 0, 1], atol=1e-2)
+        nptest.assert_allclose(g.y[i, :, 0]/self.s[i].radius,
+                [0, 0, 0, -1, 0, 1], atol=1e-3)
+        print(g.y[i, :, :2]/self.s[i].radius)
         g.rays_paraxial_line(p)
 
 
