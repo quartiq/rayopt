@@ -381,7 +381,7 @@ class Interface(Element):
             uz *= -1
         usag = np.cross(u, uz)
         usagn = np.sqrt(np.square(usag).sum(1))[:, None]
-        usag = np.where(usagn == 0, (1, 0, 0), usag)
+        usag = np.where(usagn == 0, (-1., 0, 0), usag)
         usagn = np.where(usagn == 0, 1., usagn)
         usag /= usagn
         umer = np.cross(u, usag)
