@@ -126,6 +126,7 @@ I 0       42.95 .364 AIR
         p, g = self.traces()
         i = self.s.aperture_index
         r = np.array([el.radius for el in self.s[1:-1]])
+
         g.rays_paraxial_clipping(p)
         if not self.s.object.finite:
             nptest.assert_allclose(g.u[0, :, :], g.u[0,
@@ -133,6 +134,7 @@ I 0       42.95 .364 AIR
         nptest.assert_allclose(g.y[i, 0, 1], 0, atol=1e-7)
         nptest.assert_allclose(min(g.y[1:-1, 1, 1] + r), 0, atol=1e-7)
         nptest.assert_allclose(max(g.y[1:-1, 2, 1] - r), 0, atol=1e-7)
+
         g.rays_paraxial_point(p, 1., distribution="cross", nrays=5)
         if not self.s.object.finite:
             nptest.assert_allclose(g.u[0, :, :], g.u[0,

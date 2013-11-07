@@ -847,31 +847,35 @@ class GeometricTrace(Trace):
         self.rays_given(y, u, l)
 
         if np.allclose(yp, 0):
+            # aim chief and determine pupil distance
             def vary(a):
-                z1 = z*(1 + a)
+                z1 = z*a
                 y, u = self.system.object.aim(yo, yp, z1, p)
                 self.y[0, 0] = y
                 self.u[0, 0] = u
                 return z1
         else:
+            # aim marginal and determine pupil aperture
             p1 = np.array(p) # copies
             def vary(a):
-                p1[axis] = p[axis]*(1 + a)
+                p1[axis] = p[axis]*a
                 y, u = self.system.object.aim(yo, yp, z, p1)
                 self.y[0, 0] = y
                 self.u[0, 0] = u
                 return p1[axis]
 
-        if stop is -1: # return clipping ray
+        if stop is -1:
+            # return clipping ray
             radii = np.array([e.radius for e in self.system[1:-1]])
             target = np.sign(yp[axis])
             @simple_cache
             def distance(a):
                 vary(a)
-                self.propagate(stop=-1, clip=False)
-                res = self.y[1:-1, 0, axis]*target
-                return max(res - radii)
-        else: # return pupil ray
+                self.propagate(clip=False)
+                res = self.y[1:-1, 0, axis]
+                return max(res*target - radii)
+        else:
+            # return pupil ray
             if stop is None:
                 stop = self.system.aperture_index
             target = yp[axis]*self.system[stop].radius
@@ -882,22 +886,21 @@ class GeometricTrace(Trace):
                 res = self.y[stop, 0, axis]
                 return res - target
 
-        def find_start(fun, a0):
+        def find_start(fun, a0=1.):
             f0 = fun(a0)
             if not np.isnan(f0):
                 return a0, f0
-            for scale in np.logspace(-1, 0, 5):
+            for scale in np.logspace(-1, 2, 16):
                 for ai in -scale, scale:
-                    fi = fun(ai)
+                    fi = fun(a0 + ai)
                     if not np.isnan(fi):
-                        return ai, fi
+                        return a0 + ai, fi
             raise RuntimeError("no starting ray found")
 
-        a, f0 = find_start(distance, 0.)
-        if abs(f0 - target) > tol:
+        a, f = find_start(distance)
+        if abs(f - target) > tol:
             a = newton(distance, a, tol=tol, maxiter=maxiter)
-        r = vary(a)
-        return r
+        return vary(a)
 
     def pupil_distance(self, y, u, axis=1):
         # given real (non-axial) chief ray
@@ -916,10 +919,10 @@ class GeometricTrace(Trace):
         ph = np.ones(2)*pupil_height
         if height:
             # can only determine pupil distance if chief is non-axial
-            yp = (0, 0)
+            yp = (0, 0.)
             pd = self.aim(yo, yp, pd, ph, l, axis=1)
         for ax in axis:
-            yp = [(1, 0), (0, 1)][ax]
+            yp = [(1., 0), (0, 1.)][ax]
             ph[ax] = self.aim(yo, yp, pd, ph, l, axis=ax)
         return pd, ph
 
@@ -996,8 +999,8 @@ class GeometricTrace(Trace):
         ph = np.ones(2)*pupil_height
         try:
             pd = self.aim(yo, (0, 0), pd, ph, wavelength, axis=1, **kwargs)
-        except RuntimeError:
-            print("chief aim failed", height)
+        except RuntimeError as e:
+            print("chief aim failed", height, e)
         y, u = self.system.object.aim(yo, (0, 0), pd, ph)
         ys, us = [y], [u]
         for t in -1, 1:
@@ -1005,8 +1008,8 @@ class GeometricTrace(Trace):
             yp[axis] = t
             try:
                 ph[axis] = self.aim(yo, yp, pd, ph, wavelength, axis=axis, stop=-1)
-            except RuntimeError:
-                print("clipping aim failed", height, t)
+            except RuntimeError as e:
+                print("clipping aim failed", height, t, e)
             y, u = self.system.object.aim(yo, yp, pd, ph)
             ys.append(y)
             us.append(u)
@@ -1021,8 +1024,8 @@ class GeometricTrace(Trace):
             try:
                 pupil_distance, pupil_height = self.aim_pupil(height,
                         pupil_distance, pupil_height, wavelength, axis=aim)
-            except RuntimeError:
-                print("pupil aim failed", height)
+            except RuntimeError as e:
+                print("pupil aim failed", height, e)
         icenter, yp = self.pupil_distribution(distribution, nrays)
         # NOTE: will not have same ray density in x and y if pupil is
         # distorted
