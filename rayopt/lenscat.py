@@ -59,7 +59,7 @@ def oslo_lenscat(prefix, name):
         elems = read_oslo_lens(lensdat)
         for ele in elems:
             ele.radius = dia/2
-        lenscat[part] = (efl, elems, dia, thick, desc, lensdat, elems)
+        lenscat[part] = (efl, dia, thick, desc, lensdat, elems)
     return lenscat
 
 
@@ -110,7 +110,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
 
 
 def default_sys_from_elem(ele):
-    obj = Object(finite=False, radius=.1, material=air)
+    obj = Object(angular_radius=.1, material=air)
     ap = Aperture(distance=1., radius=max(e.radius for e in ele))
     img = Image()
     sys = System([obj, ap] + ele + [img])
