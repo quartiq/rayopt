@@ -313,16 +313,17 @@ class Interface(Element):
     def intercept(self, y, u):
         s = super(Interface, self).intercept(y, u)
         for i in range(y.shape[0]):
-            yi, ui, si = y[i], u[i], s[i]
-            def func(si): return self.surface_sag(yi + si*ui)
-            def fprime(si): return np.dot(
-                    self.surface_normal(yi + si*ui), ui)
+            yi, ui = y[None, i], u[None, i]
+            def func(si):
+                return self.surface_sag(yi + si*ui)[0]
+            def fprime(si):
+                return np.dot(self.surface_normal(yi + si*ui), ui.T)[0]
             try:
-                s[i] = newton(func=func, fprime=fprime, x0=si,
+                s[i] = newton(func=func, fprime=fprime, x0=s[i],
                         tol=1e-7, maxiter=5)
             except RuntimeError:
                 s[i] = np.nan
-        return s # np.where(s>=0, s, np.nan) # TODO mask
+        return s
 
     def refract(self, y, u0, mu):
         # G. H. Spencer and M. V. R. K. Murty
