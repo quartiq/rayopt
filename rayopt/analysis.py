@@ -236,7 +236,7 @@ class Analysis(object):
                 labelbottom=False, labelleft=False)
 
     def transverse(self, fig, heights=[1., .707, 0.],
-            wavelengths=None, nrays_line=602,
+            wavelengths=None, nrays_line=302,
             colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
@@ -265,7 +265,7 @@ class Analysis(object):
                 self.post_setup_axes(axii)
 
     def spots(self, ax, heights=[1., .707, 0.],
-            wavelengths=None, nrays=500, colors="grbcmyk"):
+            wavelengths=None, nrays=300, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.wavelengths
@@ -304,7 +304,7 @@ class Analysis(object):
                 self.post_setup_axes(axii)
 
     def opds(self, ax, heights=[1., .707, 0.],
-            wavelength=None, nrays=1000, colors="grbcmyk"):
+            wavelength=None, nrays=500, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelength is None:
             wavelength = self.system.wavelengths[0]
@@ -374,7 +374,7 @@ class Analysis(object):
                 self.post_setup_axes(axij)
 
     def longitudinal(self, ax, height=1.,
-            wavelengths=None, nrays=21, colors="grbcmyk"):
+            wavelengths=None, nrays=31, colors="grbcmyk"):
         paraxial = self.paraxial
         # lateral color: image relative to image at wl[0]
         # focus shift paraxial focus vs wl
