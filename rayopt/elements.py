@@ -180,7 +180,7 @@ class Element(NameMixin, TransformMixin):
 
     def dict(self):
         dat = super(Element, self).dict()
-        dat["type"] = type(self).__name__.lower()
+        t = type(self).__name__.lower()
         if self.radius not in (np.inf, None):
             dat["radius"] = self.radius
         if self.angular_radius is not None:

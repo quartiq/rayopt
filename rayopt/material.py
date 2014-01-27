@@ -18,7 +18,11 @@
 
 from __future__ import print_function, absolute_import, division
 
-import shelve, anydbm, os.path, cPickle as pickle, glob
+import shelve
+import anydbm
+import os.path
+import cPickle as pickle
+import glob
 
 import numpy as np
 

@@ -18,6 +18,8 @@
 
 from __future__ import print_function, absolute_import, division
 
+import json
+
 import numpy as np
 import yaml
 
@@ -192,7 +194,7 @@ def system_from_zemax(fil):
     return s
 
 
-def system_from_yaml(text, default_material="air"):
+def system_from_yaml(text):
     dat = yaml.load(text)
     assert dat.pop("type") == "system"
     return System(**dat)
@@ -201,3 +203,14 @@ def system_from_yaml(text, default_material="air"):
 def system_to_yaml(system):
     dat = system.dict()
     return yaml.dump(dat)
+
+
+def system_from_json(text):
+    dat = json.loads(text)
+    assert dat.pop("type") == "system"
+    return System(**dat)
+
+
+def system_to_json(system):
+    dat = system.dict()
+    return json.dumps(dat)
