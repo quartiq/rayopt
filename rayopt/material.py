@@ -18,6 +18,8 @@
 
 from __future__ import print_function, absolute_import, division
 
+import io
+import codecs
 import shelve
 import anydbm
 import os.path
@@ -164,7 +166,11 @@ basic = dict((m.name, m) for m in (vacuum, air, mirror))
 
 def load_catalog_zemax(fil, name=None):
     catalog = {}
-    dat = open(fil)
+    raw = open(fil, "rb").read(32)
+    if raw.startswith(codecs.BOM_UTF16):
+        dat = io.open(fil, encoding="utf-16")
+    else:
+        dat = io.open(fil)
     for line in dat:
         try:
             cmd, args = line.split(" ", 1)
@@ -202,14 +208,14 @@ def load_catalog_zemax(fil, name=None):
             else:
                 print(cmd, args, "not handled")
         except Exception, e:
-            print(cmd, args, "failed parsing", e)
+            print(line, "failed parsing", e)
     catalog[g.name] = g
     return catalog
 
 
 def load_catalog_oslo(f, catalog_name=None):
     glasscat = {}
-    f = open(f, "r")
+    f = io.open(f, "r")
     line = f.readline().split()
     ver, num, name = line[:3]
     #if len(line) > 3:
@@ -272,7 +278,7 @@ def load_catalogs(catdb, catalogs):
                 raise ValueError("glass catalog extension %s unknown" %
                         ext)
             for k, v in cf.items():
-                db["%s/%s" % (name, k.lower())] = v
+                db[("%s/%s" % (name, k.lower())).encode("ascii")] = v
                 defaults[k.lower()] = name
         name = "basic"
         for k, v in basic.items():

@@ -37,8 +37,8 @@ class System(list):
         dat = dict(
                 type="system",
                 description=self.description,
-                scale=self.scale,
-                wavelengths=self.wavelengths,
+                scale=float(self.scale),
+                wavelengths=list(map(float, self.wavelengths)),
                 elements=[el.dict() for el in self],
                 )
         return dat

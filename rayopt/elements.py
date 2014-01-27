@@ -40,11 +40,11 @@ class TransformMixin(object):
     def dict(self):
         dat = {}
         if self.distance:
-            dat["distance"] = self.distance
+            dat["distance"] = float(self.distance)
         if not self.straight:
-            dat["direction"] = tuple(self.direction)
+            dat["direction"] = tuple(map(float, self.direction))
         if not self.normal:
-            dat["angles"] = tuple(self.angles)
+            dat["angles"] = tuple(map(float, self.angles))
         return dat
 
     @property
@@ -180,11 +180,11 @@ class Element(NameMixin, TransformMixin):
 
     def dict(self):
         dat = super(Element, self).dict()
-        t = type(self).__name__.lower()
-        if self.radius not in (np.inf, None):
-            dat["radius"] = self.radius
+        dat["type"] = type(self).__name__.lower()
+        if np.isfinite(self.radius):
+            dat["radius"] = float(self.radius)
         if self.angular_radius is not None:
-            dat["angular_radius"] = self.angular_radius
+            dat["angular_radius"] = float(self.angular_radius)
         return dat
 
     @property
@@ -194,7 +194,6 @@ class Element(NameMixin, TransformMixin):
     @radius.setter
     def radius(self, radius):
         self._radius = radius
-        self.finite = radius is not None
 
     @property
     def angular_radius(self):
@@ -452,11 +451,11 @@ class Spheroid(Interface):
     def dict(self):
         dat = super(Spheroid, self).dict()
         if self.curvature:
-            dat["curvature"] = self.curvature
+            dat["curvature"] = float(self.curvature)
         if self.conic != 1.:
-            dat["conic"] = self.conic
-        if self.aspherics:
-            dat["aspherics"] = list(self.aspherics)
+            dat["conic"] = float(self.conic)
+        if self.aspherics is not None:
+            dat["aspherics"] = list(map(float, self.aspherics))
         return dat
 
     def surface_sag(self, xyz):

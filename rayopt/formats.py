@@ -67,7 +67,7 @@ def system_from_array(data,
         el.radius = (try_get(line, columns, "radius", 0.) or
                 try_get(line, columns, "diameter", 0.)/2.)
         if typ == "O":
-            el.angular_radius = el.radius
+            el.angular_radius = el.radius # default to infinite
         if hasattr(el, "material"):
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)
