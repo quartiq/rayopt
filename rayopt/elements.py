@@ -415,7 +415,7 @@ class StdSpheroid(Interface):
         self.curvature = curvature
         self.conic = conic
         if aspherics is not None:
-            aspherics = np.array(aspherics)
+            aspherics = list(aspherics)
         self.aspherics = aspherics
         if self.curvature and np.isfinite(self.radius):
             assert self.radius**2 < 1/(self.conic*self.curvature**2)
@@ -512,13 +512,14 @@ class StdSpheroid(Interface):
         super(StdSpheroid, self).reverse()
         self.curvature *= -1
         if self.aspherics is not None:
-            self.aspherics *= -1
+            self.aspherics = [-ai for ai in self.aspherics]
 
     def rescale(self, scale):
         super(StdSpheroid, self).rescale(scale)
         self.curvature /= scale
         if self.aspherics is not None:
-            self.aspherics /= scale**(2*np.arange(self.aspherics.size) + 1)
+            self.aspherics = [ai/scale**(2*i + 3) for i, ai in
+                    enumerate(self.aspherics)]
 
     def aberration(self, y, u, n0, n, kmax):
         y, yb = y
