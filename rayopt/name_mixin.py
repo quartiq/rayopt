@@ -1,6 +1,9 @@
 class NameMixin(object):
-    typ = "?"
     _nickname = None
+
+    @property
+    def typ(self):
+        return type(self).__name__[0].upper()
 
     @property
     def nickname(self):

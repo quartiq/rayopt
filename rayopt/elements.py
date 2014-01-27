@@ -26,15 +26,26 @@ from .transformations import (euler_matrix, euler_from_matrix,
 from .name_mixin import NameMixin
 from .aberration_orders import aberration_intrinsic
 from .utils import sinarctan, tanarcsin
+from .material import get_material
 
 
 class TransformMixin(object):
-    def __init__(self, distance=0., direction=(0, 0, 1.), angles=None):
+    def __init__(self, distance=0., direction=(0, 0, 1.), angles=(0, 0, 0)):
         self.update(distance, direction, angles)
         # offset = distance*direction: in lab system, relative to last
         # element (thus cumulative in lab system)
         # angles: relative to unit offset (-incidence angle)
         # excidence: excidence angles for axial ray (snell)
+
+    def dict(self):
+        dat = {}
+        if self.distance:
+            dat["distance"] = self.distance
+        if not self.straight:
+            dat["direction"] = tuple(self.direction)
+        if not self.normal:
+            dat["angles"] = tuple(self.angles)
+        return dat
 
     @property
     def offset(self):
@@ -107,12 +118,13 @@ class TransformMixin(object):
             direction = 0, 0, 1.
         self._direction = u = np.array(direction)/dlen
         if distance < 0:
+            distance *= -1
             u *= -1
-        self._distance = d = abs(distance)
+        self.straight = np.allclose(u, (0, 0, 1.))
+        self._distance = d = distance
         self._offset = o = d*u
-        self.normal = angles is None or np.allclose(angles, 0)
-        self.straight = np.allclose(u, (0, 0, 1))
-        self._angles = a = None if self.normal else np.array(angles)
+        self._angles = a = np.array(angles)
+        self.normal = np.allclose(a, 0.)
         self.rotated = not (self.normal and self.straight)
         if not self.rotated:
             self.rot_axis = self.rot_normal = None
@@ -155,15 +167,25 @@ class TransformMixin(object):
 
 
 class Element(NameMixin, TransformMixin):
-    typ = "P"
-
-    def __init__(self, radius=np.inf, angular_radius=None, **kwargs):
+    def __init__(self, radius=np.inf, angular_radius=None,
+            diameter=None, angular_diameter=None, **kwargs):
         super(Element, self).__init__(**kwargs)
-        if radius is not None:
-            self.radius = radius
-        if angular_radius is not None:
-            self.angular_radius = angular_radius
+        if diameter is not None:
+            radius = diameter/2
+        if angular_diameter is not None:
+            angular_radius = angular_diameter/2
+        self.radius = radius
+        self.angular_radius = angular_radius
         # angular radius is u as tan(u) and sin(u) are ambiguous
+
+    def dict(self):
+        dat = super(Element, self).dict()
+        dat["type"] = type(self).__name__.lower()
+        if self.radius not in (np.inf, None):
+            dat["radius"] = self.radius
+        if self.angular_radius is not None:
+            dat["angular_radius"] = self.angular_radius
+        return dat
 
     @property
     def radius(self):
@@ -171,7 +193,8 @@ class Element(NameMixin, TransformMixin):
 
     @radius.setter
     def radius(self, radius):
-        self.finite, self._radius = True, radius
+        self._radius = radius
+        self.finite = radius is not None
 
     @property
     def angular_radius(self):
@@ -179,7 +202,8 @@ class Element(NameMixin, TransformMixin):
 
     @angular_radius.setter
     def angular_radius(self, angular_radius):
-        self.finite, self._angular_radius = False, angular_radius
+        self._angular_radius = angular_radius
+        self.finite = angular_radius is None
 
     def field(self, z):
         if self.finite:
@@ -255,8 +279,6 @@ class Element(NameMixin, TransformMixin):
 
 
 class Aperture(Element):
-    typ = "A"
-
     def surface_cut(self, axis, points):
         r = self.radius if np.isfinite(self.radius) else 0.
         xyz = np.zeros((5, 3))
@@ -265,11 +287,17 @@ class Aperture(Element):
 
 
 class Interface(Element):
-    typ = "F"
-
     def __init__(self, material=None, **kwargs):
         super(Interface, self).__init__(**kwargs)
+        if material:
+            material = get_material(material)
         self.material = material
+
+    def dict(self):
+        dat = super(Interface, self).dict()
+        if self.material is not None:
+            dat["material"] = str(self.material)
+        return dat
 
     def refractive_index(self, wavelength):
         return abs(self.material.refractive_index(wavelength))
@@ -407,11 +435,12 @@ class Interface(Element):
         return y, u
 
 
-class StdSpheroid(Interface):
-    typ = "S"
-
-    def __init__(self, curvature=0., conic=1., aspherics=None, **kwargs):
-        super(StdSpheroid, self).__init__(**kwargs)
+class Spheroid(Interface):
+    def __init__(self, curvature=0., conic=1., aspherics=None, roc=None,
+            **kwargs):
+        super(Spheroid, self).__init__(**kwargs)
+        if roc is not None:
+            curvature = 1./roc
         self.curvature = curvature
         self.conic = conic
         if aspherics is not None:
@@ -419,6 +448,16 @@ class StdSpheroid(Interface):
         self.aspherics = aspherics
         if self.curvature and np.isfinite(self.radius):
             assert self.radius**2 < 1/(self.conic*self.curvature**2)
+
+    def dict(self):
+        dat = super(Spheroid, self).dict()
+        if self.curvature:
+            dat["curvature"] = self.curvature
+        if self.conic != 1.:
+            dat["conic"] = self.conic
+        if self.aspherics:
+            dat["aspherics"] = list(self.aspherics)
+        return dat
 
     def surface_sag(self, xyz):
         x, y, z = xyz.T
@@ -509,13 +548,13 @@ class StdSpheroid(Interface):
         return n, m
    
     def reverse(self):
-        super(StdSpheroid, self).reverse()
+        super(Spheroid, self).reverse()
         self.curvature *= -1
         if self.aspherics is not None:
             self.aspherics = [-ai for ai in self.aspherics]
 
     def rescale(self, scale):
-        super(StdSpheroid, self).rescale(scale)
+        super(Spheroid, self).rescale(scale)
         self.curvature /= scale
         if self.aspherics is not None:
             self.aspherics = [ai/scale**(2*i + 3) for i, ai in
@@ -533,7 +572,7 @@ class StdSpheroid(Interface):
         return a
 
 
-class FastSpheroid(StdSpheroid):
+class FastSpheroid(Spheroid):
     def propagate(self, y0, u0, n0, l, clip=True):
         m = y0.shape[0]
         y = np.empty((m, 3))
@@ -548,11 +587,23 @@ try:
     # slower for nrays=1000...
     raise ImportError
     from .numba_elements import fast_propagate
-    Spheroid = FastSpheroid
+    class Spheroid(FastSpheroid):
+        pass
 except ImportError:
-    Spheroid = StdSpheroid
-
+    pass
 
 # aliases as Spheroid has all features
-Object = Spheroid
-Image = Spheroid
+class Object(Spheroid):
+    pass
+
+class Image(Spheroid):
+    pass
+
+element_map = dict((cls.__name__.lower(), cls) for cls in [
+    Object, Spheroid, Aperture, Image])
+
+def get_element(element):
+    if isinstance(element, tuple(element_map.values())):
+        return element
+    type = element.pop("type", "spheroid")
+    return element_map[type](**element)

@@ -53,7 +53,7 @@ class TransformCase(unittest.TestCase):
         nptest.assert_allclose(x, x2)
 
     def test_rot(self):
-        self.s.angles = None
+        self.s.angles = 0, 0, 0
         x = np.array([0., 0, 3])
         x1 = self.s.from_normal(x)
         nptest.assert_allclose(x1, self.s.direction*3)
@@ -77,7 +77,7 @@ class ParaxialCase(unittest.TestCase):
         nptest.assert_allclose(self.s.offset, 0)
     
     def test_rotation(self):
-        self.assertEqual(self.s.angles, None)
+        nptest.assert_allclose(self.s.angles, (0, 0, 0.))
         nptest.assert_allclose(self.s.from_axis([0, 0, 1]), (0, 0, 1))
         nptest.assert_allclose(self.s.from_normal([0, 0, 1]), (0, 0, 1))
 

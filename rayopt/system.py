@@ -20,32 +20,32 @@ from __future__ import print_function, absolute_import, division
 
 import numpy as np
 
-from .elements import Object, Image, Aperture
+from .elements import Spheroid, Aperture, get_element
 from .material import fraunhofer, air
 
 
 class System(list):
     def __init__(self, elements=[], description="", scale=1e-3,
             wavelengths=[fraunhofer[i] for i in "dCF"]):
-        if elements is None:
-            elements = [Object(finite=False), Aperture(), Image()]
+        elements = map(get_element, elements)
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
         self.wavelengths = wavelengths
 
+    def dict(self):
+        dat = dict(
+                type="system",
+                description=self.description,
+                scale=self.scale,
+                wavelengths=self.wavelengths,
+                elements=[el.dict() for el in self],
+                )
+        return dat
+
     @property
     def object(self):
-        assert isinstance(self[0], Object)
         return self[0]
-
-    @object.setter
-    def object(self, value):
-        assert isinstance(value, Object)
-        if isinstance(self[0], Object):
-            self[0] = value
-        else:
-            self.insert(0, value)
 
     @property
     def aperture(self):
@@ -55,20 +55,13 @@ class System(list):
 
     @property
     def aperture_index(self):
-        return self.index(self.aperture)
+        for i, el in enumerate(self):
+            if isinstance(el, Aperture):
+                return i
 
     @property
     def image(self):
-        assert isinstance(self[-1], Image)
         return self[-1]
-
-    @image.setter
-    def image(self, value):
-        assert isinstance(value, Image)
-        if isinstance(self[-1], Image):
-            self[-1] = value
-        else:
-            self.append(value)
 
     def reverse(self):
         # reverse surface order
@@ -103,7 +96,7 @@ class System(list):
         yield u"Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.wavelengths)
         yield u"Elements:"
-        yield u"%2s %1s %10s %10s %10s %10s %10s %10s %10s" % (
+        yield u"%2s %1s %10s %10s %10s %17s %7s %7s %7s" % (
                 "#", "T", "Distance", "Rad Curv", "Diameter", 
                 "Material", "n", "nd", "Vd")
         for i,e in enumerate(self):
@@ -117,7 +110,7 @@ class System(list):
                 n = mat.refractive_index(self.wavelengths[0])
             else:
                 n = nd
-            yield u"%2i %1s %10.5g %10.4g %10.5g %10s %10.3f %10.3f %10.2f" % (
+            yield u"%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
                     i, e.typ, e.distance, roc, rad*2, mat, n, nd, vd)
 
     def resize_convex(self):

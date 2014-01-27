@@ -67,11 +67,6 @@ I 0       42.95 .364 AIR
         self.assertIs(s.object, o)
         self.assertIs(s.aperture, a)
         self.assertIs(s.image, i)
-        s.object = o
-        s.image = i
-        self.assertIs(s.object, o)
-        self.assertIs(s.aperture, a)
-        self.assertIs(s.image, i)
         self.assertEqual(len(self.s), 9)
 
     def test_reverse(self):

@@ -18,7 +18,7 @@
 
 from __future__ import print_function, absolute_import, division
 
-import shelve, anydbm, os.path, cPickle as pickle
+import shelve, anydbm, os.path, cPickle as pickle, glob
 
 import numpy as np
 
@@ -48,13 +48,17 @@ lambda_C = fraunhofer["C"]
 
 
 class Material(object):
-    def __init__(self, name="-", solid=True, mirror=False):
+    def __init__(self, name="-", solid=True, mirror=False, catalog=None):
         self.name = name
         self.solid = solid
         self.mirror = mirror
+        self.catalog = catalog
 
     def __str__(self):
-        return self.name
+        if self.catalog is not None:
+            return "%s/%s" % (self.catalog, self.name)
+        else:
+            return self.name
 
     @simple_cache
     def refractive_index(self, wavelength):
@@ -144,12 +148,14 @@ class GasMaterial(SellmeierMaterial):
 
 
 # http://refractiveindex.info
-vacuum = ModelMaterial(name="VACUUM", nd=1., vd=np.inf, solid=False)
-air = GasMaterial(name="AIR",
+vacuum = ModelMaterial(name="VACUUM", catalog="basic",
+        nd=1., vd=np.inf, solid=False)
+air = GasMaterial(name="AIR", catalog="basic",
         sellmeier=[[5792105E-8, 238.0185], [167917E-8, 57.362]])
-mirror = Material(name="MIRROR", mirror=True, solid=False)
+mirror = Material(name="MIRROR", catalog="basic",
+        mirror=True, solid=False)
 
-basics = dict((m.name, m) for m in (vacuum, air, mirror))
+basic = dict((m.name, m) for m in (vacuum, air, mirror))
 
 
 def load_catalog_zemax(fil, name=None):
@@ -240,31 +246,77 @@ def load_catalog_oslo(f, catalog_name=None):
     return glasscat
 
 
-def load_catalogs(all, catalogs):
+def load_catalogs(catdb, catalogs):
     kw = dict(protocol=pickle.HIGHEST_PROTOCOL, writeback=False)
     try:
-        db = shelve.open(all, "r", **kw)
+        db = shelve.open(catdb, "r", **kw)
         if not db.keys():
             db.close()
             raise anydbm.error
     except anydbm.error:
         # keeping it open writeable corrupts it
-        db = shelve.open(all, "c", **kw)
+        db = shelve.open(catdb, "c", **kw)
+        defaults = {}
         for f in catalogs:
             _, name = os.path.split(f)
-            name, _ = os.path.splitext(name)
-            cf = load_catalog_zemax(f, name)
-            db.update(cf)
-        db.update(basics)
+            name, ext = os.path.splitext(name.lower())
+            if ext == ".agf":
+                cf = load_catalog_zemax(f, name)
+            elif ext == ".glc":
+                cf = load_catalog_oslo(f, name)
+            else:
+                raise ValueError("glass catalog extension %s unknown" %
+                        ext)
+            for k, v in cf.items():
+                db["%s/%s" % (name, k.lower())] = v
+                defaults[k.lower()] = name
+        name = "basic"
+        for k, v in basic.items():
+            db["%s/%s" % (name, k.lower())] = v
+            defaults[k.lower()] = name
+        db["__default__"] = defaults
         db.close()
-        db = shelve.open(all, "r", **kw)
+        db = shelve.open(catdb, "r", **kw)
     return db
 
+def load_default_catalogs():
+    global catalogs
+    dir, _ = os.path.split(__file__)
+    dir = os.path.join(dir, "../glass")
+    cats = []
+    for ext in "*.agf", "*.glc":
+        for ext in ext.upper(), ext.lower():
+            pattern = os.path.join(dir, ext)
+            cats.extend(sorted(glob.glob(pattern)))
+    catdb = os.path.join(dir, "all.shelve")
+    catalogs = load_catalogs(catdb, cats)
+    return catalogs
 
-catpath = os.path.expanduser("~/work/nist/pyrayopt/glass")
-cats = "misc infrared schott ohara hoya corning heraeus hikari sumita"
-cats = cats.split()[::-1]
-cats = [os.path.join(catpath, "%s.agf" % _) for _ in cats]
-all = os.path.join(catpath, "all.shelve")
-all_materials = load_catalogs(all, cats)
+catalogs = {}
+load_default_catalogs()
+
+def get_material(name):
+    if isinstance(name, Material):
+        return name
+    if type(name) is type(1.):
+        return ModelMaterial(nd=name)
+    if type(name) is tuple:
+        return ModelMaterial(nd=name[0], vd=name[1])
+    try:
+        return ModelMaterial.from_string(name)
+    except ValueError:
+        pass
+    name = str(name).lower()
+    if "/" in name:
+        return catalogs[name]
+    else:
+        cat = catalogs["__default__"][name]
+        return catalogs["%s/%s" % (cat, name)]
+
+class DefaultGlass(object):
+    def __getitem__(self, key):
+        cat = catalogs["__defaults__"][key]
+        return catalogs["%s/%s" % (cat, key)]
+
+all_materials = DefaultGlass()
 AllGlasses = all_materials

@@ -19,11 +19,11 @@
 from __future__ import print_function, absolute_import, division
 
 import numpy as np
+import yaml
 
 from .system import System
-from .elements import Spheroid, Aperture, Image, Object
-from .material import (air, all_materials, ModelMaterial, lambda_d, lambda_C,
-        lambda_F)
+from .elements import Spheroid, Aperture
+from .material import air, ModelMaterial, get_material
 
 
 def try_get(line, columns, field, default=None):
@@ -45,7 +45,8 @@ def system_from_array(data,
     for k, v in shifts.items():
         i = columns.index(k)
         data[:, i] = np.roll(data[:, i], v)
-    element_map = {"O": Object, "S": Spheroid, "A": Aperture, "I": Image}
+    element_map = {"O": Spheroid, "S": Spheroid, "A": Aperture, "I":
+            Spheroid}
     s = System(**kwargs)
     for line in data:
         typ = try_get(line, columns, "type", "S")
@@ -68,15 +69,7 @@ def system_from_array(data,
         if hasattr(el, "material"):
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)
-            if type(mat) is type(1.):
-                m = ModelMaterial(nd=mat)
-            elif str(mat) in all_materials:
-                m = all_materials[str(mat)]
-            else:
-                try:
-                    m = ModelMaterial.from_string(mat)
-                except (ValueError, TypeError):
-                    m = None
+            m = get_material(mat)
             el.material = m
         s.append(el)
     return s
@@ -91,6 +84,7 @@ def system_from_text(text, *args, **kwargs):
 
 def system_from_oslo(fil):
     s = System()
+    e = Spheroid()
     th = 0.
     for line in fil.readlines():
         p = line.split()
@@ -101,7 +95,6 @@ def system_from_oslo(fil):
             s.description = " ".join(args[1:-2]).strip("\"")
         elif cmd == "UNI":
             s.scale = float(args[0])*1e-3
-            e = Spheroid()
         elif cmd == "AIR":
             e.material = air
         elif cmd == "TH":
@@ -111,7 +104,7 @@ def system_from_oslo(fil):
         elif cmd == "AP":
             e.radius = float(args[0])
         elif cmd == "GLA":
-            e.material = all_materials[args[0]]
+            e.material = get_material(args[0])
         elif cmd == "AST":
             s.append(Aperture(radius=e.radius))
         elif cmd == "RD":
@@ -129,9 +122,8 @@ def system_from_oslo(fil):
 
 
 def system_from_zemax(fil):
-    s = System([Object(material=air, angular_radius=np.inf), Image()])
+    s = System()
     next_pos = 0.
-    a = None
     for line in fil.readlines():
         if not line.strip():
             continue
@@ -147,8 +139,7 @@ def system_from_zemax(fil):
         elif cmd == "NAME":
             s.description = args.strip("\"")
         elif cmd == "SURF":
-            e = Spheroid(distance=next_pos)
-            e.material = air
+            e = Spheroid(distance=next_pos, material=air)
             s.insert(-1, e)
         elif cmd == "CURV":
             e.curvature = float(args.split()[0])
@@ -157,15 +148,13 @@ def system_from_zemax(fil):
         elif cmd == "GLAS":
             args = args.split()
             name = args[0]
-            if name in all_materials:
-                e.material = all_materials[name]
-            else:
+            try:
+                e.material = get_material(name)
+            except KeyError:
                 try:
-                    t = "/".join(args[3:5])
-                    e.material = ModelMaterial.from_string(t)
+                    e.material = get_material(float(args[3]), float(args[4]))
                 except Exception as e:
                     print("material not found", name, e)
-                    e.material = None
         elif cmd == "DIAM":
             e.radius = float(args.split()[0])/2
         elif cmd == "STOP":
@@ -199,11 +188,16 @@ def system_from_zemax(fil):
         else:
             print(cmd, "not handled", args)
             continue
-    # the first element is the object, the last is the image, convert them
-    s.object.radius = s[1].radius
-    del s[1]
-    s.image.radius = s[-2].radius
-    s.image.distance = s[-2].distance
-    del s[-2]
-    s.aperture.radius = s[s.aperture_index-1].radius
+    s.aperture.radius = s[s.aperture_index - 1].radius
     return s
+
+
+def system_from_yaml(text, default_material="air"):
+    dat = yaml.load(text)
+    assert dat.pop("type") == "system"
+    return System(**dat)
+
+
+def system_to_yaml(system):
+    dat = system.dict()
+    return yaml.dump(dat)
