@@ -202,7 +202,7 @@ def system_from_yaml(text):
 
 def system_to_yaml(system):
     dat = system.dict()
-    return yaml.dump(dat, default_flow_style=False)
+    return yaml.dump(dat) #, default_flow_style=False)
 
 
 def system_from_json(text):
