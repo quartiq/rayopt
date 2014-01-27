@@ -34,13 +34,15 @@ class System(list):
         self.wavelengths = wavelengths
 
     def dict(self):
-        dat = dict(
-                type="system",
-                description=self.description,
-                scale=float(self.scale),
-                wavelengths=list(map(float, self.wavelengths)),
-                elements=[el.dict() for el in self],
-                )
+        dat = {"type": "system"}
+        if self.description:
+            dat["description"] = self.description
+        if self.wavelengths:
+            dat["wavelengths"] = list(map(float, self.wavelengths))
+        if self.scale:
+            dat["scale"] = float(self.scale)
+        if self.elements:
+            dat["elements"] = [el.dict() for el in self]
         return dat
 
     @property
