@@ -41,7 +41,7 @@ class System(list):
             dat["wavelengths"] = list(map(float, self.wavelengths))
         if self.scale:
             dat["scale"] = float(self.scale)
-        if self.elements:
+        if self:
             dat["elements"] = [el.dict() for el in self]
         return dat
 
