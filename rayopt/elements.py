@@ -42,9 +42,9 @@ class TransformMixin(object):
         if self.distance:
             dat["distance"] = float(self.distance)
         if not self.straight:
-            dat["direction"] = tuple(map(float, self.direction))
+            dat["direction"] = list(map(float, self.direction))
         if not self.normal:
-            dat["angles"] = tuple(map(float, self.angles))
+            dat["angles"] = list(map(float, self.angles))
         return dat
 
     @property
