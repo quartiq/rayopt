@@ -304,7 +304,7 @@ class Analysis(object):
                 self.post_setup_axes(axii)
 
     def opds(self, ax, heights=[1., .707, 0.],
-            wavelength=None, nrays=500, colors="grbcmyk"):
+            wavelength=None, nrays=1000, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelength is None:
             wavelength = self.system.wavelengths[0]
