@@ -20,7 +20,7 @@ from __future__ import print_function, absolute_import, division
 
 import numpy as np
 
-from .elements import Aperture, get_element
+from .elements import get_element
 from .material import fraunhofer
 
 
@@ -34,14 +34,16 @@ class System(list):
         self.scale = scale
         self.wavelengths = wavelengths
         self.pickups = pickups
+        self.validators = validators
 
     def dict(self):
-        dat = {"type": "system"}
+        dat = {}
+        # dat["type"] = "system"
         if self.description:
             dat["description"] = self.description
         if self.wavelengths:
             dat["wavelengths"] = [float(w) for w in self.wavelengths]
-        if self.scale:
+        if self.scale != 1e-3:
             dat["scale"] = float(self.scale)
         if self.pickups:
             dat["pickups"] = [dict(p) for p in self.pickups]
@@ -58,13 +60,13 @@ class System(list):
     @property
     def aperture(self):
         for el in self:
-            if isinstance(el, Aperture):
+            if el.stop:
                 return el
 
     @property
     def aperture_index(self):
         for i, el in enumerate(self):
-            if isinstance(el, Aperture):
+            if el.stop:
                 return i
 
     @property

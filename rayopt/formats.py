@@ -196,7 +196,7 @@ def system_from_zemax(fil):
 
 def system_from_yaml(text):
     dat = yaml.load(text)
-    assert dat.pop("type") == "system"
+    assert dat.pop("type", "system") == "system"
     return System(**dat)
 
 
@@ -207,7 +207,7 @@ def system_to_yaml(system):
 
 def system_from_json(text):
     dat = json.loads(text)
-    assert dat.pop("type") == "system"
+    assert dat.pop("type", "system") == "system"
     return System(**dat)
 
 

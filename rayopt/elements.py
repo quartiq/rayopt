@@ -168,7 +168,7 @@ class TransformMixin(object):
 
 class Element(NameMixin, TransformMixin):
     def __init__(self, radius=np.inf, angular_radius=None,
-            diameter=None, angular_diameter=None, **kwargs):
+            diameter=None, angular_diameter=None, stop=False, **kwargs):
         super(Element, self).__init__(**kwargs)
         if diameter is not None:
             radius = diameter/2
@@ -177,14 +177,19 @@ class Element(NameMixin, TransformMixin):
         self.radius = radius
         self.angular_radius = angular_radius
         # angular radius is u as tan(u) and sin(u) are ambiguous
+        self.stop = stop
 
     def dict(self):
         dat = super(Element, self).dict()
-        dat["type"] = type(self).__name__.lower()
+        typ = type(self).__name__.lower()
+        if typ != "spheroid":
+            dat["type"] = typ
         if np.isfinite(self.radius):
             dat["radius"] = float(self.radius)
         if self.angular_radius is not None:
             dat["angular_radius"] = float(self.angular_radius)
+        if self.stop:
+            dat["stop"] = self.stop
         return dat
 
     @property
@@ -266,8 +271,12 @@ class Element(NameMixin, TransformMixin):
 
     def surface_cut(self, axis, points):
         rad = self.radius if np.isfinite(self.radius) else 0.
-        xyz = np.zeros((points, 3))
-        xyz[:, axis] = np.linspace(-rad, rad, points)
+        if self.stop:
+            xyz = np.zeros((5, 3))
+            xyz[:, axis] = -rad*1.5, -rad, np.nan, rad, rad*1.5
+        else:
+            xyz = np.zeros((1, 3))
+            # xyz[:, axis] = -rad, rad
         return xyz
 
     def aberration(self, *args):
@@ -275,14 +284,6 @@ class Element(NameMixin, TransformMixin):
 
     def dispersion(self, *args):
         return 0
-
-
-class Aperture(Element):
-    def surface_cut(self, axis, points):
-        r = self.radius if np.isfinite(self.radius) else 0.
-        xyz = np.zeros((5, 3))
-        xyz[:, axis] = np.array([-r*1.5, -r, np.nan, r, r*1.5])
-        return xyz
 
 
 class Interface(Element):
@@ -373,7 +374,11 @@ class Interface(Element):
         return u
 
     def surface_cut(self, axis, points):
-        xyz = super(Interface, self).surface_cut(axis, points)
+        if self.material is None:
+            return super(Interface, self).surface_cut(axis, points)
+        rad = self.radius if np.isfinite(self.radius) else 0.
+        xyz = np.zeros((points, 3))
+        xyz[:, axis] = np.linspace(-rad, rad, points)
         xyz[:, 2] = -self.surface_sag(xyz)
         return xyz
 
@@ -594,6 +599,10 @@ except ImportError:
 # aliases as Spheroid has all features
 class Object(Spheroid):
     pass
+
+class Aperture(Spheroid):
+    def __init__(self, stop=True, **kwargs):
+        super(Aperture, self).__init__(stop=stop, **kwargs)
 
 class Image(Spheroid):
     pass
