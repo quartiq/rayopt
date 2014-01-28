@@ -20,29 +20,35 @@ from __future__ import print_function, absolute_import, division
 
 import numpy as np
 
-from .elements import Spheroid, Aperture, get_element
-from .material import fraunhofer, air
+from .elements import Aperture, get_element
+from .material import fraunhofer
 
 
 class System(list):
     def __init__(self, elements=[], description="", scale=1e-3,
-            wavelengths=[fraunhofer[i] for i in "dCF"]):
+            wavelengths=[fraunhofer[i] for i in "dCF"], pickups=[],
+            validators=[]):
         elements = map(get_element, elements)
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
         self.wavelengths = wavelengths
+        self.pickups = pickups
 
     def dict(self):
         dat = {"type": "system"}
         if self.description:
             dat["description"] = self.description
         if self.wavelengths:
-            dat["wavelengths"] = list(map(float, self.wavelengths))
+            dat["wavelengths"] = [float(w) for w in self.wavelengths]
         if self.scale:
             dat["scale"] = float(self.scale)
+        if self.pickups:
+            dat["pickups"] = [dict(p) for p in self.pickups]
+        if self.validators:
+            dat["validators"] = [dict(v) for v in self.validators]
         if self:
-            dat["elements"] = [el.dict() for el in self]
+            dat["elements"] = [e.dict() for e in self]
         return dat
 
     @property
@@ -83,6 +89,62 @@ class System(list):
         if group:
             yield group
 
+    def get_path(self, path):
+        v = self
+        for k in path:
+            if isinstance(k, str):
+                v = getattr(v, k)
+            else:
+                v = v[k]
+        return v
+
+    def set_path(self, path, value):
+        v = self
+        for k in path[:-1]:
+            if isinstance(k, str):
+                v = getattr(v, k)
+            else:
+                v = v[k]
+        k = path[0]
+        if isinstance(k, str):
+            setattr(v, k, value)
+        else:
+            v[k] = value
+
+    def update(self):
+        for pickup in self.pickups:
+            value = None
+            if "source" in pickup:
+                value = self.get_path(pickup["source"])
+            if "func" in pickup:
+                value = pickup["func"](self, pickup, value)
+            if "factor" in pickup:
+                value *= pickup["factor"]
+            if "offset" in pickup:
+                value += pickup["offset"]
+            if "target" in pickup:
+                self.set_path(pickup["target"], value)
+
+    def validate(self):
+        for validator in self.validators:
+            value = None
+            if "source" in validator:
+                value = self.get_path(validator["source"])
+            if "func" in validator:
+                value = validator["func"](self, validator, value)
+            if "minimum" in validator:
+                v = validator["minimum"]
+                if value < v:
+                    raise ValueError("%s < %s (%s)" % (value, v, validator))
+            if "maximum" in validator:
+                v = validator["maximum"]
+                if value > v:
+                    raise ValueError("%s > %s (%s)" % (value, v, validator))
+            if "equality" in validator:
+                v = validator["equality"]
+                if value > v:
+                    raise ValueError("%s != %s (%s)" % (value, v, validator))
+
     def reverse(self):
         # reverse surface order
         self[:] = self[::-1]
@@ -93,12 +155,11 @@ class System(list):
         for e in self:
             d, e.distance = e.distance, d
         # shift materials backwards
-        m = air
+        m = self[0].material
         for e in self[::-1]:
             if hasattr(e, "material"):
                 # material is old preceeding material
                 m, e.material = e.material, m
-        
 
     def rescale(self, scale=None):
         if scale is None:
