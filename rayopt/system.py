@@ -65,6 +65,24 @@ class System(list):
     def image(self):
         return self[-1]
 
+    def groups(self):
+        """yield lists of element indices that form lens "elements"
+        (singlets, multiplets, mirrors)
+        """
+        group = []
+        for i, el in enumerate(self):
+            if hasattr(el, "material"):
+                if getattr(el.material, "solid", False):
+                    group.append(i)
+                elif group or getattr(el.material, "mirror", False):
+                    group.append(i)
+                    yield group
+                    group = []
+            elif group:
+                group.append(i)
+        if group:
+            yield group
+
     def reverse(self):
         # reverse surface order
         self[:] = self[::-1]
