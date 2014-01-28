@@ -24,7 +24,7 @@ import numpy as np
 import yaml
 
 from .system import System
-from .elements import Spheroid, Aperture
+from .elements import Spheroid
 from .material import air, ModelMaterial, get_material
 
 
@@ -47,13 +47,13 @@ def system_from_array(data,
     for k, v in shifts.items():
         i = columns.index(k)
         data[:, i] = np.roll(data[:, i], v)
-    element_map = {"O": Spheroid, "S": Spheroid, "A": Aperture, "I":
-            Spheroid}
     s = System(**kwargs)
     for line in data:
         typ = try_get(line, columns, "type", "S")
         extra = line[len(columns):]
-        el = element_map[typ](*extra)
+        el = Spheroid()
+        if typ == "A":
+            el.stop = True
         curv = try_get(line, columns, "curvature")
         if curv is None:
             roc = try_get(line, columns, "roc", 0.)
@@ -108,7 +108,7 @@ def system_from_oslo(fil):
         elif cmd == "GLA":
             e.material = get_material(args[0])
         elif cmd == "AST":
-            s.append(Aperture(radius=e.radius))
+            e.stop = True
         elif cmd == "RD":
             e.curvature = 1/float(args[0])
         elif cmd in ("NXT", "END"):
@@ -160,7 +160,7 @@ def system_from_zemax(fil):
         elif cmd == "DIAM":
             e.radius = float(args.split()[0])/2
         elif cmd == "STOP":
-            s.insert(-1, Aperture())
+            e.stop = True
         elif cmd == "WAVL":
             s.wavelengths = [float(i)*1e-6 for i in args.split() if i]
         elif cmd in ("GCAT", # glass catalog names

@@ -27,7 +27,7 @@ import numpy as np
 from numpy import testing as nptest
 
 
-from rayopt import Spheroid, Aperture, ModelMaterial, mirror
+from rayopt import Spheroid, ModelMaterial, mirror
 from rayopt.utils import sinarctan, tanarcsin
 
 

@@ -607,11 +607,10 @@ class Aperture(Spheroid):
 class Image(Spheroid):
     pass
 
-element_map = dict((cls.__name__.lower(), cls) for cls in [
-    Object, Spheroid, Aperture, Image])
+element_map = {}
 
 def get_element(element):
     if isinstance(element, tuple(element_map.values())):
         return element
-    type = element.pop("type", "spheroid")
-    return element_map[type](**element)
+    type = element.pop("type", None)
+    return element_map.get(type, Spheroid)(**element)
