@@ -196,9 +196,14 @@ class System(list):
             yield u"%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
                     i, e.typ, e.distance, roc, rad*2, mat, n, nd, vd)
 
+    def edge_thickness(self):
+        """return a list of the edge thicknesses"""
+        pending = None
+        raise NotImplementedError
+
     def resize_convex(self):
         """ensure convex surfaces are at least as large as their
-        corresponding closing surface"""
+        corresponding closing surface, enabling standard manufacturing"""
         pending = None
         c0 = None
         for el in self[1:-1]:
