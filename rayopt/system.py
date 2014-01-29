@@ -19,6 +19,7 @@
 from __future__ import print_function, absolute_import, division
 
 import numpy as np
+from scipy import optimize
 
 from .elements import get_element
 from .material import fraunhofer
@@ -27,7 +28,7 @@ from .material import fraunhofer
 class System(list):
     def __init__(self, elements=None, description="", scale=1e-3,
             wavelengths=None, pickups=None,
-            validators=None):
+            validators=None, solves=None):
         elements = map(get_element, elements or [])
         super(System, self).__init__(elements)
         self.description = description
@@ -35,6 +36,7 @@ class System(list):
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
         self.pickups = pickups or []
         self.validators = validators or []
+        self.solves = solves or []
 
     def dict(self):
         dat = {}
@@ -49,6 +51,8 @@ class System(list):
             dat["pickups"] = [dict(p) for p in self.pickups]
         if self.validators:
             dat["validators"] = [dict(v) for v in self.validators]
+        if self.solves:
+            dat["solves"] = [dict(s) for s in self.solves]
         if self:
             dat["elements"] = [e.dict() for e in self]
         return dat
@@ -113,31 +117,72 @@ class System(list):
         else:
             v[k] = value
 
-    def update(self):
+    def pickup(self):
         for pickup in self.pickups:
             value = None
-            if "source" in pickup:
-                value = self.get_path(pickup["source"])
-            if "eval" in pickup:
-                value = eval(pickup["eval"])
-            if "func" in pickup:
-                value = pickup["func"](self, pickup, value)
+            if "get" in pickup:
+                value = self.get_path(pickup["get"])
+            if "get_eval" in pickup:
+                value = eval(pickup["get_eval"])
+            if "get_func" in pickup:
+                value = pickup["get_func"](self, pickup, value)
             if "factor" in pickup:
                 value *= pickup["factor"]
             if "offset" in pickup:
                 value += pickup["offset"]
-            if "target" in pickup:
-                self.set_path(pickup["target"], value)
+            if "set" in pickup:
+                self.set_path(pickup["set"], value)
+            if "set_exec" in pickup:
+                exec pickup["set_exec"]
+
+    def solve(self):
+        for solve in self.solves:
+            if "get" in solve:
+                getter = lambda: self.get_path(solve["get"])
+            elif "get_eval" in solve:
+                def getter():
+                    loc = dict(self=self, solve=solve)
+                    return eval(solve["get_eval"], loc, globals())
+            elif "get_func" in solve:
+                getter = lambda: solve["get_func"](self, solve)
+            if "set" in solve:
+                setter = lambda x: self.set_path(solve["set"], x)
+            elif "set_exec" in solve:
+                def setter(value):
+                    loc = dict(value=value, self=self, solve=solve)
+                    exec solve["set_exec"] in loc, globals()
+            elif "set_func" in solve:
+                setter = lambda x: solve["set_func"](self, solve, x)
+            target = solve.get("target", 0.)
+            if "init" in solve:
+                init = solve["init"]
+            elif "set" in solve:
+                init = self.get_path(solve["set"])
+            else:
+                init = 0.
+            def func(x):
+                setter(x)
+                self.pickup()
+                return target - getter()
+            x = optimize.newton(func, init, tol=solve.get("tol", 1e-8),
+                    maxiter=solve.get("maxiter", 20))
+            func(x)
+            if "init_current" in solve:
+                solve["init"] = float(x)
+
+    def update(self):
+        self.solve()
+        self.pickup()
 
     def validate(self):
         for validator in self.validators:
             value = None
-            if "source" in validator:
-                value = self.get_path(validator["source"])
-            if "eval" in validator:
-                value = eval(validator["eval"])
-            if "func" in validator:
-                value = validator["func"](self, validator, value)
+            if "get" in validator:
+                value = self.get_path(validator["get"])
+            if "get_eval" in validator:
+                value = eval(validator["get_eval"])
+            if "get_func" in validator:
+                value = validator["get_func"](self, validator, value)
             if "minimum" in validator:
                 v = validator["minimum"]
                 if value < v:
@@ -184,7 +229,7 @@ class System(list):
                     for w in self.wavelengths)
         yield u"Elements:"
         yield u"%2s %1s %10s %10s %10s %17s %7s %7s %7s" % (
-                "#", "T", "Distance", "Rad Curv", "Diameter", 
+                "#", "T", "Distance", "Rad Curv", "Diameter",
                 "Material", "n", "nd", "Vd")
         for i,e in enumerate(self):
             curv = getattr(e, "curvature", 0)
