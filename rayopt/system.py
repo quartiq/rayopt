@@ -25,16 +25,16 @@ from .material import fraunhofer
 
 
 class System(list):
-    def __init__(self, elements=[], description="", scale=1e-3,
-            wavelengths=[fraunhofer[i] for i in "dCF"], pickups=[],
-            validators=[]):
-        elements = map(get_element, elements)
+    def __init__(self, elements=None, description="", scale=1e-3,
+            wavelengths=None, pickups=None,
+            validators=None):
+        elements = map(get_element, elements or [])
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
-        self.wavelengths = wavelengths
-        self.pickups = pickups
-        self.validators = validators
+        self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
+        self.pickups = pickups or []
+        self.validators = validators or []
 
     def dict(self):
         dat = {}
@@ -107,7 +107,7 @@ class System(list):
                 v = getattr(v, k)
             else:
                 v = v[k]
-        k = path[0]
+        k = path[-1]
         if isinstance(k, str):
             setattr(v, k, value)
         else:
@@ -118,6 +118,8 @@ class System(list):
             value = None
             if "source" in pickup:
                 value = self.get_path(pickup["source"])
+            if "eval" in pickup:
+                value = eval(pickup["eval"])
             if "func" in pickup:
                 value = pickup["func"](self, pickup, value)
             if "factor" in pickup:
@@ -132,6 +134,8 @@ class System(list):
             value = None
             if "source" in validator:
                 value = self.get_path(validator["source"])
+            if "eval" in validator:
+                value = eval(validator["eval"])
             if "func" in validator:
                 value = validator["func"](self, validator, value)
             if "minimum" in validator:
@@ -144,7 +148,7 @@ class System(list):
                     raise ValueError("%s > %s (%s)" % (value, v, validator))
             if "equality" in validator:
                 v = validator["equality"]
-                if value > v:
+                if value != v:
                     raise ValueError("%s != %s (%s)" % (value, v, validator))
 
     def reverse(self):
@@ -196,10 +200,20 @@ class System(list):
             yield u"%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
                     i, e.typ, e.distance, roc, rad*2, mat, n, nd, vd)
 
-    def edge_thickness(self):
-        """return a list of the edge thicknesses"""
-        pending = None
-        raise NotImplementedError
+    def edge_thickness(self, axis=1):
+        """list of the edge thicknesses"""
+        t = []
+        dz0 = 0.
+        x = np.zeros(3)
+        for el in self:
+            try:
+                x[axis] = el.radius
+                dz = el.surface_sag(x)
+            except AttributeError:
+                dz = 0.
+            t.append(el.distance - dz + dz0)
+            dz0 = dz
+        return t
 
     def resize_convex(self):
         """ensure convex surfaces are at least as large as their
@@ -211,10 +225,11 @@ class System(list):
                 continue
             c = getattr(el, "curvature", 0)
             if pending is not None:
+                r = max(el.radius, pending.radius)
                 if c < 0:
-                    el.radius = max(el.radius, pending.radius)
+                    el.radius = r
                 if c0 > 0:
-                    pending.radius = max(pending.radius, el.radius)
+                    pending.radius = r
                 pending = None
                 if el.material.solid:
                     pending = el
@@ -224,7 +239,7 @@ class System(list):
     def fix_sizes(self):
         self.resize_convex()
 
-    def surfaces_cut(self, axis, points):
+    def surfaces_cut(self, axis=1, points=31):
         """yields cut outlines of surfaces. solids are closed"""
         # FIXME: not really a global cut, but a local one
         pos = np.zeros(3)
