@@ -338,6 +338,11 @@ class Interface(Element):
     def surface_normal(self, p):
         raise NotImplementedError
 
+    def edge_sag(self, axis=1):
+        r = np.zeros(3)
+        r[axis] = self.radius
+        return self.surface_sag(r)
+
     def intercept(self, y, u):
         s = super(Interface, self).intercept(y, u)
         for i in range(y.shape[0]):

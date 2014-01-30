@@ -249,11 +249,9 @@ class System(list):
         """list of the edge thicknesses"""
         t = []
         dz0 = 0.
-        x = np.zeros(3)
         for el in self:
             try:
-                x[axis] = el.radius
-                dz = el.surface_sag(x)
+                dz = el.edge_sag(axis)
             except AttributeError:
                 dz = 0.
             t.append(el.distance - dz + dz0)
