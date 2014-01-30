@@ -244,13 +244,13 @@ class ParaxialTrace(Trace):
         f = self.lagrange/(
                 self.u[0, 1]*self.u[-2, 0] -
                 self.u[0, 0]*self.u[-2, 1])
-        return f/self.n[(0, -2), :]*[-1, 1]
+        return f/self.n.take((0, -2))*[-1, 1]
 
     @property
     def focal_distance(self):
         """front/back focal distance relative to first/last surface
         Malacara1989 p27 2.43 2.44, F-V"""
-        c = self.n[(0, -2), :]*self.focal_length/self.lagrange
+        c = self.n.take((0, -2))*self.focal_length/self.lagrange
         fd = (self.y[(1, -2), 1]*self.u[(-2, 0), 0]
                 - self.y[(1, -2), 0]*self.u[(-2, 0), 1])*c
         return fd
@@ -271,7 +271,7 @@ class ParaxialTrace(Trace):
     def numerical_aperture(self):
         # we plot u as a slope (tanU)
         # even though it is paraxial (sinu=tanu=u) we must convert here
-        return np.fabs(self.n[(0, -2), :]*sinarctan(self.u[(0, -2), 0]))
+        return np.fabs(self.n.take((0, -2))*sinarctan(self.u[(0, -2), 0]))
 
     @property
     def f_number(self):
@@ -280,7 +280,7 @@ class ParaxialTrace(Trace):
     @property
     def working_f_number(self):
         na = self.numerical_aperture
-        return self.n[(0, -2), :]/(2*na)
+        return self.n.take((0, -2))/(2*na)
 
     @property
     def airy_radius(self):
