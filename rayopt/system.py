@@ -27,13 +27,20 @@ from .material import fraunhofer
 
 class System(list):
     def __init__(self, elements=None, description="", scale=1e-3,
-            wavelengths=None, pickups=None,
-            validators=None, solves=None):
+            wavelengths=None, wavelength_weights=None,
+            fields=None, field_weights=None,
+            object_finite=False, image_finite=True,
+            pickups=None, validators=None, solves=None):
         elements = map(get_element, elements or [])
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
+        self.wavelength_weights = wavelength_weights or [1. for _ in self.wavelengths]
+        self.fields = fields or [0.]
+        self.field_weights = field_weights or [1. for _ in self.fields]
+        self.object_finite = object_finite
+        self.image_finite = image_finite
         self.pickups = pickups or []
         self.validators = validators or []
         self.solves = solves or []
