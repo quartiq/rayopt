@@ -1,0 +1,16 @@
+./*.egg-info
+./dist
+./build
+./examples/*.ipynb
+*.zmx
+*.ZMX
+debian/*.debhelper
+debian/compat
+debian/*.log
+debian/files
+debian/python-rayopt
+debian/*.substvars
+debian/*-stampdir
+./glass
+./debian/tmp
+examples/.ipynb_checkpoints
