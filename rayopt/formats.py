@@ -163,6 +163,8 @@ def system_from_zemax(fil):
             e.stop = True
         elif cmd == "WAVL":
             s.wavelengths = [float(i)*1e-6 for i in args.split() if i]
+        elif cmd == "COAT":
+            e.coating = args.split()[0]
         elif cmd in ("GCAT", # glass catalog names
                      "OPDX", # opd
                      "RAIM", # ray aiming
@@ -175,6 +177,14 @@ def system_from_zemax(fil):
                      "TYPE", # surface type
                      "HIDE", # surface hide
                      "MIRR", # surface is mirror
+                     "PARM", # aspheric parameters
+                     "SQAP", # square aperture?
+                     "XDAT", "YDAT", # xy toroidal data
+                     "OBNA", # object na
+                     "CONI", # conic
+                     "PKUP", # pickup
+                     "MAZH", "CLAP", "PPAR", "VPAR", "EDGE", "VCON",
+                     "UDAD", "USAP", "TOLE", "PFIL",
                      "TOL", "MNUM", "MOFF", "FTYP", "SDMA", "GFAC",
                      "PUSH", "PICB", "ROPD", "PWAV", "POLS", "GLRS",
                      "BLNK", "COFN", "NSCD", "GSTD", "DMFS", "ISNA",
