@@ -18,7 +18,7 @@
 
 from __future__ import print_function, absolute_import, division
 
-from struct import Struct, unpack, error
+import struct
 from StringIO import StringIO
 
 import numpy as np
@@ -26,44 +26,46 @@ import numpy as np
 from rayopt.formats import system_from_zemax
 
 
-class Stockcat(object):
-    stockcat = Struct("< I")
-    lens = Struct("< 100s H H I I I I I I d d")
+class Stockcat(list):
+    stockcat = struct.Struct("< I")
+    lens = struct.Struct("< 100s H H I I I I I I d d")
     codes = "?EBPM"
     
     @classmethod
     def from_zemax(cls, f):
         self = cls()
-        stockcat = self.stockcat.unpack(f.read(self.stockcat.size))
+        stockcat = f.read(self.stockcat.size)
+        stockcat = self.stockcat.unpack(stockcat)
         self.version = stockcat[0]
-        self.lenses = []
-        self.lensdict = {}
         while True:
-            i = f.tell()
             try:
-                li = self.lens.unpack(f.read(self.lens.size))
-                ld = f.read(li[8])
-            except error:
+                li = f.read(self.lens.size)
+                li = self.lens.unpack(li)
+            except struct.error:
                 break
             ln = li[0].strip("\0")
-            code = self.codes[li[4]]
-            efl, enpd = li[9:]
-            data = self.decrypt(efl, enpd, ld)
+            try:
+                code = self.codes[li[4]]
+            except IndexError:
+                code = li[4]
+            cipher = f.read(li[8])
             lens = dict(name=ln,
                 vendor=li[1], x=li[2], elements=li[3], code=code,
                 asphere=li[5], grin=li[6], toroidal=li[7],
-                efl=efl, enpd=enpd, data=data,
+                efl=li[9], enpd=li[10], cipher=cipher,
                 )
-            self.lenses.append(lens)
-            self.lensdict[ln] = lens
+            self.append(lens)
         return self
 
-    def decrypt(self, efl, enpd, cipher):
+    def decrypt(self, lens):
+        efl, enpd = lens["efl"], lens["enpd"]
+        cipher = lens["cipher"]
         cipher = np.fromstring(cipher, np.uint8)
         iv = np.cos(6*efl + 3*enpd)
         key = self.key(iv, len(cipher))
         plain = cipher ^ key
-        assert np.all(plain & 0x80 == 0)
+        nhigh = np.count_nonzero(plain & 0x80)
+        assert nhigh/len(plain) < .1, plain.tostring()
         return plain.tostring()
     
     @staticmethod
@@ -72,27 +74,29 @@ class Stockcat(object):
         a = np.sin(17*(p + 3))
         b = np.cos(655*np.pi/180*iv)
         c = 13.2*(a + b + iv)*(p + 1)
-        d = np.array([int(("%.8E" % _)[4:7]) for _ in c])
-        return d.astype(np.uint8)
+        d = (int(("%.8E" % _)[4:7]) for _ in c)
+        e = np.fromiter(d, np.uint8, len(c))
+        return e
 
 
 def stockcat_from_zmf(fil):
     f = open(fil, "rb")
     c = Stockcat.from_zemax(f)
-    for k in c.lenses:
-        d = StringIO(k["data"])
-        s = system_from_zemax(d)
+    for k in c:
+        s = c.decrypt(k)
+        s = StringIO(s)
+        s = system_from_zemax(s)
         k["system"] = s
     return c
 
 
 if __name__ == "__main__":
-    import glob
-    p = "glass/Stockcat/"
-    for f in glob.glob(p + "*.zmf") + glob.glob(p + "*.ZMF"):
-        try:
-            c = stockcat_from_zmf(f)
-            print(c)
-        except Exception, e:
-            print(f, e)
+    import glob, sys
+    fs = sys.argv[1:]
+    if not fs:
+        p = "glass/Stockcat/"
+        fs = glob.glob(p + "*.zmf") + glob.glob(p + "*.ZMF")
+    for f in fs:
+        c = stockcat_from_zmf(f)
+        #print(c)
 

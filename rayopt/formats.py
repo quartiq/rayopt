@@ -165,6 +165,21 @@ def system_from_zemax(fil):
             s.wavelengths = [float(i)*1e-6 for i in args.split() if i]
         elif cmd == "COAT":
             e.coating = args.split()[0]
+        elif cmd == "CONI":
+            e.conic = 1 + float(args.split()[0])
+        elif cmd == "PARM":
+            i, j = args.split()
+            i = int(i) - 2
+            j = float(j)
+            if i < 0:
+                if j != 0:
+                    print("aspheric 2nd degree not supported", cmd, args)
+                continue
+            if e.aspherics is None:
+                e.aspherics = []
+            while len(e.aspherics) <= i:
+                e.aspherics.append(0.)
+            e.aspherics[i] = j
         elif cmd in ("GCAT", # glass catalog names
                      "OPDX", # opd
                      "RAIM", # ray aiming
@@ -181,10 +196,9 @@ def system_from_zemax(fil):
                      "SQAP", # square aperture?
                      "XDAT", "YDAT", # xy toroidal data
                      "OBNA", # object na
-                     "CONI", # conic
                      "PKUP", # pickup
                      "MAZH", "CLAP", "PPAR", "VPAR", "EDGE", "VCON",
-                     "UDAD", "USAP", "TOLE", "PFIL",
+                     "UDAD", "USAP", "TOLE", "PFIL", "TCED", "FNUM",
                      "TOL", "MNUM", "MOFF", "FTYP", "SDMA", "GFAC",
                      "PUSH", "PICB", "ROPD", "PWAV", "POLS", "GLRS",
                      "BLNK", "COFN", "NSCD", "GSTD", "DMFS", "ISNA",
