@@ -119,7 +119,7 @@ I 0       42.95 .364 AIR
 
     def test_aim_point(self):
         p, g = self.traces()
-        i = self.s.aperture_index
+        i = self.s.stop
         r = np.array([el.radius for el in self.s[1:-1]])
 
         g.rays_paraxial_clipping(p)

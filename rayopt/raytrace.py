@@ -115,7 +115,7 @@ class ParaxialTrace(Trace):
         self.axis = axis
         l = self.system.wavelengths[0]
         self.n[0] = self.system.object.refractive_index(l)
-        ai = self.system.aperture_index
+        ai = self.system.stop
         m = self.system.paraxial_matrix(l, stop=ai + 1)
         m = m[axis::2, axis::2]
         mi = np.linalg.inv(m)
@@ -155,7 +155,7 @@ class ParaxialTrace(Trace):
     def extrinsic_aberrations(self):
         # FIXME: wrong
         self.d[:] = 0
-        st = self.system.aperture_index
+        st = self.system.stop
         t, s = 0, 1
         kmax = self.d.shape[-1]
         r = np.empty_like(self.d)
@@ -877,7 +877,7 @@ class GeometricTrace(Trace):
         else:
             # return pupil ray
             if stop is None:
-                stop = self.system.aperture_index
+                stop = self.system.stop
             target = yp[axis]*self.system[stop].radius
             @simple_cache
             def distance(a):

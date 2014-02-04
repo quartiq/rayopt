@@ -214,7 +214,7 @@ def system_from_zemax(fil):
         else:
             print(cmd, "not handled", args)
             continue
-    s.aperture.radius = s[s.aperture_index - 1].radius
+    #s.aperture.radius = s[s.stop - 1].radius
     return s
 
 

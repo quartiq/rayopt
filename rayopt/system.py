@@ -18,6 +18,8 @@
 
 from __future__ import print_function, absolute_import, division
 
+import warnings
+
 import numpy as np
 from scipy import optimize
 
@@ -82,11 +84,8 @@ class System(list):
 
     @property
     def aperture_index(self):
+        warnings.warn("use system.stop", DeprecationWarning)
         return self.stop
-
-    @aperture_index.setter
-    def aperture_index(self, i):
-        self.stop = int(i)
 
     @property
     def image(self):
