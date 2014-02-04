@@ -25,3 +25,5 @@
 *.SEQ
 *.len
 *.LEN
+*.pyo
+*.pyc
