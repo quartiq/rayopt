@@ -167,56 +167,19 @@ class TransformMixin(object):
 
 
 class Element(NameMixin, TransformMixin):
-    def __init__(self, radius=np.inf, angular_radius=None,
-            diameter=None, angular_diameter=None, **kwargs):
+    def __init__(self, radius=np.inf, diameter=None, **kwargs):
         super(Element, self).__init__(**kwargs)
         if diameter is not None:
             radius = diameter/2
-        if angular_diameter is not None:
-            angular_radius = angular_diameter/2
         self.radius = radius
-        self.angular_radius = angular_radius
-        # angular radius is u as tan(u) and sin(u) are ambiguous
 
     def dict(self):
         dat = super(Element, self).dict()
         typ = type(self).__name__.lower()
         if typ != "spheroid":
             dat["type"] = typ
-        if np.isfinite(self.radius):
-            dat["radius"] = float(self.radius)
-        if self.angular_radius is not None:
-            dat["angular_radius"] = float(self.angular_radius)
+        dat["radius"] = float(self.radius)
         return dat
-
-    @property
-    def radius(self):
-        return self._radius
-
-    @radius.setter
-    def radius(self, radius):
-        self._radius = radius
-
-    @property
-    def angular_radius(self):
-        return self._angular_radius
-
-    @angular_radius.setter
-    def angular_radius(self, angular_radius):
-        self._angular_radius = angular_radius
-        self.finite = angular_radius is None
-
-    def field(self, z):
-        if self.finite:
-            return np.arctan2(self._radius, z)
-        else:
-            return self._angular_radius
-
-    def height(self, z):
-        if self.finite:
-            return self._radius
-        else:
-            return np.tan(self._angular_radius)*z
 
     def intercept(self, y, u):
         # ray length to intersection with element
@@ -227,8 +190,6 @@ class Element(NameMixin, TransformMixin):
         return s
 
     def clip(self, y, u):
-        if not np.isfinite(self.radius):
-            return u
         x, y, z = y.T
         bad = x**2 + y**2 > self.radius**2
         u = np.where(bad[:, None], np.nan, u)
@@ -267,7 +228,7 @@ class Element(NameMixin, TransformMixin):
         self.radius *= scale
 
     def surface_cut(self, axis, points):
-        rad = self.radius if np.isfinite(self.radius) else 0.
+        rad = self.radius
         xyz = np.zeros((2, 3))
         xyz[:, axis] = -rad, rad
         return xyz
@@ -374,7 +335,7 @@ class Interface(Element):
     def surface_cut(self, axis, points):
         if self.material is None:
             return super(Interface, self).surface_cut(axis, points)
-        rad = self.radius if np.isfinite(self.radius) else 0.
+        rad = self.radius
         xyz = np.zeros((points, 3))
         xyz[:, axis] = np.linspace(-rad, rad, points)
         xyz[:, 2] = -self.surface_sag(xyz)
@@ -448,8 +409,8 @@ class Spheroid(Interface):
         if aspherics is not None:
             aspherics = list(aspherics)
         self.aspherics = aspherics
-        if self.curvature and np.isfinite(self.radius):
-            assert self.radius**2 < 1/(self.conic*self.curvature**2)
+        if self.curvature:
+            assert self.radius**2 <= 1/(self.conic*self.curvature**2)
 
     def dict(self):
         dat = super(Spheroid, self).dict()

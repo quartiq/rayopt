@@ -55,7 +55,8 @@ class System(list):
         # dat["type"] = "system"
         if self.description:
             dat["description"] = self.description
-        dat["stop"] = self.stop
+        if self.stop != 1:
+            dat["stop"] = self.stop
         if self.wavelengths:
             dat["wavelengths"] = [float(w) for w in self.wavelengths]
         if self.scale != 1e-3:
@@ -249,7 +250,7 @@ class System(list):
             curv = getattr(e, "curvature", 0)
             roc = curv == 0 and np.inf or 1./curv
             mat = getattr(e, "material", "")
-            rad = e.radius if e.finite else e.angular_radius
+            rad = e.radius
             nd = getattr(mat, "nd", np.nan)
             vd = getattr(mat, "vd", np.nan)
             if mat:
