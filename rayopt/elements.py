@@ -168,7 +168,7 @@ class TransformMixin(object):
 
 class Element(NameMixin, TransformMixin):
     def __init__(self, radius=np.inf, angular_radius=None,
-            diameter=None, angular_diameter=None, stop=False, **kwargs):
+            diameter=None, angular_diameter=None, **kwargs):
         super(Element, self).__init__(**kwargs)
         if diameter is not None:
             radius = diameter/2
@@ -177,7 +177,6 @@ class Element(NameMixin, TransformMixin):
         self.radius = radius
         self.angular_radius = angular_radius
         # angular radius is u as tan(u) and sin(u) are ambiguous
-        self.stop = stop
 
     def dict(self):
         dat = super(Element, self).dict()
@@ -188,8 +187,6 @@ class Element(NameMixin, TransformMixin):
             dat["radius"] = float(self.radius)
         if self.angular_radius is not None:
             dat["angular_radius"] = float(self.angular_radius)
-        if self.stop:
-            dat["stop"] = self.stop
         return dat
 
     @property
@@ -271,12 +268,8 @@ class Element(NameMixin, TransformMixin):
 
     def surface_cut(self, axis, points):
         rad = self.radius if np.isfinite(self.radius) else 0.
-        if self.stop:
-            xyz = np.zeros((5, 3))
-            xyz[:, axis] = -rad*1.5, -rad, np.nan, rad, rad*1.5
-        else:
-            xyz = np.zeros((1, 3))
-            # xyz[:, axis] = -rad, rad
+        xyz = np.zeros((2, 3))
+        xyz[:, axis] = -rad, rad
         return xyz
 
     def aberration(self, *args):
@@ -606,8 +599,7 @@ class Object(Spheroid):
     pass
 
 class Aperture(Spheroid):
-    def __init__(self, stop=True, **kwargs):
-        super(Aperture, self).__init__(stop=stop, **kwargs)
+    pass
 
 class Image(Spheroid):
     pass

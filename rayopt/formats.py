@@ -52,8 +52,9 @@ def system_from_array(data,
         typ = try_get(line, columns, "type", "S")
         extra = line[len(columns):]
         el = Spheroid()
+        s.append(el)
         if typ == "A":
-            el.stop = True
+            s.aperture = el
         curv = try_get(line, columns, "curvature")
         if curv is None:
             roc = try_get(line, columns, "roc", 0.)
@@ -73,7 +74,6 @@ def system_from_array(data,
             mat = material_map.get(mat, mat)
             m = get_material(mat)
             el.material = m
-        s.append(el)
     return s
 
 
@@ -108,7 +108,7 @@ def system_from_oslo(fil):
         elif cmd == "GLA":
             e.material = get_material(args[0])
         elif cmd == "AST":
-            e.stop = True
+            s.aperture = e
         elif cmd == "RD":
             e.curvature = 1/float(args[0])
         elif cmd in ("NXT", "END"):
@@ -142,7 +142,7 @@ def system_from_zemax(fil):
             s.description = args.strip("\"")
         elif cmd == "SURF":
             e = Spheroid(distance=next_pos, material=air)
-            s.insert(-1, e)
+            s.append(e)
         elif cmd == "CURV":
             e.curvature = float(args.split()[0])
         elif cmd == "DISZ":
@@ -160,7 +160,7 @@ def system_from_zemax(fil):
         elif cmd == "DIAM":
             e.radius = float(args.split()[0])/2
         elif cmd == "STOP":
-            e.stop = True
+            s.aperture = e
         elif cmd == "WAVL":
             s.wavelengths = [float(i)*1e-6 for i in args.split() if i]
         elif cmd == "COAT":

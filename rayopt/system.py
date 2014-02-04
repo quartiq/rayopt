@@ -27,7 +27,7 @@ from .material import fraunhofer
 
 class System(list):
     def __init__(self, elements=None, description="", scale=1e-3,
-            wavelengths=None, wavelength_weights=None,
+            wavelengths=None, stop=1, wavelength_weights=None,
             fields=None, field_weights=None, finite=False,
             pupil=None, pupil_distance=None,
             pickups=None, validators=None, solves=None):
@@ -35,6 +35,7 @@ class System(list):
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
+        self.stop = stop
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
         self.wavelength_weights = wavelength_weights or []
         self.fields = fields or [0.]
@@ -52,6 +53,7 @@ class System(list):
         # dat["type"] = "system"
         if self.description:
             dat["description"] = self.description
+        dat["stop"] = self.stop
         if self.wavelengths:
             dat["wavelengths"] = [float(w) for w in self.wavelengths]
         if self.scale != 1e-3:
@@ -72,15 +74,19 @@ class System(list):
 
     @property
     def aperture(self):
-        for el in self:
-            if el.stop:
-                return el
+        return self[self.stop]
+
+    @aperture.setter
+    def aperture(self, a):
+        self.stop = self.index(a)
 
     @property
     def aperture_index(self):
-        for i, el in enumerate(self):
-            if el.stop:
-                return i
+        return self.stop
+
+    @aperture_index.setter
+    def aperture_index(self, i):
+        self.stop = int(i)
 
     @property
     def image(self):

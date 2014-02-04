@@ -65,7 +65,7 @@ class Stockcat(list):
         key = self.key(iv, len(cipher))
         plain = cipher ^ key
         nhigh = np.count_nonzero(plain & 0x80)
-        assert nhigh/len(plain) < .1, plain.tostring()
+        assert nhigh/max(1, len(plain)) < .1, plain.tostring()
         return plain.tostring()
     
     @staticmethod
