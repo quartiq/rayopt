@@ -28,9 +28,9 @@ from .material import fraunhofer
 
 
 class System(list):
-    def __init__(self, elements=None, description="", scale=1e-3,
-            wavelengths=None, stop=1, wavelength_weights=None,
-            fields=None, field_weights=None, finite=False,
+    def __init__(self, elements=None, description="", scale=1e-3, stop=1,
+            wavelengths=None, wavelength_weights=None,
+            finite=False, fields=None, field_weights=None,
             pupil=None, pupil_distance=None,
             pickups=None, validators=None, solves=None):
         elements = map(get_element, elements or [])
@@ -40,6 +40,7 @@ class System(list):
         self.stop = stop
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
         self.wavelength_weights = wavelength_weights or []
+        self.finite = finite
         self.fields = fields or [0.]
         self.field_weights = field_weights or []
         self.pickups = pickups or []
