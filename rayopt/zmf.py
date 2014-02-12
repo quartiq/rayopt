@@ -21,7 +21,8 @@ from __future__ import (print_function, absolute_import, division,
 
 import struct
 import sqlite3
-import os.path
+import os
+import time
 from StringIO import StringIO
 
 import numpy as np
@@ -31,7 +32,7 @@ from rayopt.formats import system_from_zemax
 
 class Stockcat(list):
     stockcat = struct.Struct("< I")
-    lens = struct.Struct("< 100s H H I I I I I I d d")
+    lens = struct.Struct("< 100s I I I I I I I d d")
     codes = "?EBPM"
     
     @classmethod
@@ -44,20 +45,19 @@ class Stockcat(list):
         while True:
             li = f.read(self.lens.size)
             if len(li) != self.lens.size:
+                if len(li) > 0:
+                    print(f, "additional data", repr(li))
                 break
             li = self.lens.unpack(li)
-            if li[8] > 1e4:
+            if li[7] > 1e4:
                 raise ValueError((li, f.tell() - self.lens.size))
             ln = li[0].decode("latin1").strip("\0")
-            try:
-                code = self.codes[li[4]]
-            except IndexError:
-                code = "%i" % li[4]
-            cipher = f.read(li[8])
+            code = self.codes[li[3]]
+            cipher = f.read(li[7])
             lens = dict(name=ln,
-                x=li[1], y=li[2], elements=li[3], code=code,
-                aspheric=li[5], grin=li[6], toroidal=li[7],
-                efl=li[9], enpd=li[10], cipher=cipher,
+                version=li[1], elements=li[2], code=code,
+                aspheric=li[4], grin=li[5], toroidal=li[6],
+                efl=li[8], enpd=li[9], cipher=cipher,
                 )
             self.append(lens)
         return self
@@ -72,10 +72,9 @@ class Stockcat(list):
         if len(plain) > 100:
             nhigh = np.count_nonzero(plain & 0x80)
             if nhigh/len(plain) > .1:
-                print(lens)
-                print(lens["name"], lens["vendor"])
-                #print(repr(plain.tostring()))
-                #raise ValueError
+                print(lens["name"])
+                print(repr(plain.tostring()))
+                raise ValueError
                 return ""
         return plain.tostring()
     
@@ -101,27 +100,57 @@ def stockcat_from_zmf(fil):
     return c
 
 
-def zmf_to_sql(fil, db):
+def zmf_to_sql(fil, db="library.db"):
     f = open(fil, "rb")
     cat = Stockcat.from_zemax(f)
-    vendor = os.path.basename(fil)
-    vendor = os.path.splitext(vendor)[0]
-    vendor = vendor.lower()
     conn = sqlite3.connect(db)
     conn.text_factory = str
     cu = conn.cursor()
-    cu.execute("""create table if not exists lenses (
-        name text, vendor text, unknown1 integer, unknown2 integer,
-        elements integer, code character, aspheric integer,
-        toroidal integer, grin integer, efl real, enpd real,
-        data blob, primary key (name, vendor))""")
+    cu.execute("pragma page_size=512")
+    cu.execute("""create table if not exists lens_catalog (
+        id integer primary key autoincrement,
+        name text not null,
+        version integer,
+        file text,
+        date real,
+        import real
+        )""")
+    catalog = os.path.basename(fil)
+    catalog = os.path.splitext(catalog)[0]
+    catalog = catalog.lower()
+    cu.execute("""insert into lens_catalog
+        (name, version, file, date, import)
+        values (?, ?, ?, ?, ?)""", (
+                catalog, cat.version, fil, os.stat(fil).st_mtime,
+                time.time()))
+    catalog_id = cu.lastrowid
+    cu.execute("""create table if not exists lens (
+        name text not null,
+        catalog integer not null,
+        version integer,
+        elements integer,
+        code character,
+        aspheric integer,
+        toroidal integer,
+        grin integer,
+        efl real,
+        enpd real,
+        data blob,
+        foreign key(catalog) references lens_catalog(id),
+        primary key (catalog, name)
+        )""")
     conn.commit()
     for lens in cat:
-        s = cat.decrypt(lens)
-        cu.execute("""insert or replace into lenses values (?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?)""", (lens["name"], vendor, lens["x"],
-                lens["y"], lens["elements"], lens["code"], lens["aspheric"],
-                lens["toroidal"], lens["grin"], lens["efl"], lens["enpd"], s))
+        cu.execute("""insert into lens
+            (name, catalog, version,
+            elements, code,
+            aspheric, toroidal, grin,
+            efl, enpd, data)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+                lens["name"], catalog_id, lens["version"],
+                lens["elements"], lens["code"],
+                lens["aspheric"], lens["toroidal"], lens["grin"],
+                lens["efl"], lens["enpd"], cat.decrypt(lens)))
     conn.commit()
     return conn
 
@@ -134,6 +163,6 @@ if __name__ == "__main__":
     for f in fs:
         print(f)
         #c = stockcat_from_zmf(f)
-        c = zmf_to_sql(f, "all.db")
         #print(c)
+        c = zmf_to_sql(f)
 
