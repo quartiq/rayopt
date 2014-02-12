@@ -104,7 +104,9 @@ def stockcat_from_zmf(fil):
 def zmf_to_sql(fil, db):
     f = open(fil, "rb")
     cat = Stockcat.from_zemax(f)
-    vendor = os.path.splitext(os.path.basename(fil))[0]
+    vendor = os.path.basename(fil)
+    vendor = os.path.splitext(vendor)[0]
+    vendor = vendor.lower()
     conn = sqlite3.connect(db)
     conn.text_factory = str
     cu = conn.cursor()
