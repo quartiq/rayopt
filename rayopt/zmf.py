@@ -55,7 +55,7 @@ class Stockcat(list):
             code = self.codes[li[3]]
             cipher = f.read(li[7])
             lens = dict(name=ln,
-                version=li[1], elements=li[2], code=code,
+                version=li[1], elements=li[2], type=li[3], code=code,
                 aspheric=li[4], grin=li[5], toroidal=li[6],
                 efl=li[8], enpd=li[9], cipher=cipher,
                 )
@@ -107,6 +107,7 @@ def zmf_to_sql(fil, db="library.db"):
     conn.text_factory = str
     cu = conn.cursor()
     cu.execute("pragma page_size=512")
+    cu.execute("pragma foreign_keys=on")
     cu.execute("""create table if not exists lens_catalog (
         id integer primary key autoincrement,
         name text not null,
@@ -115,42 +116,38 @@ def zmf_to_sql(fil, db="library.db"):
         date real,
         import real
         )""")
-    catalog = os.path.basename(fil)
-    catalog = os.path.splitext(catalog)[0]
-    catalog = catalog.lower()
-    cu.execute("""insert into lens_catalog
-        (name, version, file, date, import)
-        values (?, ?, ?, ?, ?)""", (
-                catalog, cat.version, fil, os.stat(fil).st_mtime,
-                time.time()))
-    catalog_id = cu.lastrowid
     cu.execute("""create table if not exists lens (
         name text not null,
         catalog integer not null,
         version integer,
         elements integer,
         code character,
-        aspheric integer,
-        toroidal integer,
-        grin integer,
+        aspheric boolean,
+        toroidal boolean,
+        grin boolean,
         efl real,
         enpd real,
-        data blob,
-        foreign key(catalog) references lens_catalog(id),
+        data text,
+        foreign key (catalog) references lens_catalog(id),
         primary key (catalog, name)
         )""")
-    conn.commit()
-    for lens in cat:
-        cu.execute("""insert into lens
-            (name, catalog, version,
-            elements, code,
-            aspheric, toroidal, grin,
-            efl, enpd, data)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-                lens["name"], catalog_id, lens["version"],
-                lens["elements"], lens["code"],
-                lens["aspheric"], lens["toroidal"], lens["grin"],
-                lens["efl"], lens["enpd"], cat.decrypt(lens)))
+    catalog = os.path.basename(fil)
+    catalog = os.path.splitext(catalog)[0]
+    catalog = catalog.lower()
+    cu.execute("""insert into lens_catalog
+        (name, version, file, date, import)
+        values (?, ?, ?, ?, ?)""", (
+            catalog, cat.version, fil, os.stat(fil).st_mtime, time.time()))
+    catalog_id = cu.lastrowid
+    cu.executemany("""insert into lens
+        (name, catalog, version, elements, code,
+        aspheric, toroidal, grin, efl, enpd, data)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", ((
+            lens["name"], catalog_id, lens["version"],
+            lens["elements"], lens["code"],
+            lens["aspheric"], lens["toroidal"], lens["grin"],
+            lens["efl"], lens["enpd"], cat.decrypt(lens))
+            for lens in cat))
     conn.commit()
     return conn
 
