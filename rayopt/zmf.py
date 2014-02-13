@@ -111,6 +111,7 @@ def zmf_to_sql(fil, db="library.db"):
     cu.execute("""create table if not exists lens_catalog (
         id integer primary key autoincrement,
         name text not null,
+        format text,
         version integer,
         file text,
         date real,
@@ -135,9 +136,9 @@ def zmf_to_sql(fil, db="library.db"):
     catalog = os.path.splitext(catalog)[0]
     catalog = catalog.lower()
     cu.execute("""insert into lens_catalog
-        (name, version, file, date, import)
-        values (?, ?, ?, ?, ?)""", (
-            catalog, cat.version, fil, os.stat(fil).st_mtime, time.time()))
+        (name, format, version, file, date, import)
+        values (?, ?, ?, ?, ?, ?)""", (
+            catalog, "zmx", cat.version, fil, os.stat(fil).st_mtime, time.time()))
     catalog_id = cu.lastrowid
     cu.executemany("""insert into lens
         (name, catalog, version, elements, code,
