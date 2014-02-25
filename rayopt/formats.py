@@ -25,7 +25,7 @@ import yaml
 
 from .system import System
 from .elements import Spheroid
-from .material import air, ModelMaterial, get_material
+from .material import air, get_material
 
 
 def try_get(line, columns, field, default=None):
@@ -82,8 +82,6 @@ def system_from_text(text, *args, **kwargs):
     n = max(len(l) for l in array)
     array = [l for l in array if len(l) == n]
     return system_from_array(array, *args, **kwargs)
-
-
 
 
 def system_from_yaml(text):

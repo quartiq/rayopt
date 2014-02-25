@@ -18,8 +18,8 @@
 
 from __future__ import print_function, absolute_import, division
 
-from .material import (fraunhofer, AllGlasses, ModelMaterial,
-    SellmeierMaterial, GasMaterial, mirror)
+from .material import (fraunhofer, ModelMaterial,
+    SellmeierMaterial, GasMaterial, mirror, air, vacuum)
 from .elements import Spheroid, Object, Aperture, Image
 from .system import System
 from .formats import (system_from_text,
@@ -27,9 +27,7 @@ from .formats import (system_from_text,
     system_from_json, system_to_json)
 from .oslo import len_to_system
 from .zemax import zmx_to_system
+from .library import Library
 from .raytrace import (GeometricTrace, ParaxialTrace, GaussianTrace,
     FullTrace)
 from .analysis import Analysis
-#from .optimize import (Parameter, MaterialThickness, 
-#    demerit_rms_position, demerit_rms_angle, demerit_mean_angle,
-#    demerit_aberration3)

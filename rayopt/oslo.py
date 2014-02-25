@@ -21,14 +21,14 @@ from collections import namedtuple
 import os.path
 import time
 import io
+import hashlib
 
 import numpy as np
 
-from .utils import sfloat
-from .elements import Spheroid, Aperture
+from .utils import sfloat, sint
+from .elements import Spheroid
 from .system import System
-from .material import (AllGlasses, air, get_material, sint, sfloat,
-    Material, SellmeierMaterial)
+from .material import air, get_material, SellmeierMaterial
 
 
 Lens = namedtuple("Lens", "name elements efl radius thickness comment "
@@ -72,15 +72,18 @@ def olc_read(dir):
 
 
 def olc_to_library(fil, library, collision="or replace"):
+    stat = os.stat(fil)
+    sha1 = hashlib.sha1()
+    sha1.update(open(fil, "rb").read())
+    sha1 = sha1.hexdigest()
     cu = library.conn.cursor()
     catalog = os.path.basename(fil)
     catalog = os.path.splitext(catalog)[0]
-    catalog = catalog.lower()
     cu.execute("""insert into catalog
-        (name, type, format, version, file, date, import)
-        values (?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "lens", "olc", 0, fil, os.stat(fil).st_mtime,
-            time.time()))
+        (name, type, format, version, file, date, size, sha1, import)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+            catalog, "lens", "olc", 0, fil, stat.st_mtime, stat.st_size,
+            sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(olc_read(fil))
     cu.executemany("""insert %s into lens
@@ -114,9 +117,10 @@ def olc_to_system(dat, glass_map=oslo_glass_map):
         elif cmd == "GLA":
             mat = args[0].upper()
             mat = glass_map.get(mat, mat)
-            mat = AllGlasses.get(mat)
-            if not mat:
-                #print("mat not found", cmd, args)
+            try:
+                mat = get_material(mat)
+            except KeyError:
+                print("mat not found", cmd, args)
                 mat = air
             s.material = mat
         elif cmd == "TH":
@@ -196,7 +200,7 @@ def glc_read(f):
         nd = sfloat(line.pop(0))
         vd = sfloat(line.pop(0))
         density = sfloat(line.pop(0))
-        yield Glas(name, nd, vd, density, l)
+        yield Glas(name, nd, vd, density, l.strip())
 
 
 def glc_to_material(l):
@@ -231,14 +235,17 @@ def glc_to_material(l):
 
 
 def glc_to_library(fil, library, collision="or replace"):
+    stat = os.stat(fil)
+    sha1 = hashlib.sha1()
+    sha1.update(open(fil, "rb").read())
+    sha1 = sha1.hexdigest()
     cu = library.conn.cursor()
     ver, num, catalog = io.open(fil, "r").readline().split()[:3]
-    catalog = catalog.lower()
     cu.execute("""insert into catalog
-        (name, type, format, version, file, date, import)
-        values (?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "glass", "glc", float(ver), fil, os.stat(fil).st_mtime,
-            time.time()))
+        (name, type, format, version, file, size, date, sha1, import)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+            catalog, "glass", "glc", float(ver), fil, 
+            stat.st_size, stat.st_mtime, sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(glc_read(fil))
     cu.executemany("""insert %s into glass

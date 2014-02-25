@@ -25,11 +25,12 @@ import os
 import codecs
 import io
 import time
-from StringIO import StringIO
+import hashlib
 
 import numpy as np
 
-from .material import get_material, air, sint, sfloat, SellmeierMaterial
+from .utils import sfloat, sint
+from .material import get_material, air, SellmeierMaterial
 from .elements import Spheroid
 from .system import System
 
@@ -39,7 +40,7 @@ Lens = namedtuple("Lens", "name version elements code "
 
 def zmf_read(f):
     head = Struct("<I")
-    lens = Struct("< 100sIIIIIIIdd")
+    lens = Struct("<100sIIIIIIIdd")
     codes = "?EBPM"
     version, = head.unpack(f.read(head.size))
     assert version in (1001, )
@@ -59,6 +60,7 @@ def zmf_read(f):
         assert description.startswith("VERS {:06d}\n".format(li[1]))
         yield Lens(description=description, *li)
 
+
 def zmf_obfuscate(data, a, b):
     iv = np.cos(6*a + 3*b)
     iv = np.cos(655*(np.pi/180)*iv) + iv
@@ -69,26 +71,20 @@ def zmf_obfuscate(data, a, b):
     data ^= np.fromiter(k, np.uint8, len(data))
     return data.tostring()
 
-def zmf_to_system(fil):
-    f = open(fil, "rb")
-    c = Stockcat.from_zemax(f)
-    for k in c:
-        s = c.decrypt(k)
-        s = StringIO(s)
-        s = system_from_zemax(s)
-        k["system"] = s
-    return c
 
 def zmf_to_library(fil, library, collision="or replace"):
+    stat = os.stat(fil)
+    sha1 = hashlib.sha1()
+    sha1.update(open(fil, "rb").read())
+    sha1 = sha1.hexdigest()
     cu = library.conn.cursor()
     catalog = os.path.basename(fil)
     catalog = os.path.splitext(catalog)[0]
-    catalog = catalog.lower()
     cu.execute("""insert into catalog
-        (name, type, format, version, file, date, import)
-        values (?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "lens", "zmx", 1001, fil, os.stat(fil).st_mtime,
-            time.time()))
+        (name, type, format, version, file, date, size, sha1, import)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+            catalog, "lens", "zmx", 1001, fil, stat.st_mtime,
+            stat.st_size, sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(zmf_read(open(fil, "rb")))
     cu.executemany("""insert %s into lens
@@ -199,6 +195,7 @@ def zmx_to_system(fil):
 
 Glas = namedtuple("Glas", "name nd vd density code comment description")
 
+
 def agf_read(fil):
     raw = open(fil, "rb").read(32)
     if raw.startswith(codecs.BOM_UTF16):
@@ -235,15 +232,18 @@ def agf_read(fil):
 
 
 def agf_to_library(fil, library, collision="or replace"):
+    stat = os.stat(fil)
+    sha1 = hashlib.sha1()
+    sha1.update(open(fil, "rb").read())
+    sha1 = sha1.hexdigest()
     cu = library.conn.cursor()
     catalog = os.path.basename(fil)
     catalog = os.path.splitext(catalog)[0]
-    catalog = catalog.lower()
     cu.execute("""insert into catalog
-        (name, type, format, version, file, date, import)
-        values (?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "glass", "agf", 0, fil, os.stat(fil).st_mtime,
-            time.time()))
+        (name, type, format, version, file, date, size, sha1, import)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+            catalog, "glass", "agf", 0, fil, stat.st_mtime,
+            stat.st_size, sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(agf_read(fil))
     cu.executemany("""insert %s into glass

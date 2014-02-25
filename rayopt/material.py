@@ -18,17 +18,9 @@
 
 from __future__ import print_function, absolute_import, division
 
-import io
-import codecs
-import shelve
-import anydbm
-import os.path
-import cPickle as pickle
-import glob
-
 import numpy as np
 
-from .utils import sfloat, sint, simple_cache
+from .utils import simple_cache
 
 
 fraunhofer = dict(   # http://en.wikipedia.org/wiki/Abbe_number
@@ -164,55 +156,6 @@ mirror = Material(name="MIRROR", catalog="basic",
 basic = dict((m.name, m) for m in (vacuum, air, mirror))
 
 
-def load_catalogs(catdb, catalogs):
-    kw = dict(protocol=pickle.HIGHEST_PROTOCOL, writeback=False)
-    try:
-        db = shelve.open(catdb, "r", **kw)
-        if not db.keys():
-            db.close()
-            raise anydbm.error
-    except anydbm.error:
-        # keeping it open writeable corrupts it
-        db = shelve.open(catdb, "c", **kw)
-        defaults = {}
-        for f in catalogs:
-            _, name = os.path.split(f)
-            name, ext = os.path.splitext(name.lower())
-            if ext == ".agf":
-                cf = load_catalog_zemax(f, name)
-            elif ext == ".glc":
-                cf = load_catalog_oslo(f, name)
-            else:
-                raise ValueError("glass catalog extension %s unknown" %
-                        ext)
-            for k, v in cf.items():
-                db[("%s/%s" % (name, k.lower())).encode("ascii")] = v
-                defaults[k.lower()] = name
-        name = "basic"
-        for k, v in basic.items():
-            db["%s/%s" % (name, k.lower())] = v
-            defaults[k.lower()] = name
-        db["__default__"] = defaults
-        db.close()
-        db = shelve.open(catdb, "r", **kw)
-    return db
-
-def load_default_catalogs():
-    global catalogs
-    dir, _ = os.path.split(__file__)
-    dir = os.path.join(dir, "../glass")
-    cats = []
-    for ext in "*.agf", "*.glc":
-        for ext in ext.upper(), ext.lower():
-            pattern = os.path.join(dir, ext)
-            cats.extend(sorted(glob.glob(pattern)))
-    catdb = os.path.join(dir, "all.shelve")
-    catalogs = load_catalogs(catdb, cats)
-    return catalogs
-
-catalogs = {}
-load_default_catalogs()
-
 def get_material(name):
     if isinstance(name, Material):
         return name
@@ -224,17 +167,20 @@ def get_material(name):
         return ModelMaterial.from_string(name)
     except ValueError:
         pass
-    name = str(name).lower()
+    name = name.lower()
+    from .library import Library
+    lib = Library.one()
+    catalog = None
     if "/" in name:
-        return catalogs[name]
-    else:
-        cat = catalogs["__default__"][name]
-        return catalogs["%s/%s" % (cat, name)]
+        catalog, name = name.split("/", 1)
+    return lib.get("glass", name, catalog)
+
 
 class DefaultGlass(object):
     def __getitem__(self, key):
-        cat = catalogs["__defaults__"][key]
-        return catalogs["%s/%s" % (cat, key)]
+        return self.get(key)
+    def get(self, key):
+        return get_material(key)
 
 all_materials = DefaultGlass()
 AllGlasses = all_materials

@@ -22,7 +22,7 @@ from __future__ import (print_function, absolute_import, division,
 import sqlite3
 import os
 
-from . import zemax, oslo
+from rayopt import zemax, oslo
 
 
 class Library(object):
@@ -45,7 +45,7 @@ class Library(object):
         self.db_init()
         self.cache = {}
 
-    def db_get(self, db="library.db"):
+    def db_get(self, db):
         conn = sqlite3.connect(db)
         conn.text_factory = unicode
         self.conn = conn
@@ -53,22 +53,24 @@ class Library(object):
 
     def db_init(self):
         cu = self.cursor
-        cu.execute("pragma page_size=512")
-        cu.execute("pragma foreign_keys=on")
+        cu.execute("pragma page_size = 512")
+        cu.execute("pragma foreign_keys = on")
         cu.execute("""create table if not exists catalog (
             id integer primary key autoincrement,
-            name text not null,
+            name text not null collate nocase,
+            format text not null,
+            type text not null,
             comment text,
-            type text,
-            format text,
             version integer,
+            size integer,
+            sha1 text,
             file text,
             date real,
             import real
             )""")
         cu.execute("""create table if not exists glass (
             id integer primary key autoincrement,
-            name text not null,
+            name text not null collate nocase,
             catalog integer not null,
             section text,
             comment text,
@@ -85,7 +87,7 @@ class Library(object):
             )""")
         cu.execute("""create table if not exists lens (
             id integer primary key autoincrement,
-            name text not null,
+            name text not null collate nocase,
             catalog integer not null,
             section text,
             comment text,
@@ -115,9 +117,9 @@ class Library(object):
 
     def delete_catalog(self, id):
         cu = self.cursor
-        cu.execute("drop from lens where catalog = ?", id)
-        cu.execute("drop from glass where catalog = ?", id)
-        cu.execute("drop from catalog where id = ?", id)
+        cu.execute("delete from lens where catalog = ?", (id,))
+        cu.execute("delete from glass where catalog = ?", (id,))
+        cu.execute("delete from catalog where id = ?", (id,))
         self.conn.commit()
 
     def load(self, fil, mode="refresh"):
@@ -127,31 +129,36 @@ class Library(object):
         if extl not in self.loaders:
             return
         cu = self.cursor
-        res = cu.execute("select id, date from catalog where file = ?",
-            (fil,)).fetchone()
-        tim = os.stat(fil).st_mtime
-        if res:
-            if mode == "refresh" and tim <= res[1]:
+        res = cu.execute("select id, date, size "
+                "from catalog where file = ?", (fil,)).fetchone()
+        if not res:
+            pass
+        elif mode == "refresh":
+            stat = os.stat(fil)
+            if stat.st_mtime <= res[1] or stat.st_size == res[2]:
                 return
-            elif mode == "add":
-                pass
-            elif mode == "reload":
-                self.delete_catalog(res[0])
+            self.delete_catalog(res[0])
+        elif mode == "reload":
+            self.delete_catalog(res[0])
+        elif mode == "add":
+            pass
         print("loading %s" % fil)
         self.loaders[extl](fil, self)
 
     def get(self, typ, name, catalog=None, **kwargs):
         cu = self.cursor
         if catalog is None:
-            res = cu.execute("select id from {0} where name = ?"
+            res = cu.execute("select id from {0} where name = ? "
                     "".format(typ), (name,))
         else:
             res = cu.execute("select {0}.id from {0}, catalog "
-                    "where {0}.catalog = catalog.id and "
-                    "{0}.name = ? and catalog.name = ?"
+                    "where {0}.catalog = catalog.id "
+                    "and {0}.name = ? and catalog.name = ?"
                     "".format(typ), (name, catalog))
-        id = res.fetchone()[0]
-        return self.parse(typ, id, **kwargs)
+        res = res.fetchone()
+        if not res:
+            raise KeyError("{} {}/{} not found".format(typ, catalog, name))
+        return self.parse(typ, res[0], **kwargs)
 
     def parse(self, typ, id, reload=False):
         if not reload:
@@ -160,24 +167,41 @@ class Library(object):
             except KeyError:
                 pass
         cu = self.cursor
-        res = cu.execute("select data, format "
-                "from {0}, catalog where {0}.id = ? "
-                "and {0}.catalog = catalog.id".format(typ),
+        res = cu.execute("select data, format from {0}, catalog "
+                "where {0}.id = ? and {0}.catalog = catalog.id "
+                "".format(typ),
             (id,)).fetchone()
         obj = self.parsers[res[1]](res[0])
         self.cache[(typ, id)] = obj
         return obj
 
+    @classmethod
+    def one(cls):
+        try:
+            return cls._one
+        except AttributeError:
+            cls._one = cls()
+            return cls._one
 
-if __name__ == "__main__":
-    import glob, sys
-    l = Library()
-    fs = sys.argv[1:] or ["glass/Stockcat", "lenscat", "glass/Glasscat", "glass/oslo"]
-    l.load_all(fs)
+
+def _test(l):
     print(l.get("glass", "BK7"))
     print(l.get("lens", "AC127-025-A", "thorlabs"))
     for t in "glass lens".split():
         for i in l.conn.cursor().execute("select id from %s" % t
                 ).fetchall():
-            print(t, i[0])
+            #print(t, i[0])
             l.parse(t, i[0])
+
+
+if __name__ == "__main__":
+    import glob, sys
+    fs = sys.argv[1:] or [
+            "glass/Stockcat",
+            "lenscat",
+            "glass/Glasscat",
+            "glass/oslo",
+            ]
+    l = Library.one()
+    l.load_all(fs)
+    #_test(l)
