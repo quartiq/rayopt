@@ -29,7 +29,7 @@ from StringIO import StringIO
 
 import numpy as np
 
-from .material import get_material, sint, sfloat
+from .material import get_material, air, sint, sfloat, SellmeierMaterial
 from .elements import Spheroid
 from .system import System
 
@@ -103,10 +103,10 @@ def zmf_to_library(fil, library, collision="or replace"):
     library.conn.commit()
 
 
-def system_from_zemax(fil):
+def zmx_to_system(fil):
     s = System()
     next_pos = 0.
-    for line in fil.readlines():
+    for line in fil.splitlines():
         if not line.strip():
             continue
         line = line.strip().split(" ", 1)
@@ -213,7 +213,7 @@ def agf_read(fil):
             continue
         if cmd == "NM":
             if g:
-                yield Glas(name, nd, vd, density, code, comment, "\n".join(g))
+                yield Glas(name, nd, vd, density, code, comment, "".join(g))
                 g = []
                 density, price, comment = None, None, None
             args = args.split()
@@ -231,7 +231,7 @@ def agf_read(fil):
             pass
         g.append(line)
     if g:
-        yield Glas(name, nd, vd, density, code, comment, "\n".join(g))
+        yield Glas(name, nd, vd, density, code, comment, "".join(g))
 
 
 def agf_to_library(fil, library, collision="or replace"):
@@ -242,16 +242,53 @@ def agf_to_library(fil, library, collision="or replace"):
     cu.execute("""insert into catalog
         (name, type, format, version, file, date, import)
         values (?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "glas", "agf", 0, fil, os.stat(fil).st_mtime,
+            catalog, "glass", "agf", 0, fil, os.stat(fil).st_mtime,
             time.time()))
     catalog_id = cu.lastrowid
     cat = list(agf_read(fil))
-    cu.executemany("""insert %s into glas
+    cu.executemany("""insert %s into glass
         (name, catalog, nd, vd, density, data)
         values (?, ?, ?, ?, ?, ?)""" % collision, ((
-            glas.name, catalog_id, glas.nd, glas.vd, glas.density,
-            glas.description) for glas in cat))
+            glass.name, catalog_id, glass.nd, glass.vd, glass.density,
+            glass.description) for glass in cat))
     library.conn.commit()
+
+
+def agf_to_material(dat):
+    for line in dat.splitlines():
+        if not line:
+            continue
+        cmd, args = line.split(" ", 1)
+        if cmd == "NM":
+            args = args.split()
+            g = SellmeierMaterial(name=args[0], nd=sfloat(args[3]),
+                    vd=sfloat(args[4]), sellmeier=[])
+            g.glasscode = sfloat(args[2])
+        elif cmd == "GC":
+            g.comment = args
+        elif cmd == "ED":
+            args = map(sfloat, args.split())
+            g.alpham3070, g.alpha20300, g.density = args[0:3]
+        elif cmd == "CD":
+            s = np.array(map(sfloat, args.split())).reshape((-1,2))
+            g.sellmeier = np.array([si for si in s if not si[0] == 0])
+        elif cmd == "TD":
+            s = map(sfloat, args.split())
+            g.thermal = s
+        elif cmd == "OD":
+            g.chemical = map(sfloat, args[1:])
+            g.price = sfloat(args[0])
+        elif cmd == "LD":
+            s = map(sfloat, args.split())
+            pass
+        elif cmd == "IT":
+            s = map(sfloat, args.split())
+            if not hasattr(g, "transmission"):
+                g.transmission = {}
+            g.transmission[(s[0], s[2])] = s[1]
+        else:
+            print(cmd, args, "not handled")
+    return g
 
 
 if __name__ == "__main__":

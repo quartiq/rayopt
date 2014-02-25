@@ -27,7 +27,8 @@ import numpy as np
 from .utils import sfloat
 from .elements import Spheroid, Aperture
 from .system import System
-from .material import AllGlasses, air, get_material, sint, sfloat
+from .material import (AllGlasses, air, get_material, sint, sfloat,
+    Material, SellmeierMaterial)
 
 
 Lens = namedtuple("Lens", "name elements efl radius thickness comment "
@@ -97,7 +98,7 @@ oslo_glass_map = {
     }
 
 
-def read_oslo_lens(dat, glass_map=oslo_glass_map):
+def olc_to_system(dat, glass_map=oslo_glass_map):
     sys = []
     s = Spheroid()
     sys.append(s)
@@ -139,7 +140,7 @@ def read_oslo_lens(dat, glass_map=oslo_glass_map):
     return sys
 
 
-def system_from_oslo(fil):
+def len_to_system(fil):
     s = System()
     e = Spheroid()
     th = 0.
@@ -198,7 +199,7 @@ def glc_read(f):
         yield Glas(name, nd, vd, density, l)
 
 
-def glas_to_material(l):
+def glc_to_material(l):
     line = l.strip().split()
     name = line.pop(0)
     nd = sfloat(line.pop(0))
@@ -211,7 +212,7 @@ def glas_to_material(l):
     if a in (1, 2):
         sellmeier = sellmeier.reshape(2, -1).T
     del line[:num]
-    mat = Material(name=name, sellmeier=sellmeier, nd=nd, vd=vd)
+    mat = SellmeierMaterial(name=name, sellmeier=sellmeier, nd=nd, vd=vd)
     #if not np.allclose(nd, mat.nd):
     #    print(name, nd, mat.nd)
     mat.density = density
@@ -236,16 +237,16 @@ def glc_to_library(fil, library, collision="or replace"):
     cu.execute("""insert into catalog
         (name, type, format, version, file, date, import)
         values (?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "glas", "glc", float(ver), fil, os.stat(fil).st_mtime,
+            catalog, "glass", "glc", float(ver), fil, os.stat(fil).st_mtime,
             time.time()))
     catalog_id = cu.lastrowid
     cat = list(glc_read(fil))
-    cu.executemany("""insert %s into glas
+    cu.executemany("""insert %s into glass
         (name, catalog, nd, vd, density, data)
         values (?, ?, ?, ?, ?, ?)""" % collision, ((
-            glas.name, catalog_id, glas.nd, glas.vd, glas.density,
-            glas.description) for glas in cat))
-    n = cu.execute("select count() from glas where catalog = ?",
+            glass.name, catalog_id, glass.nd, glass.vd, glass.density,
+            glass.description) for glass in cat))
+    n = cu.execute("select count() from glass where catalog = ?",
             (catalog_id,)).fetchone()[0]
     #assert n == int(num), (n, int(num))
     library.conn.commit()

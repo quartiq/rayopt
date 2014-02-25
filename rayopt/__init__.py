@@ -25,8 +25,8 @@ from .system import System
 from .formats import (system_from_text,
     system_from_yaml, system_to_yaml,
     system_from_json, system_to_json)
-from .oslo import system_from_oslo
-from .zemax import system_from_zemax
+from .oslo import len_to_system
+from .zemax import zmx_to_system
 from .raytrace import (GeometricTrace, ParaxialTrace, GaussianTrace,
     FullTrace)
 from .analysis import Analysis
