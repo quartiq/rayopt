@@ -179,7 +179,6 @@ def len_to_system(fil):
             pass
         else:
             print(cmd, "not handled", args)
-            continue
     return s
 
 

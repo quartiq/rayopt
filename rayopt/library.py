@@ -74,13 +74,14 @@ class Library(object):
             catalog integer not null,
             section text,
             comment text,
+            status integer,
             code integer,
             solid boolean,
             mirror boolean,
             nd real,
             vd real,
             density real,
-            price real,
+            tce real,
             data text,
             foreign key (catalog) references catalog(id),
             unique (name, catalog)
@@ -91,11 +92,12 @@ class Library(object):
             catalog integer not null,
             section text,
             comment text,
+            status integer,
             version integer,
             elements integer,
             thickness real,
             radius real,
-            code character,
+            shape character,
             aspheric boolean,
             toroidal boolean,
             grin boolean,
@@ -197,10 +199,10 @@ def _test(l):
 if __name__ == "__main__":
     import glob, sys
     fs = sys.argv[1:] or [
-            "glass/Stockcat",
-            "lenscat",
-            "glass/Glasscat",
-            "glass/oslo",
+            "catalog/oslo_glass",
+            "catalog/zemax_glass",
+            "catalog/oslo_lens",
+            "catalog/zemax_lens",
             ]
     l = Library.one()
     l.load_all(fs)

@@ -35,13 +35,13 @@ from .elements import Spheroid
 from .system import System
 
 
-Lens = namedtuple("Lens", "name version elements code "
+Lens = namedtuple("Lens", "name version elements shape "
         "aspheric grin toroidal length efl enp description")
 
 def zmf_read(f):
     head = Struct("<I")
     lens = Struct("<100sIIIIIIIdd")
-    codes = "?EBPM"
+    shapes = "?EBPM"
     version, = head.unpack(f.read(head.size))
     assert version in (1001, )
     while True:
@@ -52,7 +52,7 @@ def zmf_read(f):
             break
         li = list(lens.unpack(li))
         li[0] = li[0].decode("latin1").strip("\0")
-        li[3] = codes[li[3]]
+        li[3] = shapes[li[3]]
         description = f.read(li[7])
         assert len(description) == li[7]
         description = zmf_obfuscate(description, li[8], li[9])
@@ -88,11 +88,11 @@ def zmf_to_library(fil, library, collision="or replace"):
     catalog_id = cu.lastrowid
     cat = list(zmf_read(open(fil, "rb")))
     cu.executemany("""insert %s into lens
-        (name, catalog, version, elements, code,
+        (name, catalog, version, elements, shape,
         aspheric, toroidal, grin, efl, enp, data)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""" % collision, ((
             lens.name, catalog_id, lens.version,
-            lens.elements, lens.code,
+            lens.elements, lens.shape,
             lens.aspheric, lens.toroidal, lens.grin,
             lens.efl, lens.enp, lens.description)
             for lens in cat))
@@ -193,7 +193,8 @@ def zmx_to_system(fil):
     return s
 
 
-Glas = namedtuple("Glas", "name nd vd density code comment description")
+Glas = namedtuple("Glas", "name nd vd density code comment status "
+        "tce description")
 
 
 def agf_read(fil):
@@ -203,32 +204,34 @@ def agf_read(fil):
     else:
         dat = io.open(fil, encoding="latin1")
     g = []
-    density, price, comment = None, None, None
+    density, comment, status, tce = None, None, None, None
     for line in dat:
         cmd, args = line.split(" ", 1)
         if cmd == "CC":
             continue
         if cmd == "NM":
             if g:
-                yield Glas(name, nd, vd, density, code, comment, "".join(g))
+                yield Glas(name, nd, vd, density, code, comment, status,
+                        tce, "".join(g))
                 g = []
-                density, price, comment = None, None, None
+                density, comment, status, tce = None, None, None, None
             args = args.split()
             name = args[0]
             nd = sfloat(args[3])
             vd = sfloat(args[4])
             code = args[2]
+            if len(args) >= 7:
+                status = sint(args[6])
         elif cmd == "GC":
             comment = args
         elif cmd == "ED":
-            density = sfloat(args.split()[2])
-        elif cmd == "OD":
-            price = sfloat(args[0])
-        else:
-            pass
+            args = args.split()
+            tce = sfloat(args[0])
+            density = sfloat(args[2])
         g.append(line)
     if g:
-        yield Glas(name, nd, vd, density, code, comment, "".join(g))
+        yield Glas(name, nd, vd, density, code, comment, status, tce,
+                "".join(g))
 
 
 def agf_to_library(fil, library, collision="or replace"):
@@ -247,10 +250,12 @@ def agf_to_library(fil, library, collision="or replace"):
     catalog_id = cu.lastrowid
     cat = list(agf_read(fil))
     cu.executemany("""insert %s into glass
-        (name, catalog, nd, vd, density, data)
-        values (?, ?, ?, ?, ?, ?)""" % collision, ((
+        (name, catalog, nd, vd, density, code, status, tce, comment, data)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""" % collision, ((
             glass.name, catalog_id, glass.nd, glass.vd, glass.density,
-            glass.description) for glass in cat))
+            glass.code, glass.status, glass.tce, glass.comment,
+            glass.description)
+            for glass in cat))
     library.conn.commit()
 
 
@@ -265,7 +270,7 @@ def agf_to_material(dat):
                     vd=sfloat(args[4]), sellmeier=[])
             g.glasscode = sfloat(args[2])
         elif cmd == "GC":
-            g.comment = args
+            g.comment = args.strip()
         elif cmd == "ED":
             args = map(sfloat, args.split())
             g.alpham3070, g.alpha20300, g.density = args[0:3]
@@ -280,7 +285,6 @@ def agf_to_material(dat):
             g.price = sfloat(args[0])
         elif cmd == "LD":
             s = map(sfloat, args.split())
-            pass
         elif cmd == "IT":
             s = map(sfloat, args.split())
             if not hasattr(g, "transmission"):
