@@ -246,7 +246,7 @@ def glc_to_library(fil, library, collision="or replace"):
 	sha1, import)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
             catalog, "glass", "oslo", "glc", float(ver), fil, 
-            stat.st_size, stat.st_mtime, sha1, time.time()))
+            stat.st_mtime, stat.st_size, sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(glc_read(fil))
     cu.executemany("""insert %s into glass

@@ -58,6 +58,18 @@ class Material(object):
         else:
             return self.name
 
+    def dict(self):
+        dat = {}
+        if self.name:
+            dat["name"] = self.name
+        if not self.solid:
+            dat["solid"] = self.solid
+        if self.mirror:
+            dat["mirror"] = self.mirror
+        if self.catalog:
+            dat["catalog"] = self.catalog
+        return dat
+
     @simple_cache
     def refractive_index(self, wavelength):
         return 1.
@@ -95,6 +107,12 @@ class ModelMaterial(Material):
         return (self.nd + (wavelength - lambda_d)/(lambda_C - lambda_F)
                 *(1 - self.nd)/self.vd)
 
+    def dict(self):
+        dat = super(ModelMaterial, self).dict()
+        dat["nd"] = self.nd
+        dat["vd"] = self.vd
+        return dat
+
 
 class SellmeierMaterial(Material):
     def __init__(self, sellmeier, thermal=None, nd=None, vd=None, **kwargs):
@@ -126,6 +144,15 @@ class SellmeierMaterial(Material):
         dn = (n**2-1)/(2*n)*(d0*dt+d1*dt**2+d2*dt**3+
                 (e0*dt+e1*dt**2)/(w**2-lref**2))
         return dn
+
+    def dict(self):
+        dat = super(SellmeierMaterial, self).dict()
+        dat["sellmeier"] = map(list, self.sellmeier)
+        if self.thermal:
+            dat["thermal"] = self.thermal
+        dat["nd"] = self.nd
+        dat["vd"] = self.vd
+        return dat
 
 
 class GasMaterial(SellmeierMaterial):
@@ -168,11 +195,15 @@ def get_material(name):
     except ValueError:
         pass
     name = name.lower()
-    from .library import Library
-    lib = Library.one()
     catalog = None
     if "/" in name:
         catalog, name = name.split("/", 1)
+    try:
+        return basic[name]
+    except KeyError:
+        pass
+    from .library import Library
+    lib = Library.one()
     return lib.get("glass", name, catalog)
 
 
