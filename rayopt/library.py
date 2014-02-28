@@ -149,19 +149,28 @@ class Library(object):
         print("loading %s" % fil)
         self.loaders[extl](fil, self)
 
-    def get(self, typ, name, catalog=None, **kwargs):
+    def get(self, typ, name, catalog=None, source=None, **kwargs):
         cu = self.cursor
         if catalog is None:
             res = cu.execute("select id from {0} where name = ? "
                     "".format(typ), (name,))
+        elif source is None:
+            res = cu.execute("select {0}.id from {0}, catalog "
+                    "where {0}.name = ? "
+                    "and {0}.catalog = catalog.id "
+                    "and catalog.name = ? "
+                    "".format(typ), (name, catalog))
         else:
             res = cu.execute("select {0}.id from {0}, catalog "
-                    "where {0}.catalog = catalog.id "
-                    "and {0}.name = ? and catalog.name = ?"
-                    "".format(typ), (name, catalog))
+                    "where {0}.name = ? "
+                    "and {0}.catalog = catalog.id "
+                    "and catalog.name = ? "
+                    "and catalog.source = ? "
+                    "".format(typ), (name, catalog, source))
         res = res.fetchone()
         if not res:
-            raise KeyError("{} {}/{} not found".format(typ, catalog, name))
+            raise KeyError("{} {}/{}/{} not found".format(
+                typ, source, catalog, name))
         return self.parse(typ, res[0], **kwargs)
 
     def parse(self, typ, id, reload=False):

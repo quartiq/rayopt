@@ -173,11 +173,11 @@ class GasMaterial(SellmeierMaterial):
 
 
 # http://refractiveindex.info
-vacuum = ModelMaterial(name="VACUUM", catalog="basic",
+vacuum = ModelMaterial(name="vacuum", catalog="basic",
         nd=1., vd=np.inf, solid=False)
-air = GasMaterial(name="AIR", catalog="basic",
+air = GasMaterial(name="air", catalog="basic",
         sellmeier=[[5792105E-8, 238.0185], [167917E-8, 57.362]])
-mirror = Material(name="MIRROR", catalog="basic",
+mirror = Material(name="mirror", catalog="basic",
         mirror=True, solid=False)
 
 basic = dict((m.name, m) for m in (vacuum, air, mirror))
@@ -194,14 +194,20 @@ def get_material(name):
         return ModelMaterial.from_string(name)
     except ValueError:
         pass
-    name = name.lower()
-    catalog = None
-    if "/" in name:
-        catalog, name = name.split("/", 1)
-    try:
-        return basic[name.upper()]
-    except KeyError:
-        pass
+    name = name.lower().split("/")
+    if len(name) == 3:
+        source, catalog, name = name
+    elif len(name) == 2:
+        source = None
+        catalog, name = name
+    else:
+        source, catalog = None, None
+        name, = name
+    if catalog in (None, "basic"):
+        try:
+            return basic[name]
+        except KeyError:
+            pass
     from .library import Library
     lib = Library.one()
     return lib.get("glass", name, catalog)
