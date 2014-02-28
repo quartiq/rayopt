@@ -80,10 +80,11 @@ def olc_to_library(fil, library, collision="or replace"):
     catalog = os.path.basename(fil)
     catalog = os.path.splitext(catalog)[0]
     cu.execute("""insert into catalog
-        (name, type, format, version, file, date, size, sha1, import)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "lens", "olc", 0, fil, stat.st_mtime, stat.st_size,
-            sha1, time.time()))
+        (name, type, source, format, version, file, date, size,
+	sha1, import)
+	values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+            catalog, "lens", "oslo", "olc", 0, fil,
+	    stat.st_mtime, stat.st_size, sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(olc_read(fil))
     cu.executemany("""insert %s into lens
@@ -241,9 +242,10 @@ def glc_to_library(fil, library, collision="or replace"):
     cu = library.conn.cursor()
     ver, num, catalog = io.open(fil, "r").readline().split()[:3]
     cu.execute("""insert into catalog
-        (name, type, format, version, file, size, date, sha1, import)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "glass", "glc", float(ver), fil, 
+        (name, type, source, format, version, file, date, size,
+	sha1, import)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+            catalog, "glass", "oslo", "glc", float(ver), fil, 
             stat.st_size, stat.st_mtime, sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(glc_read(fil))

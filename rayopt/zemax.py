@@ -81,10 +81,11 @@ def zmf_to_library(fil, library, collision="or replace"):
     catalog = os.path.basename(fil)
     catalog = os.path.splitext(catalog)[0]
     cu.execute("""insert into catalog
-        (name, type, format, version, file, date, size, sha1, import)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "lens", "zmx", 1001, fil, stat.st_mtime,
-            stat.st_size, sha1, time.time()))
+        (name, type, source, format, version, file, date, size,
+        sha1, import)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+            catalog, "lens", "zemax", "zmx", 1001, fil,
+            stat.st_mtime, stat.st_size, sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(zmf_read(open(fil, "rb")))
     cu.executemany("""insert %s into lens
@@ -243,9 +244,10 @@ def agf_to_library(fil, library, collision="or replace"):
     catalog = os.path.basename(fil)
     catalog = os.path.splitext(catalog)[0]
     cu.execute("""insert into catalog
-        (name, type, format, version, file, date, size, sha1, import)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "glass", "agf", 0, fil, stat.st_mtime,
+        (name, type, source, format, version, file, date, size,
+        sha1, import)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
+            catalog, "glass", "zemax", "agf", 0, fil, stat.st_mtime,
             stat.st_size, sha1, time.time()))
     catalog_id = cu.lastrowid
     cat = list(agf_read(fil))
