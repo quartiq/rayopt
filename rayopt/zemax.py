@@ -265,7 +265,7 @@ def agf_to_material(dat):
     for line in dat.splitlines():
         if not line:
             continue
-        cmd, args = line.split(" ", 1)
+        cmd, args = line[:2], line[3:]
         if cmd == "NM":
             args = args.split()
             g = SellmeierMaterial(name=args[0], nd=sfloat(args[3]),
