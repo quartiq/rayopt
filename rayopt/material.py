@@ -199,7 +199,7 @@ def get_material(name):
     if "/" in name:
         catalog, name = name.split("/", 1)
     try:
-        return basic[name]
+        return basic[name.upper()]
     except KeyError:
         pass
     from .library import Library
