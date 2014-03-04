@@ -40,7 +40,10 @@ class Library(object):
             "glc": oslo.glc_to_material,
     }
 
-    def __init__(self, db="library.db"):
+    def __init__(self, db=None):
+        if db is None:
+            dir = os.path.split(__file__)[0]
+            db = os.path.join(dir, "library.db")
         self.db_get(db)
         self.db_init()
         self.cache = {}
