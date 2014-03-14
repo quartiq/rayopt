@@ -29,8 +29,7 @@ from .material import fraunhofer
 
 class System(list):
     def __init__(self, elements=None, description="", scale=1e-3, stop=1,
-            wavelengths=None, wavelength_weights=None,
-            finite=False, fields=None, field_weights=None,
+            wavelengths=None, finite=False, fields=None,
             pupil=None, pupil_distance=None,
             pickups=None, validators=None, solves=None):
         elements = map(get_element, elements or [])
