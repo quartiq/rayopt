@@ -27,28 +27,42 @@ from .elements import get_element
 from .material import fraunhofer
 
 
+class Configuration(object):
+    self.finite = finite
+    self.fields = field or [0.]
+
+    def __init__(self, **kwargs):
+        for k in sorted(kwargs.keys()):
+            self.update(k=kwargs[k])
+
+    def update(self, **kwargs):
+        assert len(kwargs) == 1
+        k, v = kwargs.items()[0]
+        setattr(self, k, float(v))
+        if k == "":
+            pass
+
+    # aperture: radius, object na, slope, image na, working fno
+    # field: object angle, object radius, image radius
+    # conjugate: object distance, image distance, magnification
+
+
+
+
 class System(list):
     def __init__(self, elements=None, description="", scale=1e-3, stop=1,
-            wavelengths=None, finite=False, fields=None,
-            pupil=None, pupil_distance=None,
-            pickups=None, validators=None, solves=None):
+            wavelengths=None, pickups=None, validators=None, solves=None,
+            **config):
         elements = map(get_element, elements or [])
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
         self.stop = stop
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
-        self.wavelength_weights = wavelength_weights or []
-        self.finite = finite
-        self.fields = fields or [0.]
-        self.field_weights = field_weights or []
         self.pickups = pickups or []
         self.validators = validators or []
         self.solves = solves or []
-
-        # aperture: radius, object na, slope, image na, working fno
-        # field: object angle, object radius, image radius
-        # conjugate: object distance, image distance, magnification
+        self.config = Configuration(self, **config)
 
     def dict(self):
         dat = {}
