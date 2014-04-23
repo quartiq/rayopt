@@ -86,7 +86,7 @@ class GaussianTrace(Trace):
             # returns the qi right after element i if z == z[i]
             i = np.searchsorted(self.z, z) - 1
             i = np.where(i < 0, 0, i)
-            dz = z - self.z[i, :]
+            dz = z - self.z.take(i)
             qi = self.qi[i, :]
             # have to do full freespace propagation here
             # simple astigmatic have just q = q0 + dz
@@ -97,7 +97,7 @@ class GaussianTrace(Trace):
             qi1[:, 0, 0] = n*(qixx*(1 + dz*qiyy) - dz*qixy2)
             qi1[:, 1, 0] = qi1[:, 0, 1] = n*qixy
             qi1[:, 1, 1] = n*(qiyy*(1 + dz*qixx) - dz*qixy2)
-            n = self.n[i, :]
+            n = self.n.take(i)
             return qi1, n
 
     def angle(self, qi):
@@ -261,7 +261,7 @@ class GaussianTrace(Trace):
         kwargs.setdefault("color", "black")
         z = np.linspace(self.z[0], self.z[-1], npoints)
         i = np.searchsorted(self.z, z) - 1
-        m = self.mirrored[i, :]
+        m = self.mirrored.take(i)
         wx, wy = self.spot_radius_at(z).T*scale*m
         y = np.array([
             [wx, wx, z], [wy, wy, z], 
