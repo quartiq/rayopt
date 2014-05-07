@@ -144,11 +144,11 @@ class TransformMixin(object):
             r = np.dot(r, r1)
         self.rot_normal = r
 
-    def _do_rotate(self, r, t, f, y):
-        if f:
-            if t:
-                r = r.T
-            y = tuple(np.dot(yi, r) for yi in y)
+    def _do_rotate(self, rotation, inverse, flag, y):
+        if flag:
+            if inverse:
+                rotation = rotation.T
+            y = tuple(np.dot(yi, rotation) for yi in y)
         if len(y) == 1:
             y = y[0]
         return y
@@ -178,7 +178,8 @@ class Element(NameMixin, TransformMixin):
         typ = type(self).__name__.lower()
         if typ != "spheroid":
             dat["type"] = typ
-        dat["radius"] = float(self.radius)
+        if np.isfinite(self.radius):
+            dat["radius"] = float(self.radius)
         return dat
 
     def intercept(self, y, u):
@@ -409,7 +410,7 @@ class Spheroid(Interface):
         if aspherics is not None:
             aspherics = list(aspherics)
         self.aspherics = aspherics
-        if self.curvature:
+        if self.curvature and self.radius < np.inf:
             assert self.radius**2 <= 1/(self.conic*self.curvature**2)
 
     def dict(self):
@@ -553,16 +554,6 @@ try:
     class Spheroid(FastSpheroid):
         pass
 except ImportError:
-    pass
-
-# aliases as Spheroid has all features
-class Object(Spheroid):
-    pass
-
-class Aperture(Spheroid):
-    pass
-
-class Image(Spheroid):
     pass
 
 element_map = {}
