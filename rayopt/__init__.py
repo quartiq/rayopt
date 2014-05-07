@@ -20,7 +20,7 @@ from __future__ import print_function, absolute_import, division
 
 from .material import (fraunhofer, ModelMaterial,
     SellmeierMaterial, GasMaterial, mirror, air, vacuum)
-from .elements import Spheroid, Object
+from .elements import Spheroid
 from .system import System
 from .formats import (system_from_text,
     system_from_yaml, system_to_yaml,

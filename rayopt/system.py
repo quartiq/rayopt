@@ -27,32 +27,41 @@ from .elements import get_element
 from .material import fraunhofer
 
 
-class Configuration(object):
-    self.finite = finite
-    self.fields = field or [0.]
-
-    def __init__(self, **kwargs):
-        for k in sorted(kwargs.keys()):
-            self.update(k=kwargs[k])
-
-    def update(self, **kwargs):
-        assert len(kwargs) == 1
-        k, v = kwargs.items()[0]
-        setattr(self, k, float(v))
-        if k == "":
-            pass
-
     # aperture: radius, object na, slope, image na, working fno
     # field: object angle, object radius, image radius
     # conjugate: object distance, image distance, magnification
 
+class Conjugate(object):
+    def __init__(self, pupil_radius=None, pupil_distance=None,
+            na=None, f_number**kwargs):
+        self.update(dict(aperture_r=None, object_na=None,
+            image_na=None, f_number=None,
+            object_a=None, object_r=None, object_d=None, object_n=1.,
+            image_a=None, image_r=None, image_d=None, image_n=1.,
+            magnification=None))
+        self.config(**kwargs)
 
+    def dict(self):
+        return self
+
+    def config(self, **kwargs):
+        self.update(kwargs)
+        if "object_r" in kwargs:
+            self["object_na"] = 
+        if "aperture_radius" in kwargs:
+            self["object_na"] = (self["object_n"]*
+                    self["aperture_r"]/self["object_d"])
+            self["image_na"] = (self["image_n"]*
+                    self["aperture_r"]/
 
 
 class System(list):
-    def __init__(self, elements=None, description="", scale=1e-3, stop=1,
-            wavelengths=None, pickups=None, validators=None, solves=None,
-            **config):
+    def __init__(self, elements=None,
+            description="", scale=1e-3, stop=1,
+            wavelengths=None,
+            finite=False, fields=None,
+            pupil=None, pupil_distance=None,
+            pickups=None, validators=None, solves=None):
         elements = map(get_element, elements or [])
         super(System, self).__init__(elements)
         self.description = description
