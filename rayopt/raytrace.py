@@ -31,10 +31,11 @@ from scipy.interpolate import griddata
 
 from .aberration_orders import aberration_extrinsic
 from .elements import Spheroid
-from .utils import sinarctan, tanarcsin, simple_cache
+from .utils import sinarctan, tanarcsin, simple_cache, public
 from .transformations import rotation_matrix
 
 
+@public
 class Trace(object):
     def __init__(self, system):
         self.system = system
@@ -68,7 +69,7 @@ class Trace(object):
                 (u"#", u"T") + tuple(labels))
         fmt = u"%2s %1s" + u"% 10.4g" * len(labels)
         for i, a in enumerate(coeff):
-            yield fmt % ((i, self.system[i].typ) + tuple(a))
+            yield fmt % ((i, self.system[i].type) + tuple(a))
         if sum:
             yield fmt % ((u" ∑", u"") + tuple(coeff.sum(0)))
 
@@ -77,22 +78,24 @@ class Trace(object):
         self.propagate()
 
 
+@public
 class ParaxialTrace(Trace):
     # y[i] is ray height after the ith element perpendicular to the
     # excidence direction (assumes excidence and offset of the
     # next element coincide: use el.align())
-    # u[i] is tan(u) angle after the ith element
+    # u[i] is tan(u) angle after the ith element: always a slope.
+    # a.k.a. "the paraxial u is tan u"
     #
     # calculations assume aplanatic (and not paraxial system
     # oslo also assumes aplanatic). aplanatic is equivalent to the abbe
     # sine condition, magnification is equal to optical input ray sine
     # over optical output sine for all rays:
-    # m = n0 sin u0/ (nk sin uk) 
-    # "the paraxial u is tan u"?
+    # m = n0 sin u0/ (nk sin uk)
     def __init__(self, system, aberration_orders=3, axis=1):
         super(ParaxialTrace, self).__init__(system)
+        self.axis = axis
         self.allocate(aberration_orders)
-        self.rays(axis=axis)
+        self.rays()
         self.propagate()
         self.aberrations()
 
@@ -110,23 +113,36 @@ class ParaxialTrace(Trace):
         self.c = np.empty((n, 2, 2, k, k, k))
         self.d = np.empty_like(self.c)
 
-    def rays(self, axis=1):
-        y, u = self.y, self.u
-        self.axis = axis
-        l = self.system.wavelengths[0]
-        self.n[0] = self.system.object.refractive_index(l)
+    def __aim(self):
         ai = self.system.stop
-        m = self.system.paraxial_matrix(l, stop=ai + 1)
-        m = m[axis::2, axis::2]
-        mi = np.linalg.inv(m)
+        m = self.system.paraxial_matrix(self.l, stop=ai + 1)
+        m = m[self.axis::2, self.axis::2]
+        a, b, c, d = m.flat
+        r = self.system[ai].radius
+        self.system.object.pupil_distance = b/a
+        self.system.object.pupil_radius = r/b
+
+    def __rays(self):
+        y, u = self.y, self.u
+        ai = self.system.stop
+        y, u = self.system.object.aim([0, 0], [], )
+        self.y[0] = 0
+        self.n[0] = self.system[0].refractive_index(self.l)
+
+    def rays(self):
+        y, u = self.y, self.u
+        ai = self.system.stop
+        m = self.system.paraxial_matrix(self.l, stop=ai + 1)
+        a, b, c, d = m[self.axis::2, self.axis::2].flat
+        #mi = np.linalg.inv(m)
         r = self.system[ai].radius
         if self.system.object.finite:
-            c = -self.system.object.radius
-            y, u, mi = u, y, mi[::-1]
+            c = self.system.object.radius
         else:
-            c = self.system.object.angular_radius
-        y[0, 0], u[0, 0] = r*(mi[0, 0] - mi[0, 1]*mi[1, 0]/mi[1, 1]), 0
-        y[0, 1], u[0, 1] = c*mi[0, 1]/mi[1, 1], c
+            c = -tanarcsin(self.system.object.angle)
+            y, u = u, y
+        y[0], u[0] = (0, -c), (r/a, a*c/b)
+        self.n[0] = self.system[0].refractive_index(self.l)
 
     def propagate(self, start=1, stop=None):
         super(ParaxialTrace, self).propagate()
@@ -426,8 +442,9 @@ class ParaxialTrace(Trace):
     def refocus(self):
         self.system.image.distance -= self.y[-1, 0]/self.u[-1, 0]
         self.propagate()
-       
 
+
+@public
 class GaussianTrace(Trace):
     # qi[i] is valid after the ith element perpendicular to/along
     # the excidence direction (assumes aligned()
@@ -459,7 +476,7 @@ class GaussianTrace(Trace):
         # z0 = pi*n*w0**2/lambda
         if l is None:
             l = self.system.wavelengths[0]
-        n = self.system.object.refractive_index(l)
+        n = self.system[0].refractive_index(l)
         if qi is None:
             obj = self.system.object
             assert obj.finite # otherwise need pupil
@@ -690,6 +707,7 @@ class GaussianTrace(Trace):
                             ax.plot(y[:, 2], y[:, axis], cj, **kwargs)
 
 
+@public
 class GeometricTrace(Trace):
     # y[i]: intercept
     # i[i]: incoming/incidence direction
@@ -723,7 +741,7 @@ class GeometricTrace(Trace):
             ux, uy = self.u[0, :, 0], self.u[0, :, 1]
             self.u[0, :, 2] = np.sqrt(1 - ux**2 - uy**2)
         self.i[0] = self.u[0]
-        self.n[0] = self.system.object.refractive_index(l)
+        self.n[0] = self.system[0].refractive_index(l)
         self.t[0] = 0
 
     def propagate(self, start=1, stop=None, clip=False):
@@ -1053,11 +1071,11 @@ class GeometricTrace(Trace):
         e[(1, 2), :, (1, 0)] = eps # meridional, sagittal
         if self.system.object.finite:
             y = np.tile(y, (3, 1))
-            u = (u + e*pupil_height).reshape(-1, 3)
+            ph = sinarctan(pupil_height/pupil_distance)
+            u = (u + e*ph).reshape(-1, 3)
             u /= np.sqrt(np.square(u).sum(1))[:, None]
         else:
-            yr = self.system.object.height(pupil_distance)
-            y = (y + e*yr).reshape(-1, 3)
+            y = (y + e*pupil_height).reshape(-1, 3)
             u = np.tile(u, (3, 1))
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
@@ -1111,4 +1129,6 @@ class GeometricTrace(Trace):
         return "\n".join(t)
 
 # alias
-FullTrace = GeometricTrace
+@public
+class FullTrace(GeometricTrace):
+    pass

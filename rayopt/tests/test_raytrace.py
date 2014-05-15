@@ -27,47 +27,46 @@ import numpy as np
 from numpy import testing as nptest
 
 
-from rayopt import system_from_text, ParaxialTrace, GeometricTrace
+from rayopt import system_from_yaml, ParaxialTrace, GeometricTrace
+from rayopt import system_to_yaml
 
 
 class DemotripCase(unittest.TestCase):
     def setUp(self):
-        description = "oslo cooke triplet example 50mm f/4 20deg"
-        columns = "type roc distance radius material"
-        text = """
-O 0       0     .364 AIR
-S 21.25   5     6.5  SK16
-S -158.65 2     6.5  AIR
-S -20.25  6     5    F4
-S 19.3    1     5    AIR
-A 0       0     4.75 AIR
-S 141.25  6     6.5  SK16
-S -17.285 2     6.5  AIR
-I 0       42.95 .364 AIR
-"""
-        self.s = system_from_text(text, columns.split(),
-            description=description)
+        self.s = system_from_yaml("""
+description: 'oslo cooke triplet example 50mm f/4 20deg'
+object: {angle: .364}
+stop: 5
+elements:
+- {material: air}
+- {roc: 21.25, distance: 5.0, material: SK16, radius: 6.5}
+- {roc: -158.65, distance: 2.0, material: air, radius: 6.5}
+- {roc: -20.25, distance: 6.0, material: F4, radius: 5.0}
+- {roc: 19.3, distance: 1.0, material: air, radius: 5.0}
+- {material: basic/air, radius: 4.75}
+- {roc: 141.25, distance: 6.0, material: SK16, radius: 6.5}
+- {roc: -17.285, distance: 2.0, material: air, radius: 6.5}
+- {distance: 42.95, radius: 0.364}
+""")
+        print(system_to_yaml(self.s))
 
     def test_from_text(self):
-        self.assertEqual(len(self.s), 9)
-        self.assertFalse(self.s[0].finite)
+        self.assertFalse(self.s.object.finite)
         for i, el in enumerate(self.s):
-            self.assertGreater(el.radius, 0)
-            if i not in (0, 5):
+            if i not in (0,):
+                self.assertGreater(el.radius, 0)
+            if i not in (0, self.s.stop):
                 self.assertGreater(el.distance, 0)
-            if i not in (0, 5, 8):
+            if i not in (0, self.s.stop, len(self.s)-1):
                 self.assertGreater(abs(el.curvature), 0)
-            if i not in (5,):
+            if i not in (len(self.s)-1, ):
                 self.assertIsNot(el.material, None)
 
     def test_system(self):
         s = self.s
-        self.assertEqual(len(str(s).splitlines()), 14)
-        o, a, i = s[0], s[5], s[-1]
-        self.assertIs(s.object, o)
-        self.assertIs(s.aperture, a)
-        self.assertIs(s.image, i)
-        self.assertEqual(len(self.s), 9)
+        self.assertGreater(len(str(s).splitlines()), 10)
+        self.assertIs(s.aperture, s[s.stop])
+        #self.assertEqual(len(self.s), 9)
 
     def test_reverse(self):
         s = self.s
@@ -110,7 +109,7 @@ I 0       42.95 .364 AIR
         print(z, a)
         z, a = g.aim_pupil(1., z, a)
         print(z, a)
-    
+
     def test_aim_point(self):
         p, g = self.traces()
         g.rays_paraxial_clipping(p)

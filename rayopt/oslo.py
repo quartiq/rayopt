@@ -28,7 +28,7 @@ import numpy as np
 from .utils import sfloat, sint
 from .elements import Spheroid
 from .system import System
-from .material import air, get_material, SellmeierMaterial
+from .material import air, Material, SellmeierMaterial
 
 
 Lens = namedtuple("Lens", "name elements efl radius thickness comment "
@@ -119,7 +119,7 @@ def olc_to_system(dat, glass_map=oslo_glass_map):
             mat = args[0].upper()
             mat = glass_map.get(mat, mat)
             try:
-                mat = get_material(mat)
+                mat = Material.make(mat)
             except KeyError:
                 print("mat not found", cmd, args)
                 mat = air
@@ -167,7 +167,7 @@ def len_to_system(fil):
         elif cmd == "AP":
             e.radius = float(args[0])
         elif cmd == "GLA":
-            e.material = get_material(args[0])
+            e.material = Material.make(args[0])
         elif cmd == "AST":
             e.stop = True
         elif cmd == "RD":

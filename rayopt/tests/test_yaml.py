@@ -33,16 +33,17 @@ class TripletYamlCase(unittest.TestCase):
         text = """
 description: oslo cooke triplet example 50mm f/4 20deg
 wavelengths: [546.1e-9, 486.e-9, 656.e-9]
+object: {angle: .364}
 stop: 4
 elements:
-  - {radius: .364, material: air}
-  - {distance: 5, radius: 6.5, roc: 21.25, material: schott/SK16}
-  - {distance: 2, radius: 6.5, roc: -158.65, material: air}
-  - {distance: 6, radius: 5, roc: -20.25, material: schott/F4}
-  - {distance: 1, radius: 5, roc: 19.3, material: air}
-  - {distance: 6, radius: 6.5, roc: 141.25, material: schott/SK16}
-  - {distance: 2, radius: 6.5, roc: -17.285, material: air}
-  - {distance: 42.95, radius: .364, material: air}
+- {material: air}
+- {distance: 5, radius: 6.5, roc: 21.25, material: schott/SK16}
+- {distance: 2, radius: 6.5, roc: -158.65, material: air}
+- {distance: 6, radius: 5, roc: -20.25, material: schott/F4}
+- {distance: 1, radius: 5, roc: 19.3, material: air}
+- {distance: 6, radius: 6.5, roc: 141.25, material: schott/SK16}
+- {distance: 2, radius: 6.5, roc: -17.285, material: air}
+- {distance: 42.95, radius: .364, material: air}
 """
         self.s = system_from_yaml(text)
     

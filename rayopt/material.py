@@ -21,6 +21,7 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 
 from .utils import simple_cache
+from .name_mixin import NameMixin
 
 
 fraunhofer = dict(   # http://en.wikipedia.org/wiki/Abbe_number
@@ -45,12 +46,46 @@ lambda_d = fraunhofer["d"]
 lambda_C = fraunhofer["C"]
 
 
-class Material(object):
+class Material(NameMixin):
     def __init__(self, name="-", solid=True, mirror=False, catalog=None):
         self.name = name
         self.solid = solid
         self.mirror = mirror
         self.catalog = catalog
+
+    @classmethod
+    def make(cls, name):
+        if name is None:
+            return None
+        if isinstance(name, dict):
+            return super(Material, self).make(name)
+        if isinstance(name, Material):
+            return name
+        if type(name) is float:
+            return ModelMaterial(nd=name)
+        if type(name) is tuple:
+            return ModelMaterial(nd=name[0], vd=name[1])
+        try:
+            return ModelMaterial.from_string(name)
+        except ValueError:
+            pass
+        name = name.lower().split("/")
+        if len(name) == 3:
+            source, catalog, name = name
+        elif len(name) == 2:
+            source = None
+            catalog, name = name
+        else:
+            source, catalog = None, None
+            name, = name
+        if catalog in (None, "basic"):
+            try:
+                return basic[name]
+            except KeyError:
+                pass
+        from .library import Library
+        lib = Library.one()
+        return lib.get("glass", name, catalog)
 
     def __str__(self):
         if self.catalog is not None:
@@ -183,41 +218,11 @@ mirror = Material(name="mirror", catalog="basic",
 basic = dict((m.name, m) for m in (vacuum, air, mirror))
 
 
-def get_material(name):
-    if isinstance(name, Material):
-        return name
-    if type(name) is type(1.):
-        return ModelMaterial(nd=name)
-    if type(name) is tuple:
-        return ModelMaterial(nd=name[0], vd=name[1])
-    try:
-        return ModelMaterial.from_string(name)
-    except ValueError:
-        pass
-    name = name.lower().split("/")
-    if len(name) == 3:
-        source, catalog, name = name
-    elif len(name) == 2:
-        source = None
-        catalog, name = name
-    else:
-        source, catalog = None, None
-        name, = name
-    if catalog in (None, "basic"):
-        try:
-            return basic[name]
-        except KeyError:
-            pass
-    from .library import Library
-    lib = Library.one()
-    return lib.get("glass", name, catalog)
-
-
 class DefaultGlass(object):
     def __getitem__(self, key):
         return self.get(key)
     def get(self, key):
-        return get_material(key)
+        return Material.make(key)
 
 all_materials = DefaultGlass()
 AllGlasses = all_materials

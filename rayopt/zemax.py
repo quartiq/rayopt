@@ -30,7 +30,7 @@ import hashlib
 import numpy as np
 
 from .utils import sfloat, sint
-from .material import get_material, air, SellmeierMaterial
+from .material import Material, air, SellmeierMaterial
 from .elements import Spheroid
 from .system import System
 
@@ -128,10 +128,11 @@ def zmx_to_system(fil):
             args = args.split()
             name = args[0]
             try:
-                e.material = get_material(name)
+                e.material = Material.make(name)
             except KeyError:
                 try:
-                    e.material = get_material(float(args[3]), float(args[4]))
+                    e.material = Material.make((float(args[3]),
+                        float(args[4])))
                 except Exception as e:
                     print("material not found", name, e)
         elif cmd == "DIAM":

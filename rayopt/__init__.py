@@ -20,14 +20,17 @@ from __future__ import print_function, absolute_import, division
 
 from .material import (fraunhofer, ModelMaterial,
     SellmeierMaterial, GasMaterial, mirror, air, vacuum)
-from .elements import Spheroid
-from .system import System
+
+from .elements import *
+from .conjugates import *
+from .system import *
+from .raytrace import *
+
+from .library import Library
+from .analysis import Analysis
+
 from .formats import (system_from_text,
     system_from_yaml, system_to_yaml,
     system_from_json, system_to_json)
 from .oslo import len_to_system
 from .zemax import zmx_to_system
-from .library import Library
-from .raytrace import (GeometricTrace, ParaxialTrace, GaussianTrace,
-    FullTrace)
-from .analysis import Analysis

@@ -25,7 +25,7 @@ import yaml
 
 from .system import System
 from .elements import Spheroid
-from .material import air, get_material
+from .material import air, Material
 
 
 def try_get(line, columns, field, default=None):
@@ -72,7 +72,7 @@ def system_from_array(data,
         if hasattr(el, "material"):
             mat = try_get(line, columns, "material")
             mat = material_map.get(mat, mat)
-            m = get_material(mat)
+            m = Material.make(mat)
             el.material = m
     return s
 

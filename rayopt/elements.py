@@ -21,14 +21,15 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 from scipy.optimize import newton
 
+from .utils import public
 from .transformations import (euler_matrix, euler_from_matrix, 
         rotation_matrix)
 from .name_mixin import NameMixin
 from .aberration_orders import aberration_intrinsic
-from .utils import sinarctan, tanarcsin
-from .material import get_material
+from .material import Material
 
 
+@public
 class TransformMixin(object):
     def __init__(self, distance=0., direction=(0, 0, 1.), angles=(0, 0, 0)):
         self.update(distance, direction, angles)
@@ -166,7 +167,10 @@ class TransformMixin(object):
         return self._do_rotate(self.rot_normal, True, self.rotated, y)
 
 
+@public
 class Element(NameMixin, TransformMixin):
+    _default_type = "spheroid"
+
     def __init__(self, radius=np.inf, diameter=None, **kwargs):
         super(Element, self).__init__(**kwargs)
         if diameter is not None:
@@ -174,10 +178,8 @@ class Element(NameMixin, TransformMixin):
         self.radius = radius
 
     def dict(self):
-        dat = super(Element, self).dict()
-        typ = type(self).__name__.lower()
-        if typ != "spheroid":
-            dat["type"] = typ
+        dat = NameMixin.dict(self)
+        dat.update(TransformMixin.dict(self))
         if np.isfinite(self.radius):
             dat["radius"] = float(self.radius)
         return dat
@@ -241,11 +243,12 @@ class Element(NameMixin, TransformMixin):
         return 0
 
 
+@public
 class Interface(Element):
     def __init__(self, material=None, **kwargs):
         super(Interface, self).__init__(**kwargs)
         if material:
-            material = get_material(material)
+            material = Material.make(material)
         self.material = material
 
     def dict(self):
@@ -342,63 +345,9 @@ class Interface(Element):
         xyz[:, 2] = -self.surface_sag(xyz)
         return xyz
 
-    def aim(self, yo, yp, z, a):
-        # yo 2d fractional object coordinate (object knows meaning)
-        # yp 2d fractional angular pupil coordinate (since object points
-        # emit into solid angles)
-        # z pupil distance from object apex (also infinite object)
-        # a pupil aperture (also for infinite object, then from z=0)
-        yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
-        n = yo.shape[0]
-        uz = np.array((0, 0, z))
-        if self.finite:
-            # do not take yo as angular fractional as self.radius is
-            # not angular eigher. This does become problematic if object
-            # is finite and hyperhemispherical. But we want to solve
-            # that issue for Spheroids generically.
-            y = np.zeros((n, 3))
-            y[:, :2] = -yo*self.radius
-            y[:, 2] = self.surface_sag(y)
-            u = uz - y
-        else:
-            # lambert azimuthal equal area
-            # planar coords
-            yo = yo*2*np.sin(self.angular_radius/2)
-            yo2 = np.square(yo).sum(1)
-            u = np.empty((n, 3))
-            u[:, :2] = yo*np.sqrt(1 - yo2[:, None]/4)
-            u[:, 2] = 1 - yo2/2
-            y = uz - z*u # have rays start on sphere around pupil center
-        if z < 0:
-            u *= -1
-        usag = np.cross(u, uz)
-        usagn = np.sqrt(np.square(usag).sum(1))[:, None]
-        usag = np.where(usagn == 0, (1., 0, 0), usag)
-        usagn = np.where(usagn == 0, 1., usagn)
-        usag /= usagn
-        umer = np.cross(u, usag)
-        umer /= np.sqrt(np.square(umer).sum(1))[:, None]
-        # umer /= np.sqrt(np.square(umer).sum(1)) by construction
-        # lambert azimuthal equal area
-        # yp is relative planar X and Y pupil coords
-        #yp = yp*np.tan(a)*z
-        yp = yp*2*np.sin(a/2)
-        yp2 = np.square(yp).sum(1)[:, None]
-        # unit vector to pupil point from (0, 0, 0)
-        #up = np.empty((n, 3))
-        #up[:, :2] = np.sqrt(1 - yp2/4)*yp
-        #up[:, 2] = 1 - yp2/2
-        yp *= np.sqrt(1 - yp2/4)/(1 - yp2/2)*z
-        yp = usag*yp[:, 0, None] + umer*yp[:, 1, None]
-        if self.finite:
-            u += yp
-            u /= np.sqrt(np.square(u).sum(1))[:, None]
-        else:
-            y += yp
-            # u is normalized
-        return y, u
 
-
+@public
+@Element.register
 class Spheroid(Interface):
     def __init__(self, curvature=0., conic=1., aspherics=None, roc=None,
             **kwargs):
@@ -410,7 +359,7 @@ class Spheroid(Interface):
         if aspherics is not None:
             aspherics = list(aspherics)
         self.aspherics = aspherics
-        if self.curvature and self.radius < np.inf:
+        if self.curvature and np.isfinite(self.radius):
             assert self.radius**2 <= 1/(self.conic*self.curvature**2)
 
     def dict(self):
@@ -536,30 +485,21 @@ class Spheroid(Interface):
         return a
 
 
-class FastSpheroid(Spheroid):
-    def propagate(self, y0, u0, n0, l, clip=True):
-        m = y0.shape[0]
-        y = np.empty((m, 3))
-        u = np.empty((m, 3))
-        t = np.empty((m,))
-        n = fast_propagate(self, y0, u0, n0, l, clip, y, u, t)
-        return y, u, n, t
-
-
 try:
     # the numba version is three times faster for nrays=3 but ten times
     # slower for nrays=1000...
     raise ImportError
     from .numba_elements import fast_propagate
-    class Spheroid(FastSpheroid):
-        pass
+    _Spheroid = Spheroid
+    @public
+    @Element.register
+    class Spheroid(_Spheroid):
+        def propagate(self, y0, u0, n0, l, clip=True):
+            m = y0.shape[0]
+            y = np.empty((m, 3))
+            u = np.empty((m, 3))
+            t = np.empty((m,))
+            n = fast_propagate(self, y0, u0, n0, l, clip, y, u, t)
+            return y, u, n, t
 except ImportError:
     pass
-
-element_map = {}
-
-def get_element(element):
-    if isinstance(element, tuple(element_map.values())):
-        return element
-    type = element.pop("type", None)
-    return element_map.get(type, Spheroid)(**element)

@@ -23,67 +23,52 @@ import warnings
 import numpy as np
 from scipy import optimize
 
-from .elements import get_element
+from .elements import Element
+from .conjugates import Conjugate, FiniteConjugate, InfiniteConjugate
 from .material import fraunhofer
+from .utils import public
 
 
-    # aperture: radius, object na, slope, image na, working fno
-    # field: object angle, object radius, image radius
-    # conjugate: object distance, image distance, magnification
-
-class Conjugate(object):
-    def __init__(self, pupil_radius=None, pupil_distance=None,
-            na=None, f_number**kwargs):
-        self.update(dict(aperture_r=None, object_na=None,
-            image_na=None, f_number=None,
-            object_a=None, object_r=None, object_d=None, object_n=1.,
-            image_a=None, image_r=None, image_d=None, image_n=1.,
-            magnification=None))
-        self.config(**kwargs)
-
-    def dict(self):
-        return self
-
-    def config(self, **kwargs):
-        self.update(kwargs)
-        if "object_r" in kwargs:
-            self["object_na"] = 
-        if "aperture_radius" in kwargs:
-            self["object_na"] = (self["object_n"]*
-                    self["aperture_r"]/self["object_d"])
-            self["image_na"] = (self["image_n"]*
-                    self["aperture_r"]/
-
-
+@public
 class System(list):
     def __init__(self, elements=None,
-            description="", scale=1e-3, stop=1,
-            wavelengths=None,
-            finite=False, fields=None,
-            pupil=None, pupil_distance=None,
+            description="", scale=1e-3, wavelengths=None,
+            stop=None, object=None, image=None,
             pickups=None, validators=None, solves=None):
-        elements = map(get_element, elements or [])
+        elements = map(Element.make, elements or [])
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
-        self.stop = stop
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
+        self.stop = stop
+        if object:
+            self.object = Conjugate.make(object)
+        else:
+            self.object = InfiniteConjugate(angle=0.)
+        if image:
+            self.image = Conjugate.make(image)
+        else:
+            self.image = FiniteConjugate(radius=0.)
         self.pickups = pickups or []
         self.validators = validators or []
         self.solves = solves or []
-        self.config = Configuration(self, **config)
+        self.update()
 
     def dict(self):
         dat = {}
         # dat["type"] = "system"
         if self.description:
             dat["description"] = self.description
-        if self.stop != 1:
+        if self.stop is not None:
             dat["stop"] = self.stop
-        if self.wavelengths:
-            dat["wavelengths"] = [float(w) for w in self.wavelengths]
         if self.scale != 1e-3:
             dat["scale"] = float(self.scale)
+        if self.wavelengths:
+            dat["wavelengths"] = [float(w) for w in self.wavelengths]
+        if self.object:
+            dat["object"] = self.object.dict()
+        if self.image:
+            dat["image"] = self.image.dict()
         if self.pickups:
             dat["pickups"] = [dict(p) for p in self.pickups]
         if self.validators:
@@ -93,10 +78,6 @@ class System(list):
         if self:
             dat["elements"] = [e.dict() for e in self]
         return dat
-
-    @property
-    def object(self):
-        return self[0]
 
     @property
     def aperture(self):
@@ -110,10 +91,6 @@ class System(list):
     def aperture_index(self):
         warnings.warn("use system.stop", DeprecationWarning)
         return self.stop
-
-    @property
-    def image(self):
-        return self[-1]
 
     def groups(self):
         """yield lists of element indices that form lens "elements"
@@ -211,8 +188,16 @@ class System(list):
     def update(self):
         self.solve()
         self.pickup()
+        self.object.refractive_index = \
+                self[0].refractive_index(self.wavelengths[0])
+        self.object.entrance_distance = self[1].distance
+        self.object.entrance_radius = self[1].radius
+        self.image.refractive_index = \
+                self[-2].refractive_index(self.wavelengths[0])
+        self.image.entrance_distance = self[-1].distance
+        self.image.entrance_radius = self[-2].radius
 
-    def validate(self):
+    def validate(self, fix=False):
         for validator in self.validators:
             value = None
             if "get" in validator:
@@ -224,31 +209,38 @@ class System(list):
             if "minimum" in validator:
                 v = validator["minimum"]
                 if value < v:
-                    raise ValueError("%s < %s (%s)" % (value, v, validator))
+                    if fix and "get" in validator:
+                        self.set_path(validator["get"], v)
+                    else:
+                        raise ValueError("%s < %s (%s)" % (value, v, validator))
             if "maximum" in validator:
                 v = validator["maximum"]
                 if value > v:
-                    raise ValueError("%s > %s (%s)" % (value, v, validator))
+                    if fix and "get" in validator:
+                        self.set_path(validator["get"], v)
+                    else:
+                        raise ValueError("%s > %s (%s)" % (value, v, validator))
             if "equality" in validator:
                 v = validator["equality"]
                 if value != v:
-                    raise ValueError("%s != %s (%s)" % (value, v, validator))
+                    if fix and "get" in validator:
+                        self.set_path(validator["get"], v)
+                    else:
+                        raise ValueError("%s != %s (%s)" % (value, v, validator))
 
     def reverse(self):
-        # reverse surface order
-        self[:] = self[::-1]
-        for e in self:
+        # i-1|material_i-1,distance_i|i|material_i,distance_i+1|i+1
+        # ->
+        # i-1|material_i,distance_i-1|i|material_i+1,distance_i|i+1
+        # 
+        d = [e.distance for e in self] + [0.]
+        m = [None] + [getattr(e, "material", None) for e in self]
+        for i, e in enumerate(self):
             e.reverse()
-        # shift distances forwards
-        d = 0.
-        for e in self:
-            d, e.distance = e.distance, d
-        # shift materials backwards
-        m = self[0].material
-        for e in self[::-1]:
-            if hasattr(e, "material"):
-                # material is old preceeding material
-                m, e.material = e.material, m
+            e.distance = d[i + 1]
+            e.material = m[i]
+        self.object, self.image = self.image, self.object
+        self[:] = reversed(self)
 
     def rescale(self, scale=None):
         if scale is None:
@@ -256,6 +248,8 @@ class System(list):
         self.scale /= scale
         for e in self:
             e.rescale(scale)
+        self.object.rescale(scale)
+        self.image.rescale(scale)
 
     def __str__(self):
         return "\n".join(self.text())
@@ -265,6 +259,12 @@ class System(list):
         yield u"Scale: %s mm" % (self.scale/1e-3)
         yield u"Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.wavelengths)
+        yield u"Object:"
+        for line in self.object.text():
+            yield u" " + line
+        yield u"Image:"
+        for line in self.image.text():
+            yield u" " + line
         yield u"Elements:"
         yield u"%2s %1s %10s %10s %10s %17s %7s %7s %7s" % (
                 "#", "T", "Distance", "Rad Curv", "Diameter",
@@ -281,7 +281,7 @@ class System(list):
             else:
                 n = nd
             yield u"%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
-                    i, e.typ, e.distance, roc, rad*2, mat, n, nd, vd)
+                    i, e.typeletter, e.distance, roc, rad*2, mat, n, nd, vd)
 
     def edge_thickness(self, axis=1):
         """list of the edge thicknesses"""
