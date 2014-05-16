@@ -26,7 +26,7 @@ from scipy.optimize import newton
 from .elements import Element
 from .conjugates import Conjugate, FiniteConjugate, InfiniteConjugate
 from .material import fraunhofer
-from .utils import public, tanarcsin, sinarctan, simple_cache
+from .utils import public, simple_cache
 
 
 @public
@@ -52,6 +52,7 @@ class System(list):
         self.pickups = pickups or []
         self.validators = validators or []
         self.solves = solves or []
+        self._pupil_cache = {}
         self.update()
 
     def dict(self):
@@ -196,6 +197,7 @@ class System(list):
                 self[-2].refractive_index(self.wavelengths[0])
         self.image.entrance_distance = self[-1].distance
         self.image.entrance_radius = self[-2].radius
+        self._pupil_cache.clear()
 
     def validate(self, fix=False):
         for validator in self.validators:
@@ -444,6 +446,10 @@ class System(list):
         # find first, then minimize
         # return apparent z and a
 
+        # TODO: should only look at total (1d) height yo and determine
+        # sagittal and meridional stop size or position:
+        # (h, stop) -> (z, sag, mer)
+
         if l is None:
             l = self.wavelengths[0]
         y, u = self.object.aim(yo, yp, z, p)
@@ -499,4 +505,11 @@ class System(list):
         a, f = find_start(distance)
         if abs(f - target) > tol:
             a = newton(distance, a, tol=tol, maxiter=maxiter)
+        res = vary(a)
+        h = np.sqrt(np.square(yo).sum())
+        dat = self._pupil_cache.setdefault((h, stop), [z, p, p])
+        if np.allclose(yp, 0):
+            dat[0] = res
+        else:
+            dat[1 + axis] = res
         return vary(a)
