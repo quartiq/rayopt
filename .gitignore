@@ -28,3 +28,4 @@
 *.pyo
 *.pyc
 /rayopt/library.db
+/catalog

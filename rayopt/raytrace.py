@@ -440,7 +440,7 @@ class ParaxialTrace(Trace):
         self.propagate()
 
     def refocus(self):
-        self.system.image.distance -= self.y[-1, 0]/self.u[-1, 0]
+        self.system[-1].distance -= self.y[-1, 0]/self.u[-1, 0]
         self.propagate()
 
 
@@ -766,7 +766,7 @@ class GeometricTrace(Trace):
         y, u = (y - y.mean(0)).ravel(), (u - u.mean(0)).ravel()
         # solution of sum((y+tu-sum(y+tu)/n)**2) == min
         t = -np.dot(y, u)/np.dot(u, u)
-        self.system.image.distance += t
+        self.system[-1].distance += t
         self.propagate()
 
     def opd(self, chief=0, radius=None, after=-2, image=-1, resample=4):
@@ -809,7 +809,7 @@ class GeometricTrace(Trace):
         return x, y, t
 
     def psf(self, chief=0, pad=4, resample=4, **kwargs):
-        radius = self.system.image.distance
+        radius = self.system[-1].distance
         x, y, o = self.opd(chief, resample=resample, radius=radius,
                 **kwargs)
         good = np.isfinite(o)
