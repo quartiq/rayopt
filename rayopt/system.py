@@ -21,12 +21,12 @@ from __future__ import print_function, absolute_import, division
 import warnings
 
 import numpy as np
-from scipy import optimize
+from scipy.optimize import newton
 
 from .elements import Element
 from .conjugates import Conjugate, FiniteConjugate, InfiniteConjugate
 from .material import fraunhofer
-from .utils import public
+from .utils import public, tanarcsin, sinarctan, simple_cache
 
 
 @public
@@ -179,7 +179,7 @@ class System(list):
                 setter(x)
                 self.pickup()
                 return target - getter()
-            x = optimize.newton(func, init, tol=solve.get("tol", 1e-8),
+            x = newton(func, init, tol=solve.get("tol", 1e-8),
                     maxiter=solve.get("maxiter", 20))
             func(x)
             if "init_current" in solve:
@@ -423,3 +423,80 @@ class System(list):
             y, u, n, t = e.propagate(y, i, n, l, clip)
             yield y, u, n, i, t
             y, u = e.from_normal(y, u)
+
+    def aim(self, yo, yp, z, p, l=None, axis=1, stop=None,
+            tol=1e-3, maxiter=100):
+        """aims ray at aperture center (or target)
+        changing angle (in case of finite object) or
+        position in case of infinite object"""
+        # yo 2d fractional object coordinate (object knows meaning)
+        # yp 2d fractional angular pupil coordinate (since object points
+        # emit into solid angles)
+        # z pupil distance from object apex
+        # a pupil angular half aperture (from z=0 even in infinite case)
+
+        # get necessary y for finite object and u for infinite
+        # get guess u0/y0
+        # setup vary functions that change u/y (angle around u0 and pos
+        # ortho to u)
+        # setup distance function that measures distance to aperture
+        # point or max(yi/target - radii) (if stop==-1)
+        # find first, then minimize
+        # return apparent z and a
+
+        if l is None:
+            l = self.wavelengths[0]
+        y, u = self.object.aim(yo, yp, z, p)
+        n = self[0].refractive_index(l)
+
+        if np.allclose(yp, 0):
+            # aim chief and determine pupil distance
+            def vary(a):
+                z1 = z*a
+                y[0], u[0] = self.object.aim(yo, yp, z1, p)
+                return z1
+        else:
+            # aim marginal and determine pupil aperture
+            p1 = np.array(p) # copies
+            def vary(a):
+                p1[axis] = p[axis]*a
+                y[0], u[0] = self.object.aim(yo, yp, z, p1)
+                return p1[axis]
+
+        if stop is -1:
+            # return clipping ray
+            radii = np.array([e.radius for e in self[1:-1]])
+            target = np.sign(yp[axis])
+            @simple_cache
+            def distance(a):
+                vary(a)
+                ys = [yunit[0][0, axis]/target for yunit in self.propagate(
+                    y, u, n, l, clip=False, stop=-1)]
+                return max(ys - radii)
+        else:
+            # return pupil ray
+            if stop is None:
+                stop = self.stop
+            target = yp[axis]*self[stop].radius
+            @simple_cache
+            def distance(a):
+                vary(a)
+                res = [yunit[0] for yunit in self.propagate(
+                    y, u, n, l, stop=stop + 1, clip=False)][-1][0, axis]
+                return res - target
+
+        def find_start(fun, a0=1.):
+            f0 = fun(a0)
+            if not np.isnan(f0):
+                return a0, f0
+            for scale in np.logspace(-1, 2, 16):
+                for ai in -scale, scale:
+                    fi = fun(a0 + ai)
+                    if not np.isnan(fi):
+                        return a0 + ai, fi
+            raise RuntimeError("no starting ray found")
+
+        a, f = find_start(distance)
+        if abs(f - target) > tol:
+            a = newton(distance, a, tol=tol, maxiter=maxiter)
+        return vary(a)

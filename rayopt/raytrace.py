@@ -26,12 +26,11 @@ from __future__ import print_function, absolute_import, division
 import itertools
 
 import numpy as np
-from scipy.optimize import newton
 from scipy.interpolate import griddata
 
 from .aberration_orders import aberration_extrinsic
 from .elements import Spheroid
-from .utils import sinarctan, tanarcsin, simple_cache, public
+from .utils import sinarctan, tanarcsin, public
 from .transformations import rotation_matrix
 
 
@@ -835,95 +834,6 @@ class GeometricTrace(Trace):
         self.rays_given(y, u)
         self.propagate(clip=False)
 
-    def aim(self, yo, yp, z, p, l=None, axis=1, stop=None,
-            tol=1e-3, maxiter=100):
-        """aims ray at aperture center (or target)
-        changing angle (in case of finite object) or
-        position in case of infinite object"""
-        # yo 2d fractional object coordinate (object knows meaning)
-        # yp 2d fractional angular pupil coordinate (since object points
-        # emit into solid angles)
-        # z pupil distance from object apex
-        # a pupil angular half aperture (from z=0 even in infinite case)
-
-        # get necessary y for finite object and u for infinite
-        # get guess u0/y0
-        # setup vary functions that change u/y (angle around u0 and pos
-        # ortho to u)
-        # setup distance function that measures distance to aperture
-        # point or max(yi/target - radii) (if stop==-1)
-        # find first, then minimize
-        # return apparent z and a
-
-        y, u = self.system.object.aim(yo, yp, z, p)
-        self.rays_given(y, u, l)
-
-        if np.allclose(yp, 0):
-            # aim chief and determine pupil distance
-            def vary(a):
-                z1 = z*a
-                y, u = self.system.object.aim(yo, yp, z1, p)
-                self.y[0, 0] = y
-                self.u[0, 0] = u
-                return z1
-        else:
-            # aim marginal and determine pupil aperture
-            p1 = np.array(p) # copies
-            def vary(a):
-                p1[axis] = p[axis]*a
-                y, u = self.system.object.aim(yo, yp, z, p1)
-                self.y[0, 0] = y
-                self.u[0, 0] = u
-                return p1[axis]
-
-        if stop is -1:
-            # return clipping ray
-            radii = np.array([e.radius for e in self.system[1:-1]])
-            target = np.sign(yp[axis])
-            @simple_cache
-            def distance(a):
-                vary(a)
-                self.propagate(clip=False)
-                res = self.y[1:-1, 0, axis]
-                return max(res*target - radii)
-        else:
-            # return pupil ray
-            if stop is None:
-                stop = self.system.stop
-            target = yp[axis]*self.system[stop].radius
-            @simple_cache
-            def distance(a):
-                vary(a)
-                self.propagate(stop=stop + 1, clip=False)
-                res = self.y[stop, 0, axis]
-                return res - target
-
-        def find_start(fun, a0=1.):
-            f0 = fun(a0)
-            if not np.isnan(f0):
-                return a0, f0
-            for scale in np.logspace(-1, 2, 16):
-                for ai in -scale, scale:
-                    fi = fun(a0 + ai)
-                    if not np.isnan(fi):
-                        return a0 + ai, fi
-            raise RuntimeError("no starting ray found")
-
-        a, f = find_start(distance)
-        if abs(f - target) > tol:
-            a = newton(distance, a, tol=tol, maxiter=maxiter)
-        return vary(a)
-
-    def pupil_distance(self, y, u, axis=1):
-        # given real (non-axial) chief ray
-        return -y[axis]/tanarcsin(u)[axis]
-
-    def pupil_height(self, y, u, d, axis=1):
-        # given real marginal ray
-        h = y[axis] + tanarcsin(u)[axis]*d
-        h = h*np.cos(np.arcsin(u[axis]))
-        return h
-
     def aim_pupil(self, height, pupil_distance, pupil_height,
             l=None, axis=(0, 1), **kwargs):
         yo = (0, height)
@@ -932,10 +842,10 @@ class GeometricTrace(Trace):
         if height:
             # can only determine pupil distance if chief is non-axial
             yp = (0, 0.)
-            pd = self.aim(yo, yp, pd, ph, l, axis=1)
+            pd = self.system.aim(yo, yp, pd, ph, l, axis=1)
         for ax in axis:
             yp = [(1., 0), (0, 1.)][ax]
-            ph[ax] = self.aim(yo, yp, pd, ph, l, axis=ax)
+            ph[ax] = self.system.aim(yo, yp, pd, ph, l, axis=ax)
         return pd, ph
 
     @staticmethod
@@ -1010,7 +920,7 @@ class GeometricTrace(Trace):
         pd = pupil_distance
         ph = np.ones(2)*pupil_height
         try:
-            pd = self.aim(yo, (0, 0), pd, ph, wavelength, axis=1, **kwargs)
+            pd = self.system.aim(yo, (0, 0), pd, ph, wavelength, axis=1, **kwargs)
         except RuntimeError as e:
             print("chief aim failed", height, e)
         y, u = self.system.object.aim(yo, (0, 0), pd, ph)
@@ -1019,7 +929,7 @@ class GeometricTrace(Trace):
             yp = [0, 0]
             yp[axis] = t
             try:
-                ph[axis] = self.aim(yo, yp, pd, ph, wavelength, axis=axis, stop=-1)
+                ph[axis] = self.system.aim(yo, yp, pd, ph, wavelength, axis=axis, stop=-1)
             except RuntimeError as e:
                 print("clipping aim failed", height, t, e)
             y, u = self.system.object.aim(yo, yp, pd, ph)
@@ -1055,10 +965,10 @@ class GeometricTrace(Trace):
         if aim:
             for i in range(yi.shape[0]):
                 try:
-                    pdi = self.aim(yi[i], (0, 0), pupil_distance,
+                    pdi = self.system.aim(yi[i], (0, 0), pupil_distance,
                             pupil_height, wavelength, axis=1)
-                    y[i] = self.y[0, 0]
-                    u[i] = self.u[0, 0]
+                    y[i], u[i] = self.system.object.aim(yi[i], (0, 0),
+                            pdi, pupil_height)
                 except RuntimeError:
                     print("chief aim failed", i)
         e = np.zeros((3, 1, 3)) # pupil
