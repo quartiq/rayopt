@@ -25,7 +25,7 @@ import unittest
 import numpy as np
 from numpy import testing as nptest
 
-from rayopt.utils import sinarctan, tanarcsin
+from rayopt.utils import *
 
 
 class MiscCase(unittest.TestCase):
@@ -39,3 +39,14 @@ class MiscCase(unittest.TestCase):
         for j in 2., 1e3:
             for i in -j, j:
                 self.assertAlmostEqual(tanarcsin(sinarctan(i)), i)
+
+    def test_gauss(self):
+        r, p, w = gaussian_roots(4)
+        nptest.assert_allclose(r,
+                np.array([.2635, .5745, .8185, .9647])[:, None],
+                atol=1e-4)
+        nptest.assert_allclose(p,
+                (np.arange(4)[None, :] + 1)*np.pi/5)
+        nptest.assert_allclose(w,
+                np.array([.087, .163, .163, .087])[:, None],
+                atol=1e-4)

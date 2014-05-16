@@ -135,6 +135,17 @@ class Conjugate(NameMixin):
         return y, u
 
 
+def sagittal_meridional(u, z):
+    z = np.array((0., 0., z))
+    s = np.cross(u, z)
+    sn = np.sqrt(np.square(s).sum(1))[..., None]
+    snz = sn == 0.
+    s = np.where(snz, (1., 0, 0), s)/np.where(snz, 1., sn)
+    m = np.cross(u, s)
+    m /= np.sqrt(np.square(m).sum(1))[..., None]
+    return s, m
+
+
 @public
 @Conjugate.register
 class FiniteConjugate(Conjugate):
@@ -204,13 +215,13 @@ class FiniteConjugate(Conjugate):
         if a is None:
             a = self.pupil_radius
         yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
-        yp = z*np.tan(yp*np.arctan2(a, z))
         y = np.zeros((yo.shape[0], 3))
         y[..., :2] = -yo*self.radius
         if surface:
             y[..., 2] = -surface.surface_sag(y)
         u = (0, 0, z) - y
-        u[..., :2] += yp[..., :2]
+        yp = z*np.tan(yp*np.arctan2(a, z))
+        u[..., :2] += yp
         u /= np.sqrt(np.square(u).sum(1))[..., None]
         if z < 0:
             u *= -1

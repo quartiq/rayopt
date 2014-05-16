@@ -16,8 +16,10 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import numpy as np
 import sys
+
+import numpy as np
+from scipy.special import orthogonal
 
 
 def public(f):
@@ -97,3 +99,24 @@ def sint(a):
         return int(a)
     except ValueError:
         return None
+
+
+@public
+def gaussian_roots(n, m=None):
+    """returns r[n, 1], phi[1, n],  weights[n, 1]
+    gaussian quadrature points (r, phi) with given weights
+    covering the [0, pi] semi-unit-circle.
+    """
+    r, weight = orthogonal.ps_roots(n)
+    m = m or n
+    phi = np.pi/(1 + m)*np.arange(1, m + 1)
+    return r[:, None]**.5, phi[None, :], weight[:, None]/2
+
+
+@public
+def lobatto_roots(n, m=None):
+    raise NotImplementedError
+    m = m or n
+    phi = np.pi/(1 + m)*np.arange(1, m + 1)
+    return r[:, None]**.5, phi[None, :], weight[:, None]/2
+
