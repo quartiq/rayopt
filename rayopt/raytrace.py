@@ -151,12 +151,11 @@ class ParaxialTrace(Trace):
         yu = np.vstack((self.y[init], self.y[init],
             self.u[init], self.u[init])).T
         n = self.n[init]
-        els = self.system[start:stop or self.length]
-        for i, el in enumerate(els):
-            i += start
-            yu, n = el.propagate_paraxial(yu, n, self.l)
-            self.y[i], self.u[i] = np.vsplit(yu[:, self.axis::2].T, 2)
-            self.n[i] = n
+        for j, (yu, n) in enumerate(self.system.propagate_paraxial(
+                yu, n, self.l, start, stop)):
+            j += start
+            self.y[j], self.u[j] = np.vsplit(yu[:, self.axis::2].T, 2)
+            self.n[j] = n
 
     def aberrations(self, start=1, stop=None):
         els = self.system[start:stop or self.length]
@@ -490,11 +489,10 @@ class GaussianTrace(Trace):
         super(GaussianTrace, self).propagate()
         init = start - 1
         qi, n = self.qi[init], self.n[init]
-        els = self.system[start:stop or self.length]
-        for i, el in enumerate(els):
-            i += start
-            qi, n = el.propagate_gaussian(qi, n, self.l)
-            self.qi[i], self.n[i] = qi, n
+        for j, (qi, n) in enumerate(self.system.propagate_gaussian(
+            qi, n, self.l, start, stop)):
+            j += start
+            self.qi[j], self.n[j] = qi, n
 
     def qin_at(self, z=None):
         if z is None:
@@ -747,16 +745,12 @@ class GeometricTrace(Trace):
     def propagate(self, start=1, stop=None, clip=False):
         super(GeometricTrace, self).propagate()
         init = start - 1
-        stop = stop or self.length
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
         y, u = self.system[init].from_normal(y, u)
-        for i, e in enumerate(self.system[start:stop]):
-            i += start
-            y, u = e.to_normal(y - e.offset, u)
-            self.i[i] = u
-            y, u, n, t = e.propagate(y, u, n, l, clip)
-            self.y[i], self.u[i], self.n[i], self.t[i] = y, u, n, t
-            y, u = e.from_normal(y, u)
+        for j, yunit in enumerate(self.system.propagate(
+            y, u, n, l, start, stop, clip)):
+            j += start
+            self.y[j], self.u[j], self.n[j], self.i[j], self.t[j] = yunit
 
     def refocus(self):
         y = self.y[-1, :, :2]

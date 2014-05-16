@@ -403,3 +403,23 @@ class System(list):
     def mirrored(self):
         return np.cumprod([-1 if getattr(getattr(el, "material", None),
             "mirror", False) else 1 for el in self])
+
+    def propagate_paraxial(self, yu, n, l, start=1, stop=None):
+        stop = stop or len(self)
+        for e in self[start:stop]:
+            yu, n = e.propagate_paraxial(yu, n, l)
+            yield yu, n
+
+    def propagate_gaussian(self, q, n, l, start=1, stop=None):
+        stop = stop or len(self)
+        for e in self[start:stop]:
+            qi, n = e.propagate_gaussian(qi, n, l)
+            yield qi, n
+
+    def propagate(self, y, u, n, l, start=1, stop=None, clip=False):
+        stop = stop or len(self)
+        for e in self[start:stop]:
+            y, i = e.to_normal(y - e.offset, u)
+            y, u, n, t = e.propagate(y, i, n, l, clip)
+            yield y, u, n, i, t
+            y, u = e.from_normal(y, u)
