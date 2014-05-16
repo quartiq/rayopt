@@ -1,0 +1,392 @@
+# -*- coding: utf8 -*-
+#
+#   pyrayopt - raytracing for optical imaging systems
+#   Copyright (C) 2012 Robert Jordens <jordens@phys.ethz.ch>
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import print_function, absolute_import, division
+
+import itertools
+
+import numpy as np
+
+from .aberration_orders import aberration_extrinsic
+from .utils import sinarctan, tanarcsin, public
+from .raytrace import Trace
+
+
+@public
+class ParaxialTrace(Trace):
+    # y[i] is ray height after the ith element perpendicular to the
+    # excidence direction (assumes excidence and offset of the
+    # next element coincide: use el.align())
+    # u[i] is tan(u) angle after the ith element: always a slope.
+    # a.k.a. "the paraxial u is tan u"
+    #
+    # calculations assume aplanatic (and not paraxial system
+    # oslo also assumes aplanatic). aplanatic is equivalent to the abbe
+    # sine condition, magnification is equal to optical input ray sine
+    # over optical output sine for all rays:
+    # m = n0 sin u0/ (nk sin uk)
+    def __init__(self, system, aberration_orders=3, axis=1):
+        super(ParaxialTrace, self).__init__(system)
+        self.axis = axis
+        self.allocate(aberration_orders)
+        self.rays()
+        self.propagate()
+        self.aberrations()
+
+    def allocate(self, k):
+        super(ParaxialTrace, self).allocate()
+        l = self.system.wavelengths
+        self.l = l[0]
+        self.lmin = min(l)
+        self.lmax = max(l)
+        n = self.length
+        self.n = np.empty(n)
+        self.y = np.empty((n, 2))
+        self.u = np.empty((n, 2))
+        self.v = np.empty(n)
+        self.c = np.empty((n, 2, 2, k, k, k))
+        self.d = np.empty_like(self.c)
+
+    def __aim(self):
+        ai = self.system.stop
+        m = self.system.paraxial_matrix(self.l, stop=ai + 1)
+        m = m[self.axis::2, self.axis::2]
+        a, b, c, d = m.flat
+        r = self.system[ai].radius
+        self.system.object.pupil_distance = b/a
+        self.system.object.pupil_radius = r/b
+
+    def __rays(self):
+        y, u = self.y, self.u
+        ai = self.system.stop
+        y, u = self.system.object.aim([0, 0], [], )
+        self.y[0] = 0
+        self.n[0] = self.system[0].refractive_index(self.l)
+
+    def rays(self):
+        y, u = self.y, self.u
+        ai = self.system.stop
+        m = self.system.paraxial_matrix(self.l, stop=ai + 1)
+        a, b, c, d = m[self.axis::2, self.axis::2].flat
+        #mi = np.linalg.inv(m)
+        r = self.system[ai].radius
+        if self.system.object.finite:
+            c = self.system.object.radius
+        else:
+            c = -tanarcsin(self.system.object.angle)
+            y, u = u, y
+        y[0], u[0] = (0, -c), (r/a, a*c/b)
+        self.n[0] = self.system[0].refractive_index(self.l)
+
+    def propagate(self, start=1, stop=None):
+        super(ParaxialTrace, self).propagate()
+        init = start - 1
+        # FIXME not really round for gen astig...
+        yu = np.vstack((self.y[init], self.y[init],
+            self.u[init], self.u[init])).T
+        n = self.n[init]
+        for j, (yu, n) in enumerate(self.system.propagate_paraxial(
+                yu, n, self.l, start, stop)):
+            j += start
+            self.y[j], self.u[j] = np.vsplit(yu[:, self.axis::2].T, 2)
+            self.n[j] = n
+
+    def aberrations(self, start=1, stop=None):
+        els = self.system[start:stop or self.length]
+        self.c[start - 1] = self.v[start - 1] = 0
+        for i, el in enumerate(els):
+            i += start
+            self.v[i] = el.dispersion(self.lmin, self.lmax)
+            self.c[i] = el.aberration(self.y[i], self.u[i - 1],
+                    self.n[i - 1], self.n[i], self.c.shape[-1])
+        self.extrinsic_aberrations()
+
+    def extrinsic_aberrations(self):
+        # FIXME: wrong
+        self.d[:] = 0
+        st = self.system.stop
+        t, s = 0, 1
+        kmax = self.d.shape[-1]
+        r = np.empty_like(self.d)
+        for k in range(1, kmax - 1):
+            for j in range(k + 1):
+                for i in range(k - j + 1):
+                    b = (self.c[:, :, :, k - j - i, j, i]
+                       + self.d[:, :, :, k - j - i, j, i])
+                    b[st-1::-1, s] = -np.cumsum(b[st:0:-1, s], axis=0)
+                    b[st+1:, s] = np.cumsum(b[st:-1, s], axis=0)
+                    b[st, s] = 0
+                    b[1:, t] = np.cumsum(b[:-1, t], axis=0)
+                    r[:, t, :, k - j - i, j, i] = b[:, t]
+                    r[:, s, :, k - j - i, j, i] = b[:, s]
+            for i in range(1, self.length):
+                aberration_extrinsic(self.c[i], r[i], self.d[i], k + 1)
+
+    @property
+    def seidel3(self):
+        c = self.c
+        c = np.array([
+                -2*c[:, 0, 1, 1, 0, 0], # SA3
+                -c[:, 0, 1, 0, 1, 0], # CMA3
+                -c[:, 0, 0, 0, 1, 0], # AST3
+                c[:, 0, 0, 0, 1, 0] - 2*c[:, 0, 1, 0, 0, 1], # PTZ3
+                -2*c[:, 0, 0, 0, 0, 1], # DIS3
+                ])
+        # transverse image seidel (like oslo)
+        return c.T*self.height[1]/2/self.lagrange
+
+    @property
+    def seidel5(self):
+        c = self.c + self.d
+        c = np.array([
+                -2*c[:, 0, 1, 2, 0, 0], # MU1
+                -1*c[:, 0, 1, 1, 1, 0], # MU3
+                -2*c[:, 0, 0, 1, 1, 0] - 2*c[:, 0, 1, 1, 0, 1] # MU5
+                    + 2*c[:, 0, 1, 0, 2, 0], # MU6
+                2*c[:, 0, 1, 1, 0, 1], # MU5
+                # -2*c[:, 0, 0, 1, 0, 1]-c[:, 0, 0, 0, 2, 0]
+                # -c[:, 0, 1, 0, 1, 1], # MU7
+                # -c[:, 0, 1, 0, 1, 1]-c[:, 0, 0, 0, 2, 0], # MU8
+                -2*c[:, 0, 0, 1, 0, 1] - 2*c[:, 0, 0, 0, 2, 0]
+                    - 2*c[:, 0, 1, 0, 1, 1], # MU7+MU8
+                -1*c[:, 0, 1, 0, 1, 1], # MU9
+                -c[:, 0, 0, 0, 1, 1]/2, # (MU10-MU11)/4
+                -2*c[:, 0, 1, 0, 0, 2] + c[:, 0, 0, 0, 1, 1]/2,
+                # (5*MU11-MU10)/4
+                # -2*c[:, 0, 0, 0, 1, 1]-2*c[:, 0, 1, 0, 0, 2], # MU10
+                # -2*c[:, 0, 1, 0, 0, 2], # MU11
+                -2*c[:, 0, 0, 0, 0, 2], # MU12
+                ])
+        # transverse image seidel (like oslo)
+        return c.T*self.height[1]/2/self.lagrange
+
+    @property
+    def track(self):
+        """distance from first to last surface"""
+        return self.z[-2] - self.z[1]
+
+    @property
+    def height(self):
+        """object and image ray height"""
+        return self.y[(0, -1), 1]
+        #self.lagrange/(self.n[-2]*self.u[-2,0])
+
+    @property
+    def pupil_distance(self):
+        """pupil location relative to first/last surface"""
+        return -self.y[(1, -2), 1]/self.u[(0, -2), 1]
+
+    @property
+    def pupil_height(self):
+        p = self.pupil_distance
+        return self.y[(1, -2), 0] + p*self.u[(0, -2), 0]
+
+    @property
+    def lagrange(self):
+        return self.n[0]*(self.u[0, 0]*self.y[0, 1]
+                - self.u[0, 1]*self.y[0, 0])
+
+    @property
+    def focal_length(self):
+        """signed distance from principal planes to foci (infinite
+        conjugates), Malacara1989 p27 2.41, 2.42: F-P"""
+        f = self.lagrange/(
+                self.u[0, 1]*self.u[-2, 0] -
+                self.u[0, 0]*self.u[-2, 1])
+        return f/self.n.take((0, -2))*[-1, 1]
+
+    @property
+    def focal_distance(self):
+        """front/back focal distance relative to first/last surface
+        Malacara1989 p27 2.43 2.44, F-V"""
+        c = self.n.take((0, -2))*self.focal_length/self.lagrange
+        fd = (self.y[(1, -2), 1]*self.u[(-2, 0), 0]
+                - self.y[(1, -2), 0]*self.u[(-2, 0), 1])*c
+        return fd
+
+    @property
+    def principal_distance(self):
+        """distance from first/last surface to principal planes
+        Malacara1989: P-V"""
+        return self.focal_distance - self.focal_length
+
+    @property
+    def nodal_distance(self):
+        """nodal points relative to first/last surfaces
+        Malacara1989, N-V"""
+        return self.focal_length[::-1] + self.focal_distance
+
+    @property
+    def numerical_aperture(self):
+        # we plot u as a slope (tanU)
+        # even though it is paraxial (sinu=tanu=u) we must convert here
+        return np.fabs(self.n.take((0, -2))*sinarctan(self.u[(0, -2), 0]))
+
+    @property
+    def f_number(self):
+        return np.fabs(self.focal_length/(2*self.pupil_height))
+
+    @property
+    def working_f_number(self):
+        na = self.numerical_aperture
+        return self.n.take((0, -2))/(2*na)
+
+    @property
+    def airy_radius(self):
+        na = self.numerical_aperture
+        return 1.22*self.l/(2*na)/self.system.scale
+
+    @property
+    def rayleigh_range(self):
+        r = self.airy_radius
+        return np.pi*r**2/self.l*self.system.scale
+
+    @property
+    def magnification(self):
+        mt = (self.n[0]*self.u[0, 0])/(self.n[-2]*self.u[-2, 0])
+        ma = self.u[-2, 1]/self.u[0, 1]
+        return np.array([mt, ma])
+
+    @property
+    def number_of_points(self):
+        """number of resolvable independent diffraction points
+        (assuming no aberrations)"""
+        return 4*self.lagrange**2/self.l**2
+
+    @property
+    def petzval_curvature(self):
+        c = [getattr(el, "curvature", 0) for el in self.system]
+        n = self.n
+        p = c[1:-1]*(n[1:-1] - n[0:-2])/(n[1:-1]*n[0:-2])
+        return p.sum()
+
+    @property
+    def eigenrays(self):
+        e, v = np.linalg.eig(self.system.paraxial_matrix(self.l))
+        return e, v
+
+    def print_c3(self):
+        return self.print_coeffs(self.seidel3,
+                "SA3 CMA3 AST3 PTZ3 DIS3".split())
+
+    def print_h3(self): # TODO
+        c3a = self.aberration3*8 # chromatic
+        return self.print_coeffs(c3a[(6, 12), :].T, 
+                "PLC PTC".split())
+
+    def print_c5(self):
+        return self.print_coeffs(self.seidel5,
+                "SA5 CMA5 TOBSA5 SOBSA5 TECMA5 SECMA5 AST5 PTZ5 DIS5".split())
+
+    def print_params(self):
+        yield "lagrange: %.5g" % self.lagrange
+        yield "track length: %.5g" % self.track
+        yield "object, image height: %s" % self.height
+        yield "front, back focal length: %s" % self.focal_length
+        yield "petzval radius: %.5g" % (1/self.petzval_curvature)
+        yield "front, back focal distance: %s" % self.focal_distance
+        yield "front, back principal distance: %s" % self.principal_distance
+        yield "front, back nodal distance: %s" % self.nodal_distance
+        yield "entry, exit pupil distance: %s" % self.pupil_distance
+        yield "entry, exit pupil height: %s" % self.pupil_height
+        yield "front, back numerical aperture: %s" % self.numerical_aperture
+        yield "front, back f number: %s" % self.f_number
+        yield "front, back working f number: %s" % self.working_f_number
+        yield "front, back airy radius: %s" % self.airy_radius
+        yield "transverse, angular magnification: %s" % self.magnification
+
+    def print_trace(self):
+        c = np.c_[self.z, self.y[:, 0], self.u[:, 0],
+                self.y[:, 1], self.u[:, 1]]
+        return self.print_coeffs(c,
+                "track/axial y/axial u/chief y/chief u".split("/"),
+                sum=False)
+
+    def __str__(self):
+        t = itertools.chain(
+                self.print_params(), ("",),
+                self.print_trace(), ("",),
+                self.print_c3(), ("",),
+                #self.print_h3(), ("",),
+                self.print_c5(), ("",),
+                )
+        return "\n".join(t)
+
+    def plot(self, ax, principals=False, pupils=False, focals=False,
+            nodals=False, **kwargs):
+        kwargs.setdefault("color", "black")
+        # this assumes that the outgoing oa of an element
+        # coincides with the incoming of the next, use align()
+        y = self.y[:, :, None] * np.ones(3)
+        y[:, :, 2] = self.z[:, None]
+        y = self.from_axis(y, range(self.length))
+        ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
+        h = self.system.aperture.radius*1.5
+        for p, flag in [
+                (self.principal_distance, principals),
+                (self.focal_distance, focals),
+                (self.nodal_distance, nodals),
+                ]:
+            if flag:
+                for i, pi, zi in zip((1, -1), p,
+                        (0, self.system[-1].distance)):
+                    y = self.origins[i] + self.system[i].from_axis(
+                            np.array([(h, h, pi-zi), (-h, -h, pi-zi)]))
+                    ax.plot(y[:, 2], y[:, self.axis], **kwargs)
+        if pupils:
+            p = self.pupil_distance
+            h = self.pupil_height
+            for i, hi, pi, zi in zip((1, -1), h, p,
+                    (0, self.system[-1].distance)):
+                y = np.empty((4, 3))
+                y[:, 0] = y[:, 1] = -1.5, 1.5, -1, 1
+                y *= hi
+                y[:, 2] = pi - zi
+                y = self.origins[i] + self.system[i].from_axis(y)
+                y = y.reshape(2, 2, 3)
+                ax.plot(y[:, :, 2], y[:, :, self.axis], **kwargs)
+
+    def plot_yybar(self, ax, **kwargs):
+        kwargs.setdefault("color", "black")
+        ax.plot(self.y[:, 0], self.y[:, 1], **kwargs)
+
+    # TODO
+    # * introduce aperture at argmax(abs(y_axial)/radius)
+    #   or at argmin(abs(u_axial))
+    # * setting any of (obj na, entrance radius, ax slope, image na,
+    # working fno), (field angle, obj height, image height), (obj dist,
+    # img dist, obj pp, img pp, mag) works
+
+    def resize(self):
+        for e, y in zip(self.system[1:], self.y[1:]):
+            e.radius = np.fabs(y).sum() # axial+chief
+
+    def focal_length_solve(self, f, i=None):
+        # TODO only works for last surface
+        if i is None:
+            i = self.length - 2
+        y0, y = self.y[(i-1, i), 0]
+        u0, u = self.u[i-1, 0], -self.y[0, 0]/f
+        n0, n = self.n[(i-1, i), :]
+        c = (n0*u0 - n*u)/(y*(n - n0))
+        self.system[i].curvature = c
+        self.propagate()
+
+    def refocus(self):
+        self.system[-1].distance -= self.y[-1, 0]/self.u[-1, 0]
+        self.propagate()

@@ -25,6 +25,9 @@ from .elements import *
 from .conjugates import *
 from .system import *
 from .raytrace import *
+from .paraxial_trace import *
+from .gaussian_trace import *
+from .geometric_trace import *
 
 from .library import Library
 from .analysis import Analysis

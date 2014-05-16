@@ -23,7 +23,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-from .raytrace import ParaxialTrace, GeometricTrace, GaussianTrace
+from . import ParaxialTrace, GeometricTrace, GaussianTrace
 from .utils import tanarcsin
 from .special_sums import polar_sum
 
