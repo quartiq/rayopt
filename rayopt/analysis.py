@@ -40,7 +40,7 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 
 class Analysis(object):
     figwidth = 12.
-    resize = True
+    resize = False
     align = True
     close = None
     refocus_paraxial = True

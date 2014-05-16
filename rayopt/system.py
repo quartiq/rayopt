@@ -298,6 +298,14 @@ class System(list):
             dz0 = dz
         return t
 
+    @property
+    def edge_y(self):
+        return np.array(self.edge_thickness(axis=1))
+
+    @property
+    def edge_x(self):
+        return np.array(self.edge_thickness(axis=0))
+
     def resize_convex(self):
         """ensure convex surfaces are at least as large as their
         corresponding closing surface, enabling standard manufacturing"""

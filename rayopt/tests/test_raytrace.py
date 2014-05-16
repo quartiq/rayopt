@@ -28,15 +28,13 @@ from numpy import testing as nptest
 
 
 from rayopt import system_from_yaml, ParaxialTrace, GeometricTrace
-from rayopt import system_to_yaml
+from rayopt.utils import tanarcsin, sinarctan
 
 
-class DemotripCase(unittest.TestCase):
-    def setUp(self):
-        self.s = system_from_yaml("""
+cooke = """
 description: 'oslo cooke triplet example 50mm f/4 20deg'
-object: {angle: .364}
-stop: 5
+wavelengths: [587.56e-9, 656.27e-9, 486.13e-9]
+object: {angle: .349}
 elements:
 - {material: air}
 - {roc: 21.25, distance: 5.0, material: SK16, radius: 6.5}
@@ -47,8 +45,25 @@ elements:
 - {roc: 141.25, distance: 6.0, material: SK16, radius: 6.5}
 - {roc: -17.285, distance: 2.0, material: air, radius: 6.5}
 - {distance: 42.95, radius: 0.364}
-""")
-        print(system_to_yaml(self.s))
+stop: 5
+pickups:
+- {get: [1, radius], set: [2, radius]}
+- {get: [3, radius], set: [4, radius]}
+- {get: [6, radius], set: [7, radius]}
+validators:
+- {get: [edge_y, 2], minimum: .5}
+- {get: [2, distance], minimum: .5}
+- {get: [edge_y, 4], minimum: .5}
+- {get: [4, distance], minimum: .5}
+- {get: [edge_y, 7], minimum: .5}
+- {get: [7, distance], minimum: .5}
+"""
+
+
+class DemotripCase(unittest.TestCase):
+    def setUp(self):
+        self.s = system_from_yaml(cooke)
+        self.s.validate()
 
     def test_from_text(self):
         self.assertFalse(self.s.object.finite)
@@ -95,7 +110,15 @@ elements:
     def test_paraxial(self):
         p = ParaxialTrace(self.s)
         print(unicode(p).encode("ascii", errors="replace"))
-        unicode(p)
+        nptest.assert_allclose(p.u[0, 0], 0)
+        nptest.assert_allclose(p.u[0, 1], tanarcsin(self.s.object.angle))
+        nptest.assert_allclose(p.y[self.s.stop, 0],
+                self.s[self.s.stop].radius)
+        nptest.assert_allclose(p.y[self.s.stop, 1], 0, atol=1e-9)
+        nptest.assert_allclose(p.working_f_number[1], 4, rtol=1e-2)
+        nptest.assert_allclose(p.focal_length[1], 50, rtol=1e-3)
+        nptest.assert_allclose(p.magnification[0], 0, rtol=1e-3)
+        nptest.assert_allclose(p.numerical_aperture[1], .124, rtol=1e-3)
 
     def traces(self):
         p = ParaxialTrace(self.s)
@@ -134,7 +157,7 @@ elements:
             nptest.assert_allclose(g.u[0, :, :], g.u[0,
                 (0,)*g.u.shape[1], :])
         nptest.assert_allclose(g.y[i, :3, 1]/self.s[i].radius,
-                [-1, 0, 1], atol=1e-2)
+                [-1, 0, 1], atol=1e-6, rtol=3e-2)
         nptest.assert_allclose(g.y[i, :, 0]/self.s[i].radius,
                 [0, 0, 0, -1, 0, 1], atol=1e-3)
         print(g.y[i, :, :2]/self.s[i].radius)

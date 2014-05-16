@@ -57,7 +57,7 @@ class Trace(object):
                 (u"#", u"T") + tuple(labels))
         fmt = u"%2s %1s" + u"% 10.4g" * len(labels)
         for i, a in enumerate(coeff):
-            yield fmt % ((i, self.system[i].type) + tuple(a))
+            yield fmt % ((i, self.system[i].typeletter) + tuple(a))
         if sum:
             yield fmt % ((u" ∑", u"") + tuple(coeff.sum(0)))
 

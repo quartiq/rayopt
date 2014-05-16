@@ -28,25 +28,16 @@ from numpy import testing as nptest
 
 
 from rayopt import system_from_yaml, Analysis
+from .test_raytrace import cooke
 
 
 class DemotripCase(unittest.TestCase):
     def setUp(self):
-        self.s = system_from_yaml("""
-description: 'oslo cooke triplet example 50mm f/4 20deg'
-object: {angle: .364}
-stop: 5
-elements:
-- {material: air}
-- {roc: 21.25, distance: 5.0, material: SK16, radius: 6.5}
-- {roc: -158.65, distance: 2.0, material: air, radius: 6.5}
-- {roc: -20.25, distance: 6.0, material: F4, radius: 5.0}
-- {roc: 19.3, distance: 1.0, material: air, radius: 5.0}
-- {material: basic/air, radius: 4.75}
-- {roc: 141.25, distance: 6.0, material: SK16, radius: 6.5}
-- {roc: -17.285, distance: 2.0, material: air, radius: 6.5}
-- {distance: 42.95, radius: 0.364}
-""")
+        self.s = system_from_yaml(cooke)
 
     def test_run(self):
         a = Analysis(self.s)
+        #for _ in a.text:
+        #    print(_)
+        #for i, _ in enumerate(a.figures):
+        #    _.savefig("analysis_%i.pdf" % i)

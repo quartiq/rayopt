@@ -79,6 +79,7 @@ class ParaxialTrace(Trace):
         self.n[0] = self.system[0].refractive_index(self.l)
 
     def rays(self):
+        self.n[0] = self.system[0].refractive_index(self.l)
         y, u = self.y, self.u
         ai = self.system.stop
         m = self.system.paraxial_matrix(self.l, stop=ai + 1)
@@ -87,11 +88,10 @@ class ParaxialTrace(Trace):
         r = self.system[ai].radius
         if self.system.object.finite:
             c = self.system.object.radius
+            y[0], u[0] = (0, -c), (r/b, a*c/b)
         else:
-            c = -tanarcsin(self.system.object.angle)
-            y, u = u, y
-        y[0], u[0] = (0, -c), (r/a, a*c/b)
-        self.n[0] = self.system[0].refractive_index(self.l)
+            c = tanarcsin(self.system.object.angle)
+            y[0], u[0] = (r/a, -b*c/a), (0, c)
 
     def propagate(self, start=1, stop=None):
         super(ParaxialTrace, self).propagate()
