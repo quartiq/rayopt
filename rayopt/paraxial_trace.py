@@ -84,7 +84,6 @@ class ParaxialTrace(Trace):
         ai = self.system.stop
         m = self.system.paraxial_matrix(self.l, stop=ai + 1)
         a, b, c, d = m[self.axis::2, self.axis::2].flat
-        #mi = np.linalg.inv(m)
         r = self.system[ai].radius
         if self.system.object.finite:
             c = self.system.object.radius
@@ -374,7 +373,7 @@ class ParaxialTrace(Trace):
 
     def resize(self):
         for e, y in zip(self.system[1:], self.y[1:]):
-            e.radius = np.fabs(y).sum() # axial+chief
+            e.radius = np.fabs(y).sum() # marginal+chief
 
     def focal_length_solve(self, f, i=None):
         # TODO only works for last surface
@@ -390,3 +389,34 @@ class ParaxialTrace(Trace):
     def refocus(self):
         self.system[-1].distance -= self.y[-1, 0]/self.u[-1, 0]
         self.propagate()
+
+    def update_conjugates(self):
+        z = self.pupil_distance
+        z += self.system[1].distance, -self.system[-1].distance
+        a = self.pupil_height
+        print(z, a)
+        self.system.object.pupil_distance = z[0]
+        self.system.object.pupil_radius = a[0]
+        self.system.object.height = self.y[0, 1]
+        self.system[0].radius = self.system.object.height
+        self.system.image.pupil_distance = -z[1]
+        self.system.image.pupil_radius = a[1]
+        self.system.image.height = self.y[-1, 1]
+        self.system[-1].radius = self.system.image.height
+
+    def update_stop(self, end="image"):
+        ai = self.system.stop
+        if end == "image":
+            m = self.system.paraxial_matrix(self.l, start=ai + 1)
+            m = m[self.axis::2, self.axis::2]
+            m = np.linalg.inv(m)
+            y, u = self.system.image.aim((0, 0), (0, -1))
+        elif end == "object":
+            m = self.system.paraxial_matrix(self.l, stop=ai + 1)
+            m = m[self.axis::2, self.axis::2]
+            y, u = self.system.object.aim((0, 0), (0, 1))
+        print(y, u)
+        u = tanarcsin(u)
+        y, u = np.dot((y[0, 1], u[0, 1]), m.T)
+        print(y, u)
+        self.system[ai].radius = y

@@ -47,7 +47,13 @@ class Conjugate(NameMixin):
         self.refractive_index = refractive_index
         self._entrance_distance = entrance_distance
         self.entrance_radius = entrance_radius
-        self.pupil_distance = pupil_distance or entrance_distance
+        self._pupil_distance = pupil_distance
+
+    def dict(self):
+        dat = super(Conjugate, self).dict()
+        if self._pupil_distance is not None:
+            dat["pupil_distance"] = float(self._pupil_distance)
+        return dat
 
     @property
     def entrance_distance(self):
@@ -55,12 +61,25 @@ class Conjugate(NameMixin):
 
     @entrance_distance.setter
     def entrance_distance(self, d):
-        self.pupil_distance += d - self._entrance_distance
+        if self._pupil_distance is not None:
+            self._pupil_distance += d - self._entrance_distance
         self._entrance_distance = d
 
+    @property
+    def pupil_distance(self):
+        if self._pupil_distance is not None:
+            return self._pupil_distance
+        else:
+            return self._entrance_distance
+
+    @pupil_distance.setter
+    def pupil_distance(self, p):
+        self._pupil_distance = p
+
     def rescale(self, scale):
-        self.pupil_distance *= scale
-        self.entrance_distance *= scale
+        if self._pupil_distance is not None:
+            self._pupil_distance *= scale
+        self._entrance_distance *= scale
         self.entrance_radius *= scale
 
     def text(self):
@@ -156,8 +175,7 @@ class FiniteConjugate(Conjugate):
             pupil_radius=None, **kwargs):
         super(FiniteConjugate, self).__init__(**kwargs)
         self.radius = radius
-        if na is not None:
-            self.na = na
+        self._na = na
         if fno is not None:
             self.fno = fno
         if slope is not None:
@@ -169,6 +187,8 @@ class FiniteConjugate(Conjugate):
         dat = super(FiniteConjugate, self).dict()
         if self.radius:
             dat["radius"] = float(self.radius)
+        if self._na is not None:
+            dat["na"] = float(self._na)
         return dat
 
     def rescale(self, scale):
@@ -176,38 +196,48 @@ class FiniteConjugate(Conjugate):
         self.radius *= scale
 
     @property
+    def na(self):
+        if self._na is not None:
+            return self._na
+        else:
+            return self.refractive_index*sinarctan(
+                    self.entrance_radius/self.entrance_distance)
+
+    @na.setter
+    def na(self, na):
+        self._na = na
+
+    @property
     def pupil_radius(self):
-        return self.entrance_radius*(self.pupil_distance/
-                self.entrance_distance)
+        return self.slope*self.pupil_distance
 
     @pupil_radius.setter
     def pupil_radius(self, p):
-        self.entrance_radius = p*(self.entrance_distance/
-                self.pupil_distance)
+        self.slope = p/self.pupil_distance
 
     @property
     def slope(self):
-        return self.entrance_radius/self.entrance_distance
+        return tanarcsin(self.na/self.refractive_index)
 
-    @property
-    def na(self):
-        return self.refractive_index*sinarctan(self.slope)
+    @slope.setter
+    def slope(self, slope):
+        self.na = self.refractive_index*sinarctan(slope)
 
     @property
     def fno(self):
         return 1/(2*self.na)
 
-    @slope.setter
-    def slope(self, slope):
-        self.entrance_radius = slope*self.entrance_distance
-
-    @na.setter
-    def na(self, na):
-        self.slope = tanarcsin(na/self.refractive_index)
-
     @fno.setter
     def fno(self, fno):
         self.na = 1/(2*fno)
+
+    @property
+    def height(self):
+        return self.radius
+
+    @height.setter
+    def height(self, h):
+        self.radius = h
 
     def aim(self, yo, yp, z=None, a=None, surface=None):
         if z is None:
@@ -234,25 +264,40 @@ class InfiniteConjugate(Conjugate):
     _type = "infinite"
     finite = False
 
-    def __init__(self, angle=0., pupil_radius=None, **kwargs):
+    def __init__(self, angle=0., angle_deg=None, pupil_radius=None,
+            **kwargs):
         super(InfiniteConjugate, self).__init__(**kwargs)
+        if angle_deg is not None:
+            angle = np.deg2rad(angle_deg)
         self.angle = angle
-        if pupil_radius is not None:
-            self.pupil_radius = pupil_radius
+        self._pupil_radius = pupil_radius
 
     def dict(self):
         dat = super(InfiniteConjugate, self).dict()
         if self.angle:
-            dat["angle"] = float(self.angle)
+            dat["angle_deg"] = float(np.rad2deg(self.angle))
+        if self._pupil_radius is not None:
+            dat["pupil_radius"] = float(self._pupil_radius)
         return dat
 
     @property
     def pupil_radius(self):
-        return self.entrance_radius
+        if self._pupil_radius is not None:
+            return self._pupil_radius
+        else:
+            return self.entrance_radius
 
     @pupil_radius.setter
     def pupil_radius(self, p):
-        self.entrance_radius = p
+        self._pupil_radius = p
+
+    @property
+    def height(self):
+        return tanarcsin(self.radius)*self.pupil_distance
+
+    @height.setter
+    def height(self, h):
+        self.radius = sinarctan(h/self.pupil_distance)
 
     def aim(self, yo, yp, z=None, a=None, surface=None):
         if z is None:

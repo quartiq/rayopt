@@ -243,6 +243,9 @@ class System(list):
             e.material = m[i]
         self.object, self.image = self.image, self.object
         self[:] = reversed(self)
+        self.pickups = []
+        self.solves = []
+        self.validators = []
 
     def rescale(self, scale=None):
         if scale is None:

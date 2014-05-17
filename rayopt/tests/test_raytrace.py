@@ -27,14 +27,16 @@ import numpy as np
 from numpy import testing as nptest
 
 
-from rayopt import system_from_yaml, ParaxialTrace, GeometricTrace
+from rayopt import (system_from_yaml, ParaxialTrace, GeometricTrace,
+    system_to_yaml)
 from rayopt.utils import tanarcsin, sinarctan
 
 
 cooke = """
 description: 'oslo cooke triplet example 50mm f/4 20deg'
 wavelengths: [587.56e-9, 656.27e-9, 486.13e-9]
-object: {angle: .349}
+object: {angle_deg: 20}
+image: {type: finite, fno: 4.}
 elements:
 - {material: air}
 - {roc: 21.25, distance: 5.0, material: SK16, radius: 6.5}
@@ -109,7 +111,7 @@ class DemotripCase(unittest.TestCase):
 
     def test_paraxial(self):
         p = ParaxialTrace(self.s)
-        print(unicode(p).encode("ascii", errors="replace"))
+        #print(unicode(p).encode("ascii", errors="replace"))
         nptest.assert_allclose(p.u[0, 0], 0)
         nptest.assert_allclose(p.u[0, 1], tanarcsin(self.s.object.angle))
         nptest.assert_allclose(p.y[self.s.stop, 0],
@@ -119,6 +121,21 @@ class DemotripCase(unittest.TestCase):
         nptest.assert_allclose(p.focal_length[1], 50, rtol=1e-3)
         nptest.assert_allclose(p.magnification[0], 0, rtol=1e-3)
         nptest.assert_allclose(p.numerical_aperture[1], .124, rtol=1e-3)
+        p.update_conjugates()
+        self.s.image.na = .125
+        p.update_stop("image")
+        p = ParaxialTrace(self.s)
+        p.update_conjugates()
+        print(system_to_yaml(self.s))
+        print(unicode(p).encode("ascii", errors="replace"))
+
+    def test_reverse_size(self):
+        p = ParaxialTrace(self.s)
+        p.update_conjugates()
+        self.s.reverse()
+        p = ParaxialTrace(self.s)
+        #print(system_to_yaml(self.s))
+        #print(unicode(p).encode("ascii", errors="replace"))
 
     def traces(self):
         p = ParaxialTrace(self.s)
@@ -129,9 +146,9 @@ class DemotripCase(unittest.TestCase):
         p, g = self.traces()
         z = p.pupil_distance[0] + p.z[1]
         a = np.arctan2(p.pupil_height[0], z)
-        print(z, a)
+        #print(z, a)
         z, a = g.aim_pupil(1., z, a)
-        print(z, a)
+        #print(z, a)
 
     def test_aim_point(self):
         p, g = self.traces()
@@ -160,7 +177,7 @@ class DemotripCase(unittest.TestCase):
                 [-1, 0, 1], atol=1e-6, rtol=3e-2)
         nptest.assert_allclose(g.y[i, :, 0]/self.s[i].radius,
                 [0, 0, 0, -1, 0, 1], atol=1e-3)
-        print(g.y[i, :, :2]/self.s[i].radius)
+        #print(g.y[i, :, :2]/self.s[i].radius)
         g.rays_paraxial_line(p)
 
 
