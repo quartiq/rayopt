@@ -187,17 +187,18 @@ class System(list):
                 solve["init"] = float(x)
 
     def update(self):
+        self._pupil_cache.clear()
         self.solve()
         self.pickup()
-        self.object.refractive_index = \
-                self[0].refractive_index(self.wavelengths[0])
-        self.object.entrance_distance = self[1].distance
-        self.object.entrance_radius = self[1].radius
-        self.image.refractive_index = \
-                self[-2].refractive_index(self.wavelengths[0])
-        self.image.entrance_distance = self[-1].distance
-        self.image.entrance_radius = self[-2].radius
-        self._pupil_cache.clear()
+        if self.wavelengths and self:
+            self.object.refractive_index = \
+                    self[0].refractive_index(self.wavelengths[0])
+            self.image.refractive_index = \
+                    self[-2].refractive_index(self.wavelengths[0])
+            self.object.entrance_distance = self[1].distance
+            self.object.entrance_radius = self[1].radius
+            self.image.entrance_distance = self[-1].distance
+            self.image.entrance_radius = self[-2].radius
 
     def validate(self, fix=False):
         for validator in self.validators:
