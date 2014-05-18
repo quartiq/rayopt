@@ -102,6 +102,27 @@ def sint(a):
 
 
 @public
+def normalize_z(u):
+    u[..., 2] = np.sqrt(1 - np.square(u[..., :2]).sum(-1))
+
+
+@public
+def normalize(u):
+    u /= np.sqrt(np.square(u).sum(-1))[..., None]
+
+
+@public
+def sagittal_meridional(u, z):
+    s = np.cross(u, z)
+    axial = np.all(s == 0, axis=-1)[..., None]
+    s = np.where(axial, (1., 0, 0), s)
+    m = np.cross(u, s)
+    normalize(s)
+    normalize(m)
+    return s, m
+
+
+@public
 def pupil_distribution(distribution, nrays):
     # TODO apodization
     """returns nrays in normalized aperture coordinates x/meridional

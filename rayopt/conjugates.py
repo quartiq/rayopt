@@ -20,7 +20,8 @@ from __future__ import print_function, absolute_import, division
 
 import numpy as np
 
-from .utils import sinarctan, tanarcsin, public
+from .utils import (sinarctan, tanarcsin, public, sagittal_meridional,
+        normalize, normalize_z)
 from .name_mixin import NameMixin
 
 # finite/infinite focal/afocal object/image
@@ -154,17 +155,6 @@ class Conjugate(NameMixin):
         return y, u
 
 
-def sagittal_meridional(u, z):
-    z = np.array((0., 0., z))
-    s = np.cross(u, z)
-    sn = np.sqrt(np.square(s).sum(1))[..., None]
-    snz = sn == 0.
-    s = np.where(snz, (1., 0, 0), s)/np.where(snz, 1., sn)
-    m = np.cross(u, s)
-    m /= np.sqrt(np.square(m).sum(1))[..., None]
-    return s, m
-
-
 @public
 @Conjugate.register
 class FiniteConjugate(Conjugate):
@@ -249,10 +239,13 @@ class FiniteConjugate(Conjugate):
         y[..., :2] = -yo*self.radius
         if surface:
             y[..., 2] = -surface.surface_sag(y)
-        u = (0, 0, z) - y
+        uz = (0, 0, z)
+        u = uz - y
         yp = z*np.tan(yp*np.arctan2(a, z))
+        #s, m = sagittal_meridional(u, uz)
+        #u += yp[..., 0, None]*s + yp[..., 1, None]*m
         u[..., :2] += yp
-        u /= np.sqrt(np.square(u).sum(1))[..., None]
+        normalize(u)
         if z < 0:
             u *= -1
         return y, u
@@ -305,13 +298,15 @@ class InfiniteConjugate(Conjugate):
         if a is None:
             a = self.pupil_radius
         yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
-        u = np.zeros((yo.shape[0], 3))
+        u = np.empty((yo.shape[0], 3))
         u[..., :2] = np.sin(yo*self.angle)
-        u2 = np.square(u[..., :2]).sum(-1)
-        u[..., 2] = np.sqrt(1 - u2)
-        y = -z*u
-        y[..., :2] += a*yp
-        y[..., 2] += z
+        normalize_z(u)
+        yz = (0, 0, z)
+        y = yz - z*u
+        yp = yp*a
+        #s, m = sagittal_meridional(y, yz)
+        #y += yp[..., 0, None]*s + yp[..., 1, None]*m
+        y[..., :2] += yp
         if surface:
             y += surface.intercept(y, u)*u
         return y, u

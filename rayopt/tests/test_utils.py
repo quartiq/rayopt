@@ -50,3 +50,29 @@ class MiscCase(unittest.TestCase):
         nptest.assert_allclose(w,
                 np.array([.087, .163, .163, .087])[:, None],
                 atol=1e-4)
+
+    def test_sag_mer(self):
+        u = np.array((0, 3., 3.))
+        z = np.array((0, 0, 3.))
+        s, m = sagittal_meridional(u, z)
+        nptest.assert_allclose(s, (1, 0, 0))
+        nptest.assert_allclose(m, (0, 2**-.5, -2**-.5))
+
+    def test_zero_sag_mer(self):
+        u = np.array((0, 0, 2.))
+        s, m = sagittal_meridional(u, u)
+        nptest.assert_allclose(s, (1, 0, 0))
+        nptest.assert_allclose(m, (0, 1, 0))
+
+    def test_random_sag_mer(self):
+        n = 10
+        u = np.random.randn(n, 3)
+        z = np.array((0, 0, 3.))
+        s, m = sagittal_meridional(u, z)
+        un = u.copy()
+        normalize(un)
+        for i in range(n):
+            nptest.assert_allclose(np.dot(u[i], s[i]), 0, atol=1e-13)
+            nptest.assert_allclose(np.dot(u[i], m[i]), 0, atol=1e-13)
+            nptest.assert_allclose(np.dot(s[i], m[i]), 0, atol=1e-13)
+            nptest.assert_allclose(np.cross(s[i], m[i]), un[i])

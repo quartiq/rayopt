@@ -28,16 +28,18 @@ from numpy import testing as nptest
 
 
 from rayopt import FiniteConjugate, InfiniteConjugate
-from rayopt.utils import tanarcsin
+from rayopt.utils import tanarcsin, sinarctan
 
 
-class FiniteCase(unittest.TestCase):
+class ConjugatesCase(unittest.TestCase):
     def test_finite(self):
         c = FiniteConjugate(entrance_distance=1e6,
                 entrance_radius=2., pupil_distance=2e6,
                 radius=.5)
         self.assertEqual(c.pupil_radius,
                 c.entrance_radius/c.entrance_distance*c.pupil_distance)
+        self.assertEqual(c.na,
+                sinarctan(c.entrance_radius/c.entrance_distance))
         self.some_aims(c)
 
     def test_infinite(self):
@@ -54,6 +56,7 @@ class FiniteCase(unittest.TestCase):
                 y.extend([(0, i), (i, 0), (0, i), (i, 0)])
                 p.extend([(0, j), (0, j), (j, 0), (0, j)])
         for a, b in zip(y, p):
+            print(a, b)
             self.assert_aims(c, a, b)
 
     def assert_hits(self, y, u, z, yp):
