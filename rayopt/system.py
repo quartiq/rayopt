@@ -27,6 +27,7 @@ from .elements import Element
 from .conjugates import Conjugate, FiniteConjugate, InfiniteConjugate
 from .material import fraunhofer
 from .utils import public, simple_cache
+from .cachend import CacheND
 
 
 @public
@@ -57,7 +58,6 @@ class System(list):
 
     def dict(self):
         dat = {}
-        # dat["type"] = "system"
         if self.description:
             dat["description"] = self.description
         if self.stop is not None:
@@ -460,7 +460,7 @@ class System(list):
 
         # TODO: should only look at total (1d) height yo and determine
         # sagittal and meridional stop size or position:
-        # (h, stop) -> (z, sag, mer)
+        # (r, phi, stop) -> (z, sag, mer)
 
         if l is None:
             l = self.wavelengths[0]
@@ -483,24 +483,25 @@ class System(list):
 
         if stop is -1:
             # return clipping ray
-            radii = np.array([e.radius for e in self[1:-1]])
-            target = np.sign(yp[axis])
+            radii = np.array([e.radius for e in self[1:-1]])**2
             @simple_cache
             def distance(a):
                 vary(a)
-                ys = [yunit[0][0, axis]/target for yunit in self.propagate(
+                ys = [yunit[0][0, :2] for yunit in self.propagate(
                     y, u, n, l, clip=False, stop=-1)]
-                return max(ys - radii)
+                rs = np.square(ys).sum(-1)
+                return max(rs - radii)
         else:
             # return pupil ray
             if stop is None:
                 stop = self.stop
-            target = yp[axis]*self[stop].radius
+            target = self[stop].radius**2*np.square(yp).sum()
             @simple_cache
             def distance(a):
                 vary(a)
-                res = [yunit[0] for yunit in self.propagate(
-                    y, u, n, l, stop=stop + 1, clip=False)][-1][0, axis]
+                res = [yunit[0][0] for yunit in self.propagate(
+                    y, u, n, l, stop=stop + 1, clip=False)][-1]
+                res = np.square(res).sum()
                 return res - target
 
         def find_start(fun, a0=1.):
@@ -515,13 +516,32 @@ class System(list):
             raise RuntimeError("no starting ray found")
 
         a, f = find_start(distance)
-        if abs(f - target) > tol:
+        if abs(f) > tol:
             a = newton(distance, a, tol=tol, maxiter=maxiter)
-        res = vary(a)
-        h = np.sqrt(np.square(yo).sum())
-        dat = self._pupil_cache.setdefault((h, stop), [z, p, p])
-        if np.allclose(yp, 0):
-            dat[0] = res
-        else:
-            dat[1 + axis] = res
         return vary(a)
+
+    def pupil(self, yo, l=None, stop=None, **kwargs):
+        k = (l, stop)
+        try:
+            return self._pupil_cache[k](*yo)
+        except KeyError:
+            self._pupil_cache[k] = c = CacheND(self._do_pupil, l=l,
+                    stop=stop, **kwargs)
+            return c(*yo)
+
+    def _do_pupil(self, xo, yo, guess, **kwargs):
+        if guess is not None:
+            z0, a0, b0 = guess
+        else:
+            z0 = self.object.pupil_distance
+            a0 = b0 = self.object.pupil_radius
+        if not np.allclose((xo, yo), 0):
+            # can only determine pupil distance if chief is non-axial
+            z = self.aim((xo, yo), (0, 0.), z0, (a0, b0), **kwargs)
+        else:
+            z = z0
+        a = self.aim((xo, yo), (1., 0), z, (a0, b0), axis=0, **kwargs)
+        b = self.aim((xo, yo), (0, 1.), z, (a, b0), axis=1, **kwargs)
+        #print((xo, yo), guess, (z0, a0, b0), (z, a, b))
+        return z, a, b
+

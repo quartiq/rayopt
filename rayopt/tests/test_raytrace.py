@@ -156,7 +156,7 @@ class DemotripCase(unittest.TestCase):
         g.rays_paraxial_point(p)
         g.rays_paraxial_line(p)
 
-    def test_aim_point(self):
+    def test_aim_point_more(self):
         p, g = self.traces()
         i = self.s.stop
         r = np.array([el.radius for el in self.s[1:-1]])
@@ -165,19 +165,24 @@ class DemotripCase(unittest.TestCase):
         if not self.s.object.finite:
             nptest.assert_allclose(g.u[0, :, :], g.u[0,
                 (0,)*g.u.shape[1], :])
-        nptest.assert_allclose(g.y[i, 0, 1], 0, atol=1e-7)
-        nptest.assert_allclose(min(g.y[1:-1, 1, 1] + r), 0, atol=1e-7)
-        nptest.assert_allclose(max(g.y[1:-1, 2, 1] - r), 0, atol=1e-7)
+        nptest.assert_allclose(g.y[i, 0, 1], 0, atol=5e-3)
+        nptest.assert_allclose(min(g.y[1:-1, 1, 1] + r), 0, atol=1e-3)
+        nptest.assert_allclose(max(g.y[1:-1, 2, 1] - r), 0, atol=1e-3)
 
         g.rays_paraxial_point(p, 1., distribution="cross", nrays=5)
         if not self.s.object.finite:
             nptest.assert_allclose(g.u[0, :, :], g.u[0,
                 (0,)*g.u.shape[1], :])
         nptest.assert_allclose(g.y[i, :3, 1]/self.s[i].radius,
-                [-1, 0, 1], atol=1e-6, rtol=3e-2)
+                [-1, 0, 1], atol=1e-3, rtol=3e-2)
         nptest.assert_allclose(g.y[i, :, 0]/self.s[i].radius,
                 [0, 0, 0, -1, 0, 1], atol=1e-3)
         #print(g.y[i, :, :2]/self.s[i].radius)
         g.rays_paraxial_line(p)
 
-
+    def test_pupil(self):
+        p, g = self.traces()
+        p.update_conjugates()
+        for y in [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1),
+                (.1, .1), (-.2, .5)]:
+            self.s.pupil(y)

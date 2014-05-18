@@ -56,7 +56,7 @@ class ConjugatesCase(unittest.TestCase):
                 y.extend([(0, i), (i, 0), (0, i), (i, 0)])
                 p.extend([(0, j), (0, j), (j, 0), (0, j)])
         for a, b in zip(y, p):
-            print(a, b)
+            #print(a, b)
             self.assert_aims(c, a, b)
 
     def assert_hits(self, y, u, z, yp):

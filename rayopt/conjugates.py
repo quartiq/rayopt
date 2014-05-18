@@ -292,7 +292,6 @@ class InfiniteConjugate(Conjugate):
         self.radius = sinarctan(h/self.pupil_distance)
 
     def aim(self, yo, yp, z=None, a=None, surface=None):
-        print(yo, yp, z, a)
         if z is None:
             z = self.pupil_distance
         if a is None:
