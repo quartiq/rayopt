@@ -102,6 +102,73 @@ def sint(a):
 
 
 @public
+def pupil_distribution(distribution, nrays):
+    # TODO apodization
+    """returns nrays in normalized aperture coordinates x/meridional
+    and y/sagittal according to distribution, all rays are clipped
+    to unit circle aperture.
+    Returns center ray index, x, y
+
+    meridional: equal spacing line
+    sagittal: equal spacing line
+    cross: meridional-sagittal cross
+    tee: meridional (+-) and sagittal (+ only) tee
+    random: random within aperture
+    square: regular square grid
+    triangular: regular triangular grid
+    hexapolar: regular hexapolar grid
+    """
+    d = distribution
+    n = nrays
+    if n == 1:
+        return 0, np.zeros((n, 2))
+    elif d == "half-meridional":
+        return 0, np.c_[np.zeros(n), np.linspace(0, 1, n)]
+    elif d == "meridional":
+        n -= n % 2
+        return n/2, np.c_[np.zeros(n + 1), np.linspace(-1, 1, n + 1)]
+    elif d == "sagittal":
+        n -= n % 2
+        return n/2, np.c_[np.linspace(-1, 1, n + 1), np.zeros(n + 1)]
+    elif d == "cross":
+        n -= n % 4
+        return n/4, np.concatenate([
+            np.c_[np.zeros(n/2 + 1), np.linspace(-1, 1, n/2 + 1)],
+            np.c_[np.linspace(-1, 1, n/2 + 1), np.zeros(n/2 + 1)],
+            ])
+    elif d == "tee":
+        n = (n - 2)/3
+        return 2*n + 1, np.concatenate([
+            np.c_[np.zeros(2*n + 1), np.linspace(-1, 1, 2*n + 1)],
+            np.c_[np.linspace(0, 1, n + 1), np.zeros(n + 1)],
+            ])
+    elif d == "random":
+        r, phi = np.random.rand(2, n)
+        xy = np.exp(2j*np.pi*phi)*np.sqrt(r)
+        xy = np.c_[xy.real, xy.imag]
+        return 0, np.concatenate([[[0, 0]], xy])
+    elif d == "square":
+        n = int(np.sqrt(n*4/np.pi))
+        xy = np.mgrid[-1:1:1j*n, -1:1:1j*n].reshape(2, -1)
+        xy = xy[:, (xy**2).sum(0)<=1].T
+        return 0, np.concatenate([[[0, 0]], xy])
+    elif d == "triangular":
+        n = int(np.sqrt(n*4/np.pi))
+        xy = np.mgrid[-1:1:1j*n, -1:1:1j*n]
+        xy[0] += (np.arange(n) % 2.)*(2./n)
+        xy = xy.reshape(2, -1)
+        xy = xy[:, (xy**2).sum(0)<=1].T
+        return 0, np.concatenate([[[0, 0]], xy])
+    elif d == "hexapolar":
+        n = int(np.sqrt(n/3.-1/12.)-1/2.)
+        l = [np.zeros((2, 1))]
+        for i in np.arange(1, n + 1.):
+            a = np.linspace(0, 2*np.pi, 6*i, endpoint=False)
+            l.append([np.sin(a)*i/n, np.cos(a)*i/n])
+        return 0, np.concatenate(l, axis=1).T
+
+
+@public
 def gaussian_roots(n, m=None):
     """returns r[n, 1], phi[1, n],  weights[n, 1]
     gaussian quadrature points (r, phi) with given weights

@@ -24,17 +24,18 @@ import numpy as np
 from scipy.interpolate import griddata
 
 from .elements import Spheroid
-from .utils import sinarctan, tanarcsin, public
+from .utils import sinarctan, tanarcsin, public, pupil_distribution
 from .raytrace import Trace
 
 
 @public
 class GeometricTrace(Trace):
-    # y[i]: intercept
-    # i[i]: incoming/incidence direction
-    # u[i]: outgoing/excidence direction
-    # all in the normal coordinate system of the ith element (positions
-    # relative to the element vertex)
+    """
+    y[i]: intercept at surface
+    i[i]: incoming/incidence direction before surface
+    u[i]: outgoing/excidence direction after surface
+    all in i-surface normal coordinates relative to vertex
+    """
     def allocate(self, nrays):
         super(GeometricTrace, self).allocate()
         self.nrays = nrays
@@ -54,13 +55,12 @@ class GeometricTrace(Trace):
         if l is None:
             l = self.system.wavelengths[0]
         self.l = l
-        self.y[0] = 0
         self.y[0, :, :m] = y
-        self.u[0] = 0
+        self.y[0, :, m:] = 0
         self.u[0, :, :m] = u
         if m < 3: # assumes forward rays
-            ux, uy = self.u[0, :, 0], self.u[0, :, 1]
-            self.u[0, :, 2] = np.sqrt(1 - ux**2 - uy**2)
+            u2 = np.square(self.u[0, :, :2]).sum(-1)
+            self.u[0, :, 2] = np.sqrt(1 - u2)
         self.i[0] = self.u[0]
         self.n[0] = self.system[0].refractive_index(l)
         self.t[0] = 0
@@ -71,19 +71,19 @@ class GeometricTrace(Trace):
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
         y, u = self.system[init].from_normal(y, u)
         for j, yunit in enumerate(self.system.propagate(
-            y, u, n, l, start, stop, clip)):
+                y, u, n, l, start, stop, clip)):
             j += start
             self.y[j], self.u[j], self.n[j], self.i[j], self.t[j] = yunit
 
-    def refocus(self):
-        y = self.y[-1, :, :2]
-        u = tanarcsin(self.i[-1])
+    def refocus(self, at=-1):
+        y = self.y[at, :, :2]
+        u = tanarcsin(self.i[at])
         good = np.all(np.isfinite(u), axis=1)
         y, u = y[good], u[good]
         y, u = (y - y.mean(0)).ravel(), (u - u.mean(0)).ravel()
         # solution of sum((y+tu-sum(y+tu)/n)**2) == min
         t = -np.dot(y, u)/np.dot(u, u)
-        self.system[-1].distance += t
+        self.system[at].distance += t
         self.propagate()
 
     def opd(self, chief=0, radius=None, after=-2, image=-1, resample=4):
@@ -152,15 +152,15 @@ class GeometricTrace(Trace):
 
     def rays_paraxial(self, paraxial):
         y = np.zeros((2, 2))
-        y[:, 1] = paraxial.y[0]
+        y[:, paraxial.axis] = paraxial.y[0]
         u = np.zeros((2, 2))
-        u[:, 1] = sinarctan(paraxial.u[0])
+        u[:, paraxial.axis] = sinarctan(paraxial.u[0])
         self.rays_given(y, u)
         self.propagate(clip=False)
 
     def aim_pupil(self, height, pupil_distance, pupil_height,
             l=None, axis=(0, 1), **kwargs):
-        yo = (0, height)
+        yo = (0., height)
         pd = pupil_distance
         ph = np.ones(2)*pupil_height
         if height:
@@ -171,72 +171,6 @@ class GeometricTrace(Trace):
             yp = [(1., 0), (0, 1.)][ax]
             ph[ax] = self.system.aim(yo, yp, pd, ph, l, axis=ax)
         return pd, ph
-
-    @staticmethod
-    def pupil_distribution(distribution, nrays):
-        # TODO apodization
-        """returns nrays in normalized aperture coordinates x/meridional
-        and y/sagittal according to distribution, all rays are clipped
-        to unit circle aperture.
-        Returns center ray index, x, y
-        
-        meridional: equal spacing line
-        sagittal: equal spacing line
-        cross: meridional-sagittal cross
-        tee: meridional (+-) and sagittal (+ only) tee
-        random: random within aperture
-        square: regular square grid
-        triangular: regular triangular grid
-        hexapolar: regular hexapolar grid
-        """
-        d = distribution
-        n = nrays
-        if n == 1:
-            return 0, np.zeros((n, 2))
-        elif d == "half-meridional":
-            return 0, np.c_[np.zeros(n), np.linspace(0, 1, n)]
-        elif d == "meridional":
-            n -= n % 2
-            return n/2, np.c_[np.zeros(n + 1), np.linspace(-1, 1, n + 1)]
-        elif d == "sagittal":
-            n -= n % 2
-            return n/2, np.c_[np.linspace(-1, 1, n + 1), np.zeros(n + 1)]
-        elif d == "cross":
-            n -= n % 4
-            return n/4, np.concatenate([
-                np.c_[np.zeros(n/2 + 1), np.linspace(-1, 1, n/2 + 1)],
-                np.c_[np.linspace(-1, 1, n/2 + 1), np.zeros(n/2 + 1)],
-                ])
-        elif d == "tee":
-            n = (n - 2)/3
-            return 2*n + 1, np.concatenate([
-                np.c_[np.zeros(2*n + 1), np.linspace(-1, 1, 2*n + 1)],
-                np.c_[np.linspace(0, 1, n + 1), np.zeros(n + 1)],
-                ])
-        elif d == "random":
-            r, phi = np.random.rand(2, n)
-            xy = np.exp(2j*np.pi*phi)*np.sqrt(r)
-            xy = np.c_[xy.real, xy.imag]
-            return 0, np.concatenate([[[0, 0]], xy])
-        elif d == "square":
-            n = int(np.sqrt(n*4/np.pi))
-            xy = np.mgrid[-1:1:1j*n, -1:1:1j*n].reshape(2, -1)
-            xy = xy[:, (xy**2).sum(0)<=1].T
-            return 0, np.concatenate([[[0, 0]], xy])
-        elif d == "triangular":
-            n = int(np.sqrt(n*4/np.pi))
-            xy = np.mgrid[-1:1:1j*n, -1:1:1j*n]
-            xy[0] += (np.arange(n) % 2.)*(2./n)
-            xy = xy.reshape(2, -1)
-            xy = xy[:, (xy**2).sum(0)<=1].T
-            return 0, np.concatenate([[[0, 0]], xy])
-        elif d == "hexapolar":
-            n = int(np.sqrt(n/3.-1/12.)-1/2.)
-            l = [np.zeros((2, 1))]
-            for i in np.arange(1, n + 1.):
-                a = np.linspace(0, 2*np.pi, 6*i, endpoint=False)
-                l.append([np.sin(a)*i/n, np.cos(a)*i/n])
-            return 0, np.concatenate(l, axis=1).T
 
     def rays_clipping(self, height, pupil_distance, pupil_height,
             wavelength=None, axis=1, clip=False, **kwargs):
@@ -272,7 +206,7 @@ class GeometricTrace(Trace):
                         pupil_distance, pupil_height, wavelength, axis=aim)
             except RuntimeError as e:
                 print("pupil aim failed", height, e)
-        icenter, yp = self.pupil_distribution(distribution, nrays)
+        icenter, yp = pupil_distribution(distribution, nrays)
         # NOTE: will not have same ray density in x and y if pupil is
         # distorted
         y, u = self.system.object.aim((0, height), yp,

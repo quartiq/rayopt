@@ -375,13 +375,11 @@ class ParaxialTrace(Trace):
         for e, y in zip(self.system[1:], self.y[1:]):
             e.radius = np.fabs(y).sum() # marginal+chief
 
-    def focal_length_solve(self, f, i=None):
+    def focal_length_solve(self, f, i=-2):
         # TODO only works for last surface
-        if i is None:
-            i = self.length - 2
-        y0, y = self.y[(i-1, i), 0]
-        u0, u = self.u[i-1, 0], -self.y[0, 0]/f
-        n0, n = self.n[(i-1, i), :]
+        y0, y = self.y[(i - 1, i), 0]
+        u0, u = self.u[i - 1, 0], -self.y[0, 0]/f
+        n0, n = self.n[(i - 1, i), :]
         c = (n0*u0 - n*u)/(y*(n - n0))
         self.system[i].curvature = c
         self.propagate()
@@ -394,7 +392,6 @@ class ParaxialTrace(Trace):
         z = self.pupil_distance
         z += self.system[1].distance, -self.system[-1].distance
         a = self.pupil_height
-        print(z, a)
         self.system.object.pupil_distance = z[0]
         self.system.object.pupil_radius = a[0]
         self.system.object.height = self.y[0, 1]
@@ -415,8 +412,6 @@ class ParaxialTrace(Trace):
             m = self.system.paraxial_matrix(self.l, stop=ai + 1)
             m = m[self.axis::2, self.axis::2]
             y, u = self.system.object.aim((0, 0), (0, 1))
-        print(y, u)
         u = tanarcsin(u)
         y, u = np.dot((y[0, 1], u[0, 1]), m.T)
-        print(y, u)
         self.system[ai].radius = y
