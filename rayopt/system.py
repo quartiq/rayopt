@@ -91,7 +91,7 @@ class System(list):
     @property
     def aperture_index(self):
         warnings.warn("use system.stop", DeprecationWarning)
-        return self.stop
+        return self.stot_infinite
 
     def groups(self):
         """yield lists of element indices that form lens "elements"

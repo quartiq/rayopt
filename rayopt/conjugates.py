@@ -242,9 +242,8 @@ class FiniteConjugate(Conjugate):
         uz = (0, 0, z)
         u = uz - y
         yp = z*np.tan(yp*np.arctan2(a, z))
-        #s, m = sagittal_meridional(u, uz)
-        #u += yp[..., 0, None]*s + yp[..., 1, None]*m
-        u[..., :2] += yp
+        s, m = sagittal_meridional(u, uz)
+        u += yp[..., 0, None]*s + yp[..., 1, None]*m
         normalize(u)
         if z < 0:
             u *= -1
@@ -293,6 +292,7 @@ class InfiniteConjugate(Conjugate):
         self.radius = sinarctan(h/self.pupil_distance)
 
     def aim(self, yo, yp, z=None, a=None, surface=None):
+        print(yo, yp, z, a)
         if z is None:
             z = self.pupil_distance
         if a is None:
@@ -304,9 +304,8 @@ class InfiniteConjugate(Conjugate):
         yz = (0, 0, z)
         y = yz - z*u
         yp = yp*a
-        #s, m = sagittal_meridional(y, yz)
-        #y += yp[..., 0, None]*s + yp[..., 1, None]*m
-        y[..., :2] += yp
+        s, m = sagittal_meridional(u, yz)
+        y += yp[..., 0, None]*s + yp[..., 1, None]*m
         if surface:
             y += surface.intercept(y, u)*u
         return y, u

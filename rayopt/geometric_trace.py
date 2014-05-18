@@ -246,19 +246,19 @@ class GeometricTrace(Trace):
             wavelength=None, **kwargs):
         # TODO: refactor rays_paraxial_*
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = np.arctan2(paraxial.pupil_height[0], zp)
+        rp = paraxial.pupil_height[0]
         return self.rays_clipping(height, zp, rp, wavelength, **kwargs)
 
     def rays_paraxial_point(self, paraxial, height=1.,
             wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = np.arctan2(paraxial.pupil_height[0], zp)
+        rp = paraxial.pupil_height[0]
         return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
     def rays_paraxial_line(self, paraxial, height=1.,
             wavelength=None, **kwargs):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = np.arctan2(paraxial.pupil_height[0], zp)
+        rp = paraxial.pupil_height[0]
         return self.rays_line(height, zp, rp, wavelength, **kwargs)
 
     def resize(self, fn=lambda a, b: a):
