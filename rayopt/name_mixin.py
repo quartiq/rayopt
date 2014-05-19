@@ -47,6 +47,8 @@ class NameMixin(object):
 
     @classmethod
     def make(cls, data):
+        if isinstance(data, cls):
+            return data
         typ = data.pop("type", cls._default_type)
         sub = cls._types[(cls, typ)]
         return sub(**data)
