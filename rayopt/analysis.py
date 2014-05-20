@@ -95,8 +95,7 @@ class Analysis(object):
             self.system.fix_sizes()
         if self.refocus_full:
             t = GeometricTrace(self.system)
-            t.rays_paraxial_point(self.paraxial, 0.,
-                    nrays=500, distribution="hexapolar", clip=True)
+            t.rays_point((0, 0.), nrays=500, distribution="hexapolar", clip=True)
             t.refocus()
             self.paraxial.propagate()
         if self.print_system:
@@ -250,8 +249,8 @@ class Analysis(object):
                     verticalalignment="center")
             for wi, ci in zip(wavelengths, colors):
                 t = GeometricTrace(self.system)
-                ref = t.rays_paraxial_point(paraxial, hi, wi,
-                        nrays=nrays_line, distribution="tee", clip=True)
+                ref = t.rays_point((0, hi), wi, nrays=nrays_line,
+                        distribution="tee", clip=True)
                 # plot transverse image plane versus entrance pupil
                 # coordinates
                 y = t.y[-1, :, :2] - t.y[-1, ref, :2]
@@ -287,9 +286,8 @@ class Analysis(object):
             for wi, ci in zip(wavelengths, colors):
                 r = paraxial.airy_radius[1]/paraxial.l*wi
                 t = GeometricTrace(self.system)
-                ref = t.rays_paraxial_point(paraxial, hi, wi,
-                        nrays=nrays, distribution="hexapolar",
-                        clip=True)
+                ref = t.rays_point((0, hi), wi, nrays=nrays,
+                        distribution="hexapolar", clip=True)
                 # plot transverse image plane hit pattern (ray spot)
                 y = t.y[-1, :, :2] - t.y[-1, ref, :2]
                 u = tanarcsin(t.i[-1])
@@ -322,8 +320,8 @@ class Analysis(object):
             self.setup_axes(axe, "R", "E")
             self.setup_axes(axm, "F", "C")
             t = GeometricTrace(self.system)
-            ref = t.rays_paraxial_point(paraxial, hi, wavelength,
-                    nrays=nrays, distribution="hexapolar", clip=True)
+            ref = t.rays_point((0, hi), wavelength, nrays=nrays,
+                    distribution="hexapolar", clip=True)
             try:
                 x, y, o = t.opd(ref)
             except ValueError:
@@ -408,7 +406,7 @@ class Analysis(object):
             xs = -(c[0]-a[0])/(r[0]-p[0])
             axf.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
             t = GeometricTrace(self.system)
-            t.rays_paraxial_point(paraxial, 0., wi, nrays=nrays,
+            t.rays_point((0, 0.), wi, nrays=nrays,
                     distribution="half-meridional")
             p = paraxial.pupil_distance[0]
             py = t.y[1, :, 1] + p*tanarcsin(t.i[1])[:, 1]

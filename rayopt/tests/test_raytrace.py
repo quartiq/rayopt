@@ -139,21 +139,20 @@ class DemotripCase(unittest.TestCase):
 
     def traces(self):
         p = ParaxialTrace(self.s)
+        p.update_conjugates()
         g = GeometricTrace(self.s)
         return p, g
     
     def test_aim(self):
         p, g = self.traces()
-        z = p.pupil_distance[0] + p.z[1]
-        a = np.arctan2(p.pupil_height[0], z)
         #print(z, a)
-        z, a = g.aim_pupil(1., z, a)
+        z, a, b = self.s.pupil((0, 1.))
         #print(z, a)
 
     def test_aim_point(self):
         p, g = self.traces()
         g.rays_paraxial_clipping(p)
-        g.rays_paraxial_point(p)
+        g.rays_point((0, 1.))
         g.rays_paraxial_line(p)
 
     def test_aim_point_more(self):
@@ -169,7 +168,7 @@ class DemotripCase(unittest.TestCase):
         nptest.assert_allclose(min(g.y[1:-1, 1, 1] + r), 0, atol=1e-3)
         nptest.assert_allclose(max(g.y[1:-1, 2, 1] - r), 0, atol=1e-3)
 
-        g.rays_paraxial_point(p, 1., distribution="cross", nrays=5)
+        g.rays_point((0, 1.), distribution="cross", nrays=5)
         if not self.s.object.finite:
             nptest.assert_allclose(g.u[0, :, :], g.u[0,
                 (0,)*g.u.shape[1], :])
@@ -193,7 +192,6 @@ class DemotripCase(unittest.TestCase):
         i, w = g.rays_quadrature((0, 1.), nrays=13)
         a = g.rms(w)
         nptest.assert_allclose(a, .059, rtol=2e-2)
-        g.rays_paraxial_point(p, 1., nrays=200,
-                distribution="square", clip=False)
+        g.rays_point((0, 1.), nrays=200, distribution="square", clip=False)
         b = g.rms()
         nptest.assert_allclose(a, b, rtol=2e-2)

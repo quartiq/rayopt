@@ -171,11 +171,6 @@ class GeometricTrace(Trace):
         self.rays_given(y, u)
         self.propagate(clip=False)
 
-    def aim_pupil(self, height, pupil_distance, pupil_height,
-            l=None, axis=(0, 1), **kwargs):
-        pd, a, b = self.system.pupil((0., height), l=l)
-        return pd, (a, b)
-
     def rays_clipping(self, height, pupil_distance, pupil_height,
             wavelength=None, axis=1, clip=False, **kwargs):
         yo = (0, height)
@@ -201,14 +196,13 @@ class GeometricTrace(Trace):
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
 
-    def rays_point(self, height, pupil_distance, pupil_height,
-            wavelength=None, nrays=11, distribution="meridional",
-            clip=False):
-        z, a, b = self.system.pupil((0, height), l=wavelength)
+    def rays_point(self, yo, wavelength=None, nrays=11,
+            distribution="meridional", clip=False):
+        z, a, b = self.system.pupil(yo, l=wavelength)
         icenter, yp = pupil_distribution(distribution, nrays)
         # NOTE: will not have same ray density in x and y if pupil is
         # distorted
-        y, u = self.system.object.aim((0, height), yp, z, (a, b))
+        y, u = self.system.object.aim(yo, yp, z, (a, b))
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
         return icenter
@@ -255,12 +249,6 @@ class GeometricTrace(Trace):
         zp = paraxial.pupil_distance[0] + paraxial.z[1]
         rp = paraxial.pupil_height[0]
         return self.rays_clipping(height, zp, rp, wavelength, **kwargs)
-
-    def rays_paraxial_point(self, paraxial, height=1.,
-            wavelength=None, **kwargs):
-        zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = paraxial.pupil_height[0]
-        return self.rays_point(height, zp, rp, wavelength, **kwargs)
 
     def rays_paraxial_line(self, paraxial, height=1.,
             wavelength=None, **kwargs):
