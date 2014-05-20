@@ -150,6 +150,19 @@ class GeometricTrace(Trace):
             np.einsum("->", o, x, y)
         return p, q, psf
 
+    def rms(self, w=None, i=-1, ref=None):
+        y = self.y[i, :, :2]
+        if ref is None:
+            y0 = y.mean(0)
+        else:
+            y0 = y[ref]
+        r = np.square(y - y0).sum(1)
+        if w is None:
+            r = r.sum()/y.shape[0]
+        else:
+            r = (r*w).sum()
+        return np.sqrt(r)
+
     def rays_paraxial(self, paraxial):
         y = np.zeros((2, 2))
         y[:, paraxial.axis] = paraxial.y[0]
@@ -241,6 +254,15 @@ class GeometricTrace(Trace):
             u = np.tile(u, (3, 1))
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
+
+    def rays_quadrature(self, height, wavelength=None, nrays=13,
+            distribution="radau"):
+        i, y, w = pupil_distribution(distribution, nrays)
+        z, a, b = self.system.pupil(height, l=wavelength)
+        y, u = self.system.object.aim(height, y, z, (a, b))
+        self.rays_given(y, u, wavelength)
+        self.propagate(clip=False)
+        return w
 
     def rays_paraxial_clipping(self, paraxial, height=1.,
             wavelength=None, **kwargs):

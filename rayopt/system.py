@@ -424,7 +424,7 @@ class System(list):
             yu, n = e.propagate_paraxial(yu, n, l)
             yield yu, n
 
-    def propagate_gaussian(self, q, n, l, start=1, stop=None):
+    def propagate_gaussian(self, qi, n, l, start=1, stop=None):
         stop = stop or len(self)
         for e in self[start:stop]:
             qi, n = e.propagate_gaussian(qi, n, l)

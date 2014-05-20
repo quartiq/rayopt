@@ -187,24 +187,60 @@ def pupil_distribution(distribution, nrays):
             a = np.linspace(0, 2*np.pi, 6*i, endpoint=False)
             l.append([np.sin(a)*i/n, np.cos(a)*i/n])
         return 0, np.concatenate(l, axis=1).T
+    elif d == "radau":
+        n = int(np.sqrt(n) + 1)
+        x, w = gr_roots(n)
+        r, p, w = interval_to_circle(x, w)
+        return 0, np.c_[r*np.cos(p), r*np.sin(p)], w
+    elif d == "lobatto":
+        n = int(np.sqrt(n) + 1)
+        x, w = gl_roots(n)
+        r, p, w = interval_to_circle(x, w)
+        return 0, np.c_[r*np.cos(p), r*np.sin(p)], w
 
 
 @public
-def gaussian_roots(n, m=None):
-    """returns r[n, 1], phi[1, n],  weights[n, 1]
-    gaussian quadrature points (r, phi) with given weights
-    covering the [0, pi] semi-unit-circle.
+def gl_roots(n):
+    """Gauss Lobatto roots and weights for [-1, 1]
+    with -1 first and 1 last
     """
-    r, weight = orthogonal.ps_roots(n)
-    m = m or n
-    phi = np.pi/(1 + m)*np.arange(1, m + 1)
-    return r[:, None]**.5, phi[None, :], weight[:, None]/2
+    leg = orthogonal.legendre(n - 1)
+    x = np.r_[-1, leg.deriv().roots, 1]
+    w = 2/(n*(n - 1)*leg(x)**2)
+    return x, w
 
 
 @public
-def lobatto_roots(n, m=None):
-    raise NotImplementedError
-    m = m or n
-    phi = np.pi/(1 + m)*np.arange(1, m + 1)
-    return r[:, None]**.5, phi[None, :], weight[:, None]/2
+def gr_roots(n):
+    """Gauss Radau roots and weights for [-1, 1]
+    with -1 first
+    """
+    leg = orthogonal.legendre(n - 1)
+    l = (leg + orthogonal.legendre(n))/np.poly1d((1, 1))
+    x = np.r_[-1, l[0].roots]
+    w = (1 - x)/(n * leg(x))**2
+    return x, w
 
+
+@public
+def interval_to_circle(x, w, p=None, a=-1., b=1.):
+    """tranform x, w on [-1, 1] to r, phi, w on the unit disc
+    """
+    n = len(x)
+    assert len(x) == len(w)
+    r = ((x - a)/(b - a))**.5
+    if p is None:
+        p = len(x)
+    if type(p) is type(1):
+        p = np.pi*((np.arange(p) + .5)/p - .5)
+    m = len(p)
+    if r[0] == 0.:
+        rs = np.r_[r[0], np.repeat(r[1:], m)]
+        ws = np.r_[w[0], np.repeat(w[1:]/m, m)]/2
+        ps = np.r_[0, np.repeat(p[None, :], n - 1, 0).ravel()]
+    else:
+        rs = np.repeat(r, m)
+        ws = np.repeat(w/m, m)/2
+        ps = np.repeat(p[None, :], n, 0).ravel()
+    assert np.allclose(ws.sum(), 1), ws.sum()
+    return rs, ps, ws

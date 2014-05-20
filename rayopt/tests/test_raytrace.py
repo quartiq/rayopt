@@ -186,3 +186,11 @@ class DemotripCase(unittest.TestCase):
         for y in [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1),
                 (.1, .1), (-.2, .5)]:
             self.s.pupil(y)
+
+    def test_pupil(self):
+        p, g = self.traces()
+        p.update_conjugates()
+        w = g.rays_quadrature((0, 0.), nrays=13)
+        print(g.rms(w))
+        g.rays_paraxial_point(p, 0., nrays=1000, distribution="hexapolar")
+        print(g.rms())

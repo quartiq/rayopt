@@ -40,17 +40,6 @@ class MiscCase(unittest.TestCase):
             for i in -j, j:
                 self.assertAlmostEqual(tanarcsin(sinarctan(i)), i)
 
-    def test_gauss(self):
-        r, p, w = gaussian_roots(4)
-        nptest.assert_allclose(r,
-                np.array([.2635, .5745, .8185, .9647])[:, None],
-                atol=1e-4)
-        nptest.assert_allclose(p,
-                (np.arange(4)[None, :] + 1)*np.pi/5)
-        nptest.assert_allclose(w,
-                np.array([.087, .163, .163, .087])[:, None],
-                atol=1e-4)
-
     def test_sag_mer(self):
         u = np.array((0, 3., 3.))
         z = np.array((0, 0, 3.))
@@ -76,3 +65,14 @@ class MiscCase(unittest.TestCase):
             nptest.assert_allclose(np.dot(u[i], m[i]), 0, atol=1e-13)
             nptest.assert_allclose(np.dot(s[i], m[i]), 0, atol=1e-13)
             nptest.assert_allclose(np.cross(s[i], m[i]), un[i])
+
+    def test_radau(self):
+        i, xy, w = pupil_distribution("radau", 7)
+        self.assertEqual(i, 0)
+        self.assertEqual(len(xy), 7)
+        r = np.hypot(xy[:, 0], xy[:, 1])
+        phi = np.arctan(xy[:, 1], xy[:, 0])
+        nptest.assert_allclose(np.unique(r),
+                [0, .596, .919], atol=1e-3)
+        nptest.assert_allclose(np.unique(w),
+                [.111, .188/3*2, .256/3*2], atol=1e-3)
