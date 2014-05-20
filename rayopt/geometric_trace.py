@@ -262,7 +262,7 @@ class GeometricTrace(Trace):
         y, u = self.system.object.aim(height, y, z, (a, b))
         self.rays_given(y, u, wavelength)
         self.propagate(clip=False)
-        return w
+        return i, w
 
     def rays_paraxial_clipping(self, paraxial, height=1.,
             wavelength=None, **kwargs):

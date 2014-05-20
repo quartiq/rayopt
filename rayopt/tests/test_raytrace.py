@@ -187,10 +187,13 @@ class DemotripCase(unittest.TestCase):
                 (.1, .1), (-.2, .5)]:
             self.s.pupil(y)
 
-    def test_pupil(self):
+    def test_quadrature(self):
         p, g = self.traces()
         p.update_conjugates()
-        w = g.rays_quadrature((0, 0.), nrays=13)
-        print(g.rms(w))
-        g.rays_paraxial_point(p, 0., nrays=1000, distribution="hexapolar")
-        print(g.rms())
+        i, w = g.rays_quadrature((0, 1.), nrays=13)
+        a = g.rms(w)
+        nptest.assert_allclose(a, .059, rtol=2e-2)
+        g.rays_paraxial_point(p, 1., nrays=200,
+                distribution="square", clip=False)
+        b = g.rms()
+        nptest.assert_allclose(a, b, rtol=2e-2)

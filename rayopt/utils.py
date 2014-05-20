@@ -171,7 +171,7 @@ def pupil_distribution(distribution, nrays):
     elif d == "square":
         n = int(np.sqrt(n*4/np.pi))
         xy = np.mgrid[-1:1:1j*n, -1:1:1j*n].reshape(2, -1)
-        xy = xy[:, (xy**2).sum(0)<=1].T
+        xy = xy[:, (xy**2).sum(0) <= 1].T
         return 0, np.concatenate([[[0, 0]], xy])
     elif d == "triangular":
         n = int(np.sqrt(n*4/np.pi))
