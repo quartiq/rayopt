@@ -173,17 +173,8 @@ class GeometricTrace(Trace):
 
     def aim_pupil(self, height, pupil_distance, pupil_height,
             l=None, axis=(0, 1), **kwargs):
-        yo = (0., height)
-        pd = pupil_distance
-        ph = np.ones(2)*pupil_height
-        if height:
-            # can only determine pupil distance if chief is non-axial
-            yp = (0, 0.)
-            pd = self.system.aim(yo, yp, pd, ph, l, axis=1)
-        for ax in axis:
-            yp = [(1., 0), (0, 1.)][ax]
-            ph[ax] = self.system.aim(yo, yp, pd, ph, l, axis=ax)
-        return pd, ph
+        pd, a, b = self.system.pupil((0., height), l=l)
+        return pd, (a, b)
 
     def rays_clipping(self, height, pupil_distance, pupil_height,
             wavelength=None, axis=1, clip=False, **kwargs):
@@ -212,18 +203,12 @@ class GeometricTrace(Trace):
 
     def rays_point(self, height, pupil_distance, pupil_height,
             wavelength=None, nrays=11, distribution="meridional",
-            clip=False, aim=(0, 1)):
-        if aim:
-            try:
-                pupil_distance, pupil_height = self.aim_pupil(height,
-                        pupil_distance, pupil_height, wavelength, axis=aim)
-            except RuntimeError as e:
-                print("pupil aim failed", height, e)
+            clip=False):
+        z, a, b = self.system.pupil((0, height), l=wavelength)
         icenter, yp = pupil_distribution(distribution, nrays)
         # NOTE: will not have same ray density in x and y if pupil is
         # distorted
-        y, u = self.system.object.aim((0, height), yp,
-                pupil_distance, pupil_height)
+        y, u = self.system.object.aim((0, height), yp, z, (a, b))
         self.rays_given(y, u, wavelength)
         self.propagate(clip=clip)
         return icenter
