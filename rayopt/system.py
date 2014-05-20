@@ -525,23 +525,36 @@ class System(list):
         try:
             c = self._pupil_cache[k]
         except KeyError:
-            c = self._pupil_cache[k] = CacheND(self._do_pupil, l=l,
+            if stop is -1:
+                solver = self._do_clipping
+            else:
+                solver = self._do_pupil
+            c = self._pupil_cache[k] = CacheND(solver, l=l,
                     stop=stop, **kwargs)
         return c(*yo)
 
     def _do_pupil(self, xo, yo, guess, **kwargs):
         if guess is not None:
-            z0, a0, b0 = guess
+            z, a, b = guess
         else:
-            z0 = self.object.pupil_distance
-            a0 = b0 = self.object.pupil_radius
+            z = self.object.pupil_distance
+            a = b = self.object.pupil_radius
         if not np.allclose((xo, yo), 0):
-            # can only determine pupil distance if chief is non-axial
-            z = self.aim((xo, yo), (0, 0.), z0, (a0, b0), **kwargs)
-        else:
-            z = z0
-        a = self.aim((xo, yo), (1., 0), z, (a0, b0), axis=0, **kwargs)
-        b = self.aim((xo, yo), (0, 1.), z, (a, b0), axis=1, **kwargs)
-        #print((xo, yo), guess, (z0, a0, b0), (z, a, b))
+            z = self.aim((xo, yo), (0, 0.), z, (a, b), **kwargs)
+        a = self.aim((xo, yo), (1., 0), z, (a, b), axis=0, **kwargs)
+        b = self.aim((xo, yo), (0, 1.), z, (a, b), axis=1, **kwargs)
         return z, a, b
 
+    def _do_clipping(self, xo, yo, guess, **kwargs):
+        if guess is not None:
+            z, t, b, l, r = guess
+        else:
+            z = self.object.pupil_distance
+            t = b = l = r = self.object.pupil_radius
+        if not np.allclose((xo, yo), 0):
+            z = self.aim((xo, yo), (0, 0.), z, (t, b), **kwargs)
+        t = self.aim((xo, yo), (0, 1.), z, (l, t), axis=1, **kwargs)
+        b = self.aim((xo, yo), (0, -1.), z, (l, b), axis=1, **kwargs)
+        l = self.aim((xo, yo), (1., 0), z, (l, t), axis=0, **kwargs)
+        r = self.aim((xo, yo), (-1., 0), z, (r, t), axis=0, **kwargs)
+        return z, t, b, l, r

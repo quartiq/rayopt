@@ -173,8 +173,11 @@ class GeometricTrace(Trace):
 
     def rays_clipping(self, height, pupil_distance, pupil_height,
             wavelength=None, axis=1, clip=False, **kwargs):
-        #z, a, b = self.system.pupil((0, height), l=wavelength, stop=-1,
-        #        **kwargs)
+        a = self.system.pupil((0, height), l=wavelength, stop=-1,
+                **kwargs)
+        print(a)
+        z, t, b, l, r = a
+        print(z, t, b, l, r)
         yo = (0, height)
         pd = pupil_distance
         ph = np.ones(2)*pupil_height
