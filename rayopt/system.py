@@ -490,7 +490,7 @@ class System(list):
                 ys = [yunit[0][0, :2] for yunit in self.propagate(
                     y, u, n, l, clip=False, stop=-1)]
                 rs = np.square(ys).sum(-1)
-                return max(rs - radii)
+                return (rs - radii).max()
         else:
             # return pupil ray
             if stop is None:
@@ -499,7 +499,7 @@ class System(list):
             @simple_cache
             def distance(a):
                 vary(a)
-                res = [yunit[0][0] for yunit in self.propagate(
+                res = [yunit[0][0, :2] for yunit in self.propagate(
                     y, u, n, l, stop=stop + 1, clip=False)][-1]
                 res = np.square(res).sum()
                 return res - target
@@ -523,11 +523,11 @@ class System(list):
     def pupil(self, yo, l=None, stop=None, **kwargs):
         k = (l, stop)
         try:
-            return self._pupil_cache[k](*yo)
+            c = self._pupil_cache[k]
         except KeyError:
-            self._pupil_cache[k] = c = CacheND(self._do_pupil, l=l,
+            c = self._pupil_cache[k] = CacheND(self._do_pupil, l=l,
                     stop=stop, **kwargs)
-            return c(*yo)
+        return c(*yo)
 
     def _do_pupil(self, xo, yo, guess, **kwargs):
         if guess is not None:
