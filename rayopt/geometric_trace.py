@@ -169,63 +169,42 @@ class GeometricTrace(Trace):
         u = np.zeros((2, 2))
         u[:, paraxial.axis] = sinarctan(paraxial.u[0])
         self.rays_given(y, u)
-        self.propagate(clip=False)
+        self.propagate()
 
-    def rays_clipping(self, height, pupil_distance, pupil_height,
-            wavelength=None, axis=1, clip=False, **kwargs):
-        a = self.system.pupil((0, height), l=wavelength, stop=-1,
-                **kwargs)
-        print(a)
-        z, t, b, l, r = a
-        print(z, t, b, l, r)
-        yo = (0, height)
-        pd = pupil_distance
-        ph = np.ones(2)*pupil_height
-        try:
-            pd = self.system.aim(yo, (0, 0), pd, ph, wavelength, axis=1, **kwargs)
-        except RuntimeError as e:
-            print("chief aim failed", height, e)
-        y, u = self.system.object.aim(yo, (0, 0), pd, ph)
-        ys, us = [y], [u]
-        for t in -1, 1:
-            yp = [0, 0]
-            yp[axis] = t
-            try:
-                ph[axis] = self.system.aim(yo, yp, pd, ph, wavelength, axis=axis, stop=-1)
-            except RuntimeError as e:
-                print("clipping aim failed", height, t, e)
-            y, u = self.system.object.aim(yo, yp, pd, ph)
-            ys.append(y)
-            us.append(u)
+    def rays_clipping(self, yo, wavelength=None, axis=(1,), **kwargs):
+        z, p = self.system.pupil(yo, l=wavelength, stop=-1, **kwargs)
+        ys, us = [], []
+        for ax in axis:
+            for t in 0, -1, 1:
+                yp = [0, 0]
+                yp[ax] = t
+                y, u = self.system.object.aim(yo, yp, z, p)
+                ys.append(y)
+                us.append(u)
         y, u = np.vstack(ys), np.vstack(us)
         self.rays_given(y, u, wavelength)
-        self.propagate(clip=clip)
+        self.propagate()
 
     def rays_point(self, yo, wavelength=None, nrays=11,
-            distribution="meridional", clip=False):
-        z, a, b = self.system.pupil(yo, l=wavelength)
-        icenter, yp = pupil_distribution(distribution, nrays)
-        # NOTE: will not have same ray density in x and y if pupil is
-        # distorted
-        y, u = self.system.object.aim(yo, yp, z, (a, b))
+            distribution="meridional", filter=True, **kwargs):
+        ref, y, weight = pupil_distribution(distribution, nrays)
+        z, p = self.system.pupil(yo, l=wavelength, **kwargs)
+        y, u = self.system.object.aim(yo, y, z, p, filter=filter)
         self.rays_given(y, u, wavelength)
-        self.propagate(clip=clip)
-        return icenter
+        self.propagate()
+        return ref, weight
 
-    def rays_line(self, height, pupil_distance, pupil_height,
-            wavelength=None, nrays=21, aim=True, eps=1e-2, clip=False):
-        yi = np.c_[np.zeros(nrays), np.linspace(0, height, nrays)]
+    def rays_line(self, yo, wavelength=None, nrays=21, aim=True,
+            eps=1e-2, **kwargs):
+        yi = np.linspace(0, 1, nrays)[:, None]*np.atleast_2d(yo)
         y = np.empty((nrays, 3))
         u = np.empty_like(y)
         if aim:
-            for i in range(yi.shape[0]):
-                try:
-                    pdi = self.system.aim(yi[i], (0, 0), pupil_distance,
-                            pupil_height, wavelength, axis=1)
-                    y[i], u[i] = self.system.object.aim(yi[i], (0, 0),
-                            pdi, pupil_height)
-                except RuntimeError:
-                    print("chief aim failed", i)
+            for i in range(y.shape[0]):
+                # TODO: no pupil needed
+                zi, p = self.system.pupil(yi[i], l=wavelength, **kwargs)
+                y[i], u[i] = self.system.object.aim(yi[i], (0, 0),
+                        zi)
         e = np.zeros((3, 1, 3)) # pupil
         e[(1, 2), :, (1, 0)] = eps # meridional, sagittal
         if self.system.object.finite:
@@ -237,29 +216,12 @@ class GeometricTrace(Trace):
             y = (y + e*pupil_height).reshape(-1, 3)
             u = np.tile(u, (3, 1))
         self.rays_given(y, u, wavelength)
-        self.propagate(clip=clip)
+        self.propagate()
 
     def rays_quadrature(self, height, wavelength=None, nrays=13,
-            distribution="radau"):
-        i, y, w = pupil_distribution(distribution, nrays)
-        z, a, b = self.system.pupil(height, l=wavelength)
-        y, u = self.system.object.aim(height, y, z, (a, b))
-        self.rays_given(y, u, wavelength)
-        self.propagate(clip=False)
-        return i, w
-
-    def rays_paraxial_clipping(self, paraxial, height=1.,
-            wavelength=None, **kwargs):
-        # TODO: refactor rays_paraxial_*
-        zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = paraxial.pupil_height[0]
-        return self.rays_clipping(height, zp, rp, wavelength, **kwargs)
-
-    def rays_paraxial_line(self, paraxial, height=1.,
-            wavelength=None, **kwargs):
-        zp = paraxial.pupil_distance[0] + paraxial.z[1]
-        rp = paraxial.pupil_height[0]
-        return self.rays_line(height, zp, rp, wavelength, **kwargs)
+            distribution="radau", filter=False, **kwargs):
+        return self.rays_point(height, wavelength, nrays, distribution,
+                filter=filter, **kwargs)
 
     def resize(self, fn=lambda a, b: a):
         r = np.hypot(self.y[:, :, 0], self.y[:, :, 1])

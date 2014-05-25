@@ -146,21 +146,21 @@ class DemotripCase(unittest.TestCase):
     def test_aim(self):
         p, g = self.traces()
         #print(z, a)
-        z, a, b = self.s.pupil((0, 1.))
+        z, p = self.s.pupil((0, 1.))
         #print(z, a)
 
     def test_aim_point(self):
         p, g = self.traces()
-        g.rays_paraxial_clipping(p)
         g.rays_point((0, 1.))
-        g.rays_paraxial_line(p)
+        g.rays_clipping((0, 1.))
+        g.rays_line((0, 1.))
 
     def test_aim_point_more(self):
         p, g = self.traces()
         i = self.s.stop
         r = np.array([el.radius for el in self.s[1:-1]])
 
-        g.rays_paraxial_clipping(p)
+        g.rays_clipping((0, 1.))
         if not self.s.object.finite:
             nptest.assert_allclose(g.u[0, :, :], g.u[0,
                 (0,)*g.u.shape[1], :])
@@ -177,7 +177,7 @@ class DemotripCase(unittest.TestCase):
         nptest.assert_allclose(g.y[i, :, 0]/self.s[i].radius,
                 [0, 0, 0, -1, 0, 1], atol=1e-3)
         #print(g.y[i, :, :2]/self.s[i].radius)
-        g.rays_paraxial_line(p)
+        g.rays_line()
 
     def test_pupil(self):
         p, g = self.traces()

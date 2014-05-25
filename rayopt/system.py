@@ -438,72 +438,7 @@ class System(list):
             yield y, u, n, i, t
             y, u = e.from_normal(y, u)
 
-    def aim(self, yo, yp, z, p, l=None, axis=1, stop=None,
-            tol=1e-3, maxiter=100):
-        """aims ray at aperture center (or target)
-        changing angle (in case of finite object) or
-        position in case of infinite object"""
-        # yo 2d fractional object coordinate (object knows meaning)
-        # yp 2d fractional angular pupil coordinate (since object points
-        # emit into solid angles)
-        # z pupil distance from object apex
-        # a pupil angular half aperture (from z=0 even in infinite case)
-
-        # get necessary y for finite object and u for infinite
-        # get guess u0/y0
-        # setup vary functions that change u/y (angle around u0 and pos
-        # ortho to u)
-        # setup distance function that measures distance to aperture
-        # point or max(yi/target - radii) (if stop==-1)
-        # find first, then minimize
-        # return apparent z and a
-
-        # TODO: should only look at total (1d) height yo and determine
-        # sagittal and meridional stop size or position:
-        # (r, phi, stop) -> (z, sag, mer)
-
-        if l is None:
-            l = self.wavelengths[0]
-        y, u = self.object.aim(yo, yp, z, p)
-        n = self[0].refractive_index(l)
-
-        if np.allclose(yp, 0):
-            # aim chief and determine pupil distance
-            def vary(a):
-                z1 = z*a
-                y[0], u[0] = self.object.aim(yo, yp, z1, p)
-                return z1
-        else:
-            # aim marginal and determine pupil aperture
-            p1 = np.array(p) # copies
-            def vary(a):
-                p1[axis] = p[axis]*a
-                y[0], u[0] = self.object.aim(yo, yp, z, p1)
-                return p1[axis]
-
-        if stop is -1:
-            # return clipping ray
-            radii = np.array([e.radius for e in self[1:-1]])**2
-            @simple_cache
-            def distance(a):
-                vary(a)
-                ys = [yunit[0][0, :2] for yunit in self.propagate(
-                    y, u, n, l, clip=False, stop=-1)]
-                rs = np.square(ys).sum(-1)
-                return (rs - radii).max()
-        else:
-            # return pupil ray
-            if stop is None:
-                stop = self.stop
-            target = self[stop].radius**2*np.square(yp).sum()
-            @simple_cache
-            def distance(a):
-                vary(a)
-                res = [yunit[0][0, :2] for yunit in self.propagate(
-                    y, u, n, l, stop=stop + 1, clip=False)][-1]
-                res = np.square(res).sum()
-                return res - target
-
+    def solve_ray(self, merit, tol=1e-3, maxiter=100):
         def find_start(fun, a0=1.):
             f0 = fun(a0)
             if not np.isnan(f0):
@@ -515,46 +450,77 @@ class System(list):
                         return a0 + ai, fi
             raise RuntimeError("no starting ray found")
 
-        a, f = find_start(distance)
+        a, f = find_start(merit)
         if abs(f) > tol:
-            a = newton(distance, a, tol=tol, maxiter=maxiter)
-        return vary(a)
+            a = newton(merit, a, tol=tol, maxiter=maxiter)
+        return a
+
+    def aim_chief(self, yo, z, l=None, stop=None, **kwargs):
+        if l is None:
+            l = self.wavelengths[0]
+        n = self[0].refractive_index(l)
+        if stop in (-1, None):
+            stop = self.stop
+        def dist(a):
+            y, u = self.object.aim(yo, None, z*a, filter=False)
+            res = [yunit[0] for yunit in self.propagate(
+                y, u, n, l, stop=stop + 1)][-1][0, :2]
+            print(yo, a, res)
+            return (yo*res).sum()
+        a = self.solve_ray(simple_cache(dist), **kwargs)
+        return a*z
+
+    def aim_marginal(self, yo, yp, z, p, l=None, stop=None, **kwargs):
+        if l is None:
+            l = self.wavelengths[0]
+        n = self[0].refractive_index(l)
+        if stop is None:
+            stop = self.stop
+        if stop == -1:
+            rad = np.array([e.radius for e in self[1:-1]])**2
+        else:
+            rad = self[stop].radius**2
+        def dist(a):
+            y, u = self.object.aim(yo, yp, z, p*a, filter=False)
+            if stop == -1:
+                ys = [yunit[0][0, :2] for yunit in self.propagate(
+                    y, u, n, l, stop=-1)]
+                return (np.square(ys).sum(-1) - rad).max()
+            else:
+                ys = [yunit[0][0, :2] for yunit in self.propagate(
+                    y, u, n, l, stop=stop + 1)][-1]
+                return np.square(ys).sum() - rad
+        a = self.solve_ray(simple_cache(dist), **kwargs)
+        return a*p
+
+    def _aim_pupil(self, xo, yo, guess, **kwargs):
+        y = np.array((xo, yo))
+        if guess is None:
+            z = self.object.pupil_distance
+            a = np.ones((2, 2))*self.object.pupil_radius
+        else:
+            q = guess
+            z, a = q[0], q[1:].reshape(2, 2)
+        if not np.allclose(y, 0):
+            z = self.aim_chief(y, z, **kwargs)
+        a[1, 1] = self.aim_marginal(y, (0, 1), z, a[1, 1], **kwargs)
+        if guess is None:
+            a[0, 1] = -a[1, 1]
+        a[0, 1] = self.aim_marginal(y, (0, -1), z, a[0, 1], **kwargs)
+        if guess is None:
+            a[1, 0] = a[1, 1]
+        a[1, 0] = self.aim_marginal(y, (1, 0), z, a[1, 0], **kwargs)
+        if guess is None:
+            a[0, 0] = -a[1, 0]
+        a[0, 0] = self.aim_marginal(y, (-1, 0), z, a[0, 0], **kwargs)
+        return np.r_[z, a.flat]
 
     def pupil(self, yo, l=None, stop=None, **kwargs):
         k = (l, stop)
         try:
             c = self._pupil_cache[k]
         except KeyError:
-            if stop is -1:
-                solver = self._do_clipping
-            else:
-                solver = self._do_pupil
-            c = self._pupil_cache[k] = CacheND(solver, l=l,
-                    stop=stop, **kwargs)
-        return c(*yo)
-
-    def _do_pupil(self, xo, yo, guess, **kwargs):
-        if guess is not None:
-            z, a, b = guess
-        else:
-            z = self.object.pupil_distance
-            a = b = self.object.pupil_radius
-        if not np.allclose((xo, yo), 0):
-            z = self.aim((xo, yo), (0, 0.), z, (a, b), **kwargs)
-        a = self.aim((xo, yo), (1., 0), z, (a, b), axis=0, **kwargs)
-        b = self.aim((xo, yo), (0, 1.), z, (a, b), axis=1, **kwargs)
-        return z, a, b
-
-    def _do_clipping(self, xo, yo, guess, **kwargs):
-        if guess is not None:
-            z, t, b, l, r = guess
-        else:
-            z = self.object.pupil_distance
-            t = b = l = r = self.object.pupil_radius
-        if not np.allclose((xo, yo), 0):
-            z = self.aim((xo, yo), (0, 0.), z, (t, b), **kwargs)
-        t = self.aim((xo, yo), (0, 1.), z, (l, t), axis=1, **kwargs)
-        b = self.aim((xo, yo), (0, -1.), z, (l, b), axis=1, **kwargs)
-        l = self.aim((xo, yo), (1., 0), z, (l, t), axis=0, **kwargs)
-        r = self.aim((xo, yo), (-1., 0), z, (r, t), axis=0, **kwargs)
-        return z, t, b, l, r
+            c = self._pupil_cache[k] = CacheND(self._aim_pupil,
+                    l=l, stop=stop, **kwargs)
+        q = c(*yo)
+        return q[0], q[1:].reshape(2, 2)

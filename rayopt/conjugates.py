@@ -86,6 +86,18 @@ class Conjugate(NameMixin):
     def text(self):
         return [] # TODO
 
+    @staticmethod
+    def map_pupil(y, a, filter=True):
+        # a = [[-sag, -mer], [+sag, +mer]]
+        am = np.fabs(a).max()
+        y = np.atleast_2d(y)*am
+        if filter:
+            c = np.sum(a, axis=0)/2
+            d = np.diff(a, axis=0)/2
+            r = ((y - c)**2/d**2).sum(1)
+            y = y[r <= 1]
+        return y
+
     def aim(self, xy, pq, z=None, a=None):
         """
         h 2d fractional object coordinate (object knows meaning)
@@ -100,59 +112,6 @@ class Conjugate(NameMixin):
         a pupil aperture (also for infinite object, then from z=0)
         """
         raise NotImplementedError
-        if z is None:
-            z = self.pupil_distance
-        if a is None:
-            a = self.pupil_radius
-        yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
-        n = yo.shape[0]
-        uz = np.array((0., 0., z))
-        if self.finite:
-            # do not take yo as angular fractional as self.radius is
-            # not angular eigher. This does become problematic if object
-            # is finite and hyperhemispherical. TODO: improve Spheroid
-            y = np.zeros((n, 3))
-            y[:, :2] = -yo*self.radius
-            y[:, 2] = self.surface_sag(y)
-            u = uz - y
-        else:
-            # lambert azimuthal equal area
-            # planar coords
-            yo = yo*2*np.sin(self.angular_radius/2)
-            yo2 = np.square(yo).sum(1)
-            u = np.empty((n, 3))
-            u[:, :2] = yo*np.sqrt(1 - yo2[:, None]/4)
-            u[:, 2] = 1 - yo2/2
-            y = uz - z*u # have rays start on sphere around pupil center
-        if z < 0:
-            u *= -1
-        usag = np.cross(u, uz)
-        usagn = np.sqrt(np.square(usag).sum(1))[:, None]
-        usagnz = usagn == 0.
-        usag = np.where(usagnz, (1., 0, 0), usag)
-        usagn = np.where(usagnz, 1., usagn)
-        usag /= usagn
-        umer = np.cross(u, usag)
-        umer /= np.sqrt(np.square(umer).sum(1))[:, None]
-        # umer /= np.sqrt(np.square(umer).sum(1)) by construction
-        # lambert azimuthal equal area
-        # yp is relative angular X and Y pupil coords (aplanatic)
-        #yp = yp*np.tan(a)*z
-        yp = yp*2*np.sin(a/2)
-        yp2 = np.square(yp).sum(1)[:, None]
-        # unit vector to pupil point from (0, 0, 0)
-        #up = np.empty((n, 3))
-        #up[:, :2] = np.sqrt(1 - yp2/4)*yp
-        #up[:, 2] = 1 - yp2/2
-        yp *= np.sqrt(1 - yp2/4)/(1 - yp2/2)*z
-        yp = usag*yp[:, 0, None] + umer*yp[:, 1, None]
-        if self.finite:
-            u += yp
-            u /= np.sqrt(np.square(u).sum(1))[:, None]
-        else:
-            y += yp
-            # u is normalized
-        return y, u
 
 
 @public
@@ -229,21 +188,29 @@ class FiniteConjugate(Conjugate):
     def height(self, h):
         self.radius = h
 
-    def aim(self, yo, yp, z=None, a=None, surface=None):
+    def aim(self, yo, yp=None, z=None, a=None, surface=None, filter=True):
         if z is None:
             z = self.pupil_distance
-        if a is None:
-            a = self.pupil_radius
-        yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
+        yo = np.atleast_2d(yo)
+        if yp is not None:
+            if a is None:
+                a = self.pupil_radius
+                a = np.array(((-a, -a), (a, a)))
+            a = np.arctan2(a, z)
+            yp = np.atleast_2d(yp)
+            yp = self.map_pupil(yp, a, filter)
+            yp = z*np.tan(yp)
+            yo, yp = np.broadcast_arrays(yo, yp)
+
         y = np.zeros((yo.shape[0], 3))
         y[..., :2] = -yo*self.radius
         if surface:
             y[..., 2] = -surface.surface_sag(y)
         uz = (0, 0, z)
         u = uz - y
-        yp = z*np.tan(yp*np.arctan2(a, z))
-        s, m = sagittal_meridional(u, uz)
-        u += yp[..., 0, None]*s + yp[..., 1, None]*m
+        if yp is not None:
+            s, m = sagittal_meridional(u, uz)
+            u += yp[..., 0, None]*s + yp[..., 1, None]*m
         normalize(u)
         if z < 0:
             u *= -1
@@ -291,20 +258,26 @@ class InfiniteConjugate(Conjugate):
     def height(self, h):
         self.radius = sinarctan(h/self.pupil_distance)
 
-    def aim(self, yo, yp, z=None, a=None, surface=None):
+    def aim(self, yo, yp=None, z=None, a=None, surface=None, filter=True):
         if z is None:
             z = self.pupil_distance
-        if a is None:
-            a = self.pupil_radius
-        yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
+        yo = np.atleast_2d(yo)
+        if yp is not None:
+            if a is None:
+                a = self.pupil_radius
+                a = np.array(((-a, -a), (a, a)))
+            yp = np.atleast_2d(yp)
+            yp = self.map_pupil(yp, a, filter)
+            yo, yp = np.broadcast_arrays(yo, yp)
+
         u = np.empty((yo.shape[0], 3))
         u[..., :2] = np.sin(yo*self.angle)
         normalize_z(u)
         yz = (0, 0, z)
         y = yz - z*u
-        yp = yp*a
-        s, m = sagittal_meridional(u, yz)
-        y += yp[..., 0, None]*s + yp[..., 1, None]*m
+        if yp is not None:
+            s, m = sagittal_meridional(u, yz)
+            y += yp[..., 0, None]*s + yp[..., 1, None]*m
         if surface:
             y += surface.intercept(y, u)*u
         return y, u
