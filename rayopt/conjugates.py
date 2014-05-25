@@ -279,5 +279,5 @@ class InfiniteConjugate(Conjugate):
             s, m = sagittal_meridional(u, yz)
             y += yp[..., 0, None]*s + yp[..., 1, None]*m
         if surface:
-            y += surface.intercept(y, u)*u
+            y += surface.intercept(y, u)[:, None]*u
         return y, u

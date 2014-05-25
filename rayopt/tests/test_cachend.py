@@ -30,7 +30,7 @@ from rayopt.cachend import *
 
 class CacheCase(unittest.TestCase):
     def test_make(self):
-        c = CacheND(lambda a: a)
+        c = LinearCacheND(lambda a: a)
 
     def test_random(self):
         n = 10
@@ -38,6 +38,6 @@ class CacheCase(unittest.TestCase):
             if guess is not None:
                 nptest.assert_allclose((a, b), guess)
             return a, b
-        c = CacheND(solver)
+        c = LinearCacheND(solver)
         for x in np.random.randn(n, 2):
             nptest.assert_equal(c(*x), x)

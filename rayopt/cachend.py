@@ -21,7 +21,7 @@ from __future__ import print_function, absolute_import, division
 import warnings
 
 import numpy as np
-from scipy.interpolate import LinearNDInterpolator
+from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 from scipy.spatial.qhull import QhullError
 
 from .utils import public
@@ -56,6 +56,22 @@ class CacheND(object):
         return value
 
     def _update(self):
+        raise NotImplementedError
+
+
+@public
+class NearestCacheND(CacheND):
+    def _update(self):
+        xy = list(self.cache.items())
+        x = np.array([_[0] for _ in xy])
+        y = np.array([_[1] for _ in xy])
+        i = NearestNDInterpolator(x, y)
+        self.interpolator = i
+
+
+@public
+class LinearCacheND(CacheND):
+    def _update(self):
         if len(self.cache) < 4:
             return
         xy = list(self.cache.items())
@@ -66,3 +82,28 @@ class CacheND(object):
         except QhullError:
             i = None
         self.interpolator = i
+
+
+@public
+class PolarCacheND(CacheND):
+    def _update(self):
+        xy = list(self.cache.items())
+        x = np.array([_[0] for _ in xy])
+        y = np.array([_[1] for _ in xy])
+        r = np.sqrt(np.square(x).sum(1))
+        i = np.argsort(r)
+        self.r = r.take(i)
+        # self.p = np.arctan2(x[:, 1], x[:, 0]).take(i)
+        self.y = y.take(i, axis=0)
+        self.interpolator = self._interpolator
+
+    def _interpolator(self, xo, yo):
+        r = np.sqrt(xo**2 + yo**2)
+        if r <= self.r[0]:
+            return self.y[0]
+        if r >= self.r[-1]:
+            return self.y[-1]
+        i = np.searchsorted(self.r, r)
+        ra, rb = self.r[i - 1], self.r[i]
+        ya, yb = self.y[i - 1], self.y[i]
+        return ya + (yb - ya)*(r - ra)/(rb - ra)

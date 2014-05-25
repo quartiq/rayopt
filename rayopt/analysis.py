@@ -106,7 +106,8 @@ class Analysis(object):
         t.rays_paraxial(self.paraxial)
         if self.print_full:
             self.text.append(unicode(t))
-        figheight = 2*max(e.radius for e in self.system)
+        figheight = 2*max(e.radius for e in self.system if
+                np.isfinite(e.radius))
         figheight = min(figheight/self.paraxial.z[-1]*self.figwidth,
                 2*self.figwidth/3)
         fig, ax = plt.subplots(figsize=(self.figwidth, figheight))
@@ -120,7 +121,7 @@ class Analysis(object):
             t.plot(ax)
         for h in 0, max(self.plot_heights):
             t = GeometricTrace(self.system)
-            t.rays_paraxial_clipping(self.paraxial, h)
+            t.rays_clipping((0, h))
             t.plot(ax)
        
         if self.plot_transverse is True:
@@ -249,7 +250,7 @@ class Analysis(object):
                     verticalalignment="center")
             for wi, ci in zip(wavelengths, colors):
                 t = GeometricTrace(self.system)
-                ref = t.rays_point((0, hi), wi, nrays=nrays_line,
+                ref, weight = t.rays_point((0, hi), wi, nrays=nrays_line,
                         distribution="tee", clip=True)
                 # plot transverse image plane versus entrance pupil
                 # coordinates
@@ -286,7 +287,7 @@ class Analysis(object):
             for wi, ci in zip(wavelengths, colors):
                 r = paraxial.airy_radius[1]/paraxial.l*wi
                 t = GeometricTrace(self.system)
-                ref = t.rays_point((0, hi), wi, nrays=nrays,
+                ref, weight = t.rays_point((0, hi), wi, nrays=nrays,
                         distribution="hexapolar", clip=True)
                 # plot transverse image plane hit pattern (ray spot)
                 y = t.y[-1, :, :2] - t.y[-1, ref, :2]
@@ -320,7 +321,7 @@ class Analysis(object):
             self.setup_axes(axe, "R", "E")
             self.setup_axes(axm, "F", "C")
             t = GeometricTrace(self.system)
-            ref = t.rays_point((0, hi), wavelength, nrays=nrays,
+            ref, weight = t.rays_point((0, hi), wavelength, nrays=nrays,
                     distribution="hexapolar", clip=True)
             try:
                 x, y, o = t.opd(ref)
@@ -391,7 +392,7 @@ class Analysis(object):
         h = np.linspace(0, height*paraxial.height[1], nrays)
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
             t = GeometricTrace(self.system)
-            t.rays_paraxial_line(paraxial, height, wi, nrays=nrays)
+            t.rays_line((0, height), wi, nrays=nrays)
             a, b, c = np.split(t.y[-1].T, (nrays, 2*nrays), axis=1)
             p, q, r = np.split(tanarcsin(t.i[-1]).T, (nrays, 2*nrays), axis=1)
             if i == 0:
@@ -406,21 +407,20 @@ class Analysis(object):
             xs = -(c[0]-a[0])/(r[0]-p[0])
             axf.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
             t = GeometricTrace(self.system)
-            t.rays_point((0, 0.), wi, nrays=nrays,
+            ref, weight = t.rays_point((0, 0.), wi, nrays=nrays,
                     distribution="half-meridional")
             p = paraxial.pupil_distance[0]
             py = t.y[1, :, 1] + p*tanarcsin(t.i[1])[:, 1]
             z = -t.y[-1, :, 1]/tanarcsin(t.i[-1])[:, 1]
-            z[0] = np.nan
+            z[ref] = np.nan
             axs.plot(py, z, ci+"-", label="%s" % wi)
         wl, wu = min(wavelengths), max(wavelengths)
         ww = np.linspace(wl - (wu - wl)/4, wu + (wu - wl)/4, nrays)
         zc = []
-        pd = paraxial.pupil_distance[0]
-        ph = np.fabs(np.arctan2(paraxial.pupil_height[0], pd))
+        pd, ph = self.system.pupil((0, 0), wavelengths[0])
+        t = GeometricTrace(self.system)
         for wwi in np.r_[wavelengths[0], ww]:
-            t = GeometricTrace(self.system)
-            y, u = self.system.object.aim((0, 0), (0, 1e-3), pd, ph)
+            y, u = self.system.aim((0, 0), (0, 1e-3), pd, ph)
             t.rays_given(y, u, wwi)
             t.propagate(clip=False)
             zc.append(-t.y[-1, 0, 1]/tanarcsin(t.i[-1, 0])[1])

@@ -27,7 +27,7 @@ from .elements import Element
 from .conjugates import Conjugate, FiniteConjugate, InfiniteConjugate
 from .material import fraunhofer
 from .utils import public, simple_cache
-from .cachend import CacheND
+from .cachend import PolarCacheND
 
 
 @public
@@ -424,11 +424,11 @@ class System(list):
             yu, n = e.propagate_paraxial(yu, n, l)
             yield yu, n
 
-    def propagate_gaussian(self, qi, n, l, start=1, stop=None):
+    def propagate_gaussian(self, q, n, l, start=1, stop=None):
         stop = stop or len(self)
         for e in self[start:stop]:
-            qi, n = e.propagate_gaussian(qi, n, l)
-            yield qi, n
+            q, n = e.propagate_gaussian(q, n, l)
+            yield q, n
 
     def propagate(self, y, u, n, l, start=1, stop=None, clip=False):
         stop = stop or len(self)
@@ -455,6 +455,9 @@ class System(list):
             a = newton(merit, a, tol=tol, maxiter=maxiter)
         return a
 
+    def aim(self, *args, **kwargs):
+        return self.object.aim(*args, surface=self[0], **kwargs)
+
     def aim_chief(self, yo, z, l=None, stop=None, **kwargs):
         if l is None:
             l = self.wavelengths[0]
@@ -462,10 +465,9 @@ class System(list):
         if stop in (-1, None):
             stop = self.stop
         def dist(a):
-            y, u = self.object.aim(yo, None, z*a, filter=False)
+            y, u = self.aim(yo, None, z*a, filter=False)
             res = [yunit[0] for yunit in self.propagate(
                 y, u, n, l, stop=stop + 1)][-1][0, :2]
-            print(yo, a, res)
             return (yo*res).sum()
         a = self.solve_ray(simple_cache(dist), **kwargs)
         return a*z
@@ -481,15 +483,15 @@ class System(list):
         else:
             rad = self[stop].radius**2
         def dist(a):
-            y, u = self.object.aim(yo, yp, z, p*a, filter=False)
+            y, u = self.aim(yo, yp, z, p*a, filter=False)
             if stop == -1:
                 ys = [yunit[0][0, :2] for yunit in self.propagate(
                     y, u, n, l, stop=-1)]
-                return (np.square(ys).sum(-1) - rad).max()
+                return (np.square(ys).sum(1)/rad - 1).max()
             else:
                 ys = [yunit[0][0, :2] for yunit in self.propagate(
                     y, u, n, l, stop=stop + 1)][-1]
-                return np.square(ys).sum() - rad
+                return np.square(ys).sum()/rad - 1
         a = self.solve_ray(simple_cache(dist), **kwargs)
         return a*p
 
@@ -520,7 +522,7 @@ class System(list):
         try:
             c = self._pupil_cache[k]
         except KeyError:
-            c = self._pupil_cache[k] = CacheND(self._aim_pupil,
+            c = self._pupil_cache[k] = PolarCacheND(self._aim_pupil,
                     l=l, stop=stop, **kwargs)
         q = c(*yo)
         return q[0], q[1:].reshape(2, 2)

@@ -27,17 +27,20 @@ import numpy as np
 from numpy import testing as nptest
 
 
-from rayopt import system_from_yaml, Analysis
+from rayopt import system_from_yaml, Analysis, ParaxialTrace
 from .test_raytrace import cooke
 
 
 class DemotripCase(unittest.TestCase):
     def setUp(self):
         self.s = system_from_yaml(cooke)
+        p = ParaxialTrace(self.s)
+        p.update_conjugates()
 
     def test_run(self):
         a = Analysis(self.s)
-        #for _ in a.text:
-        #    print(_)
-        #for i, _ in enumerate(a.figures):
-        #    _.savefig("analysis_%i.pdf" % i)
+        return
+        for _ in a.text:
+            print(_)
+        for i, _ in enumerate(a.figures):
+            _.savefig("analysis_%i.pdf" % i)

@@ -33,19 +33,19 @@ from rayopt.utils import tanarcsin, sinarctan
 
 class ConjugatesCase(unittest.TestCase):
     def test_finite(self):
-        c = FiniteConjugate(entrance_distance=1e6,
-                entrance_radius=2., pupil_distance=2e6,
-                radius=.5)
-        self.assertEqual(c.pupil_radius,
+        c = FiniteConjugate(entrance_distance=6.,
+                entrance_radius=2., pupil_distance=9.,
+                radius=.1)
+        self.assertAlmostEqual(c.pupil_radius,
                 c.entrance_radius/c.entrance_distance*c.pupil_distance)
-        self.assertEqual(c.na,
+        self.assertAlmostEqual(c.na,
                 sinarctan(c.entrance_radius/c.entrance_distance))
         self.some_aims(c)
 
     def test_infinite(self):
-        c = InfiniteConjugate(entrance_distance=30.,
-                entrance_radius=2., pupil_distance=40.,
-                angle=.2)
+        c = InfiniteConjugate(entrance_distance=6.,
+                entrance_radius=2., pupil_distance=9.,
+                angle=.1)
         self.assertEqual(c.pupil_radius, c.entrance_radius)
         self.some_aims(c)
 
@@ -61,11 +61,13 @@ class ConjugatesCase(unittest.TestCase):
 
     def assert_hits(self, y, u, z, yp):
         y1 = y[:, :2] + (z - y[:, 2])*tanarcsin(u)
-        nptest.assert_allclose(y1, yp, atol=1e-15)
+        nptest.assert_allclose(y1, yp, atol=1e-14, rtol=1e-2)
 
     def assert_aims(self, c, yo, yp):
         yo, yp = np.broadcast_arrays(*np.atleast_2d(yo, yp))
         y, u = c.aim(yo, yp)
         nptest.assert_allclose(1., np.square(u).sum(-1))
-        self.assert_hits(y, u, c.pupil_distance,
-                yp*c.pupil_radius)
+        p = np.arctan2(yo[0, 0], yo[0, 1])
+        r = np.array([[np.cos(p), -np.sin(p)], [np.sin(p), np.cos(p)]])
+        y1 = np.dot(yp*c.pupil_radius, r)
+        self.assert_hits(y, u, c.pupil_distance, y1)

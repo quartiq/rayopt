@@ -168,16 +168,17 @@ class DemotripCase(unittest.TestCase):
         nptest.assert_allclose(min(g.y[1:-1, 1, 1] + r), 0, atol=1e-3)
         nptest.assert_allclose(max(g.y[1:-1, 2, 1] - r), 0, atol=1e-3)
 
-        g.rays_point((0, 1.), distribution="cross", nrays=5)
+        g.rays_point((0, 1.), distribution="cross", nrays=5,
+                filter=False)
         if not self.s.object.finite:
             nptest.assert_allclose(g.u[0, :, :], g.u[0,
                 (0,)*g.u.shape[1], :])
         nptest.assert_allclose(g.y[i, :3, 1]/self.s[i].radius,
                 [-1, 0, 1], atol=1e-3, rtol=3e-2)
         nptest.assert_allclose(g.y[i, :, 0]/self.s[i].radius,
-                [0, 0, 0, -1, 0, 1], atol=1e-3)
+                [0, 0, 0, -1, 0, 1], atol=1e-1)
         #print(g.y[i, :, :2]/self.s[i].radius)
-        g.rays_line()
+        g.rays_line((0, 1.))
 
     def test_pupil(self):
         p, g = self.traces()
@@ -191,7 +192,8 @@ class DemotripCase(unittest.TestCase):
         p.update_conjugates()
         i, w = g.rays_quadrature((0, 1.), nrays=13)
         a = g.rms(w)
-        nptest.assert_allclose(a, .059, rtol=2e-2)
-        g.rays_point((0, 1.), nrays=200, distribution="square", clip=False)
+        nptest.assert_allclose(a, .062, rtol=2e-2)
+        g.rays_point((0, 1.), nrays=500, distribution="square",
+                clip=False, filter=True)
         b = g.rms()
         nptest.assert_allclose(a, b, rtol=2e-2)
