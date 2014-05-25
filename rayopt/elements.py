@@ -193,9 +193,8 @@ class Element(NameMixin, TransformMixin):
         return s
 
     def clip(self, y, u):
-        x, y, z = y.T
-        bad = x**2 + y**2 > self.radius**2
-        u = np.where(bad[:, None], np.nan, u)
+        good = np.square(y[:, :2]).sum(1) <= self.radius**2
+        u = np.where(good[:, None], u, np.nan)
         return u
 
     def propagate_paraxial(self, yu0, n0, l):
@@ -215,7 +214,7 @@ class Element(NameMixin, TransformMixin):
         m[0, 2] = m[1, 3] = d
         return n0, m
 
-    def propagate(self, y0, u0, n0, l, clip=True):
+    def propagate(self, y0, u0, n0, l):
         t = self.intercept(y0, u0)
         y = y0 + t[:, None]*u0
         if clip:
@@ -285,10 +284,9 @@ class Interface(Element):
         return y, u, n, t*n0
 
     def dispersion(self, lmin, lmax):
-        v = 0.
         if self.material is not None:
-            v = self.material.delta_n(lmin, lmax)
-        return v
+            return self.material.delta_n(lmin, lmax)
+        return 0.
 
     def surface_sag(self, p):
         raise NotImplementedError

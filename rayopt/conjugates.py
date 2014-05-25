@@ -84,7 +84,9 @@ class Conjugate(NameMixin):
         self.entrance_radius *= scale
 
     def text(self):
-        return [] # TODO
+        yield "Index: %.3g" % self.refractive_index
+        yield "Entrance: %.3g dia at %.3g" % (2*self.entrance_radius,
+                self.entrance_distance)
 
     @staticmethod
     def map_pupil(y, a, filter=True):
@@ -139,6 +141,12 @@ class FiniteConjugate(Conjugate):
         if self._na is not None:
             dat["na"] = float(self._na)
         return dat
+
+    def text(self):
+        for _ in super(FiniteConjugate, self).text():
+            yield _
+        yield "Radius: %.3g" % self.radius
+        yield "NA: %.3g" % self.na
 
     def rescale(self, scale):
         super(FiniteConjugate, self).rescale(scale)
@@ -238,6 +246,12 @@ class InfiniteConjugate(Conjugate):
         if self._pupil_radius is not None:
             dat["pupil_radius"] = float(self._pupil_radius)
         return dat
+
+    def text(self):
+        for _ in super(InfiniteConjugate, self).text():
+            yield _
+        yield "Angle: %.3g" % np.rad2deg(self.angle)
+        yield "Pupil: %.3g" % self.pupil_radius
 
     @property
     def pupil_radius(self):

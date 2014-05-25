@@ -1,5 +1,5 @@
 * check material=None is the same as preceding
-* fix paraxial race to be both axes
+* fix paraxial trace to be both axes
 * alternate solution for intersect in spheroid (paraboloidal
   hyperhemispherical mirrors)
 
@@ -17,7 +17,5 @@
 * analyze mtf at values vs image height
 
 * speedup refract, intercept, propagate
-* aiming cache
 
 * 3d plot
-* better lens and glass catalogs: smaller, extensible
