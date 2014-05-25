@@ -88,8 +88,7 @@ class Conjugate(NameMixin):
         yield "Entrance: %.3g dia at %.3g" % (2*self.entrance_radius,
                 self.entrance_distance)
 
-    @staticmethod
-    def map_pupil(y, a, filter=True):
+    def map_pupil(self, y, a, filter=True):
         # a = [[-sag, -mer], [+sag, +mer]]
         am = np.fabs(a).max()
         y = np.atleast_2d(y)*am
@@ -232,11 +231,12 @@ class InfiniteConjugate(Conjugate):
     finite = False
 
     def __init__(self, angle=0., angle_deg=None, pupil_radius=None,
-            **kwargs):
+            projection="rectilinear", **kwargs):
         super(InfiniteConjugate, self).__init__(**kwargs)
         if angle_deg is not None:
             angle = np.deg2rad(angle_deg)
         self.angle = angle
+        self.projection = projection
         self._pupil_radius = pupil_radius
 
     def dict(self):
@@ -245,6 +245,8 @@ class InfiniteConjugate(Conjugate):
             dat["angle_deg"] = float(np.rad2deg(self.angle))
         if self._pupil_radius is not None:
             dat["pupil_radius"] = float(self._pupil_radius)
+        if self.projection != "rectilinear":
+            dat["projection"] = self.projection
         return dat
 
     def text(self):
@@ -272,6 +274,34 @@ class InfiniteConjugate(Conjugate):
     def height(self, h):
         self.radius = sinarctan(h/self.pupil_distance)
 
+    def map_object(self, yo, a):
+        p = self.projection
+        n = yo.shape[0]
+        if p == "rectilinear":
+            y = yo*np.tan(a)
+            u = np.hstack((y, np.ones((n, 1))))
+            u /= np.sqrt(np.square(u).sum(-1))[:, None]
+        elif p == "stereographic":
+            y = yo*(2*np.tan(a/2))
+            r = np.square(y).sum(-1)[:, None]/4
+            u = np.hstack((y, 1 - r))/(r + 1)
+        elif p == "equisolid":
+            y = yo*(2*np.sin(a/2))
+            r = np.square(y).sum(-1)[:, None]
+            u = np.hstack((y*np.sqrt(1 - r/4), 1 - r/2))
+        elif p == "orthographic":
+            y = yo*np.sin(a)
+            r = np.square(y).sum(-1)[:, None]
+            u = np.hstack((y, np.sqrt(1 - r)[:, None]))
+        elif p == "equidistant":
+            y = yo*a
+            b = np.square(y).sum(-1) > (np.pi/2)**2
+            y = np.sin(y)
+            z = np.sqrt(np.square(y).sum(-1))
+            z = np.where(b, -z, z)[:, None]
+            u = np.hstack((y, z))
+        return u
+
     def aim(self, yo, yp=None, z=None, a=None, surface=None, filter=True):
         if z is None:
             z = self.pupil_distance
@@ -284,9 +314,7 @@ class InfiniteConjugate(Conjugate):
             yp = self.map_pupil(yp, a, filter)
             yo, yp = np.broadcast_arrays(yo, yp)
 
-        u = np.empty((yo.shape[0], 3))
-        u[..., :2] = np.sin(yo*self.angle)
-        normalize_z(u)
+        u = self.map_object(yo, self.angle)
         yz = (0, 0, z)
         y = yz - z*u
         if yp is not None:
