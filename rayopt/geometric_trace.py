@@ -43,17 +43,23 @@ class GeometricTrace(Trace):
         self.y = np.empty((self.length, nrays, 3))
         self.u = np.empty_like(self.y)
         self.i = np.empty_like(self.y)
+        self.w = None
+        self.ref = None
         self.l = 1.
         self.t = np.empty((self.length, nrays))
 
-    def rays_given(self, y, u, l=None):
+    def rays_given(self, y, u, l=None, w=None, ref=None):
         y, u = np.atleast_2d(y, u)
         y, u = np.broadcast_arrays(y, u)
         n, m = y.shape
-        if not hasattr(self, "y") or self.y.shape[0] != n:
+        if not hasattr(self, "y") or self.y.shape[1] != n:
             self.allocate(n)
         if l is None:
             l = self.system.wavelengths[0]
+        if w is None:
+            w = np.ones(n)/n
+        self.w = w
+        self.ref = ref
         self.l = l
         self.y[0, :, :m] = y
         self.y[0, :, m:] = 0
@@ -80,13 +86,22 @@ class GeometricTrace(Trace):
         u = tanarcsin(self.i[at])
         good = np.all(np.isfinite(u), axis=1)
         y, u = y[good], u[good]
-        y, u = (y - y.mean(0)).ravel(), (u - u.mean(0)).ravel()
-        # solution of sum((y+tu-sum(y+tu)/n)**2) == min
-        t = -np.dot(y, u)/np.dot(u, u)
+        if self.w is not None:
+            w = self.w[good]
+        else:
+            w = np.ones(y.shape[0])
+        y = y - y.mean(0)
+        u = u - u.mean(0)
+        wy = (w[:, None]*y).ravel()
+        wu = (w[:, None]*u).ravel()
+        u = u.ravel()
+        # solution of sum(w*(y+tu-sum(y+tu)/n)**2) == min
+        t = -np.dot(wy, u)/np.dot(wu, u)
         self.system[at].distance += t
         self.propagate()
 
-    def opd(self, chief=0, radius=None, after=-2, image=-1, resample=4):
+    def opd(self, radius=None, after=-2, image=-1, resample=4):
+        chief = self.ref
         t = self.t[:after + 1].sum(0)
         if not self.system.object.finite:
             # input reference sphere is a tilted plane
@@ -125,9 +140,9 @@ class GeometricTrace(Trace):
             x, y, t = xs, ys, ts
         return x, y, t
 
-    def psf(self, chief=0, pad=4, resample=4, **kwargs):
+    def psf(self, pad=4, resample=4, **kwargs):
         radius = self.system[-1].distance
-        x, y, o = self.opd(chief, resample=resample, radius=radius,
+        x, y, o = self.opd(resample=resample, radius=radius,
                 **kwargs)
         good = np.isfinite(o)
         n = np.count_nonzero(good)
@@ -150,17 +165,18 @@ class GeometricTrace(Trace):
             np.einsum("->", o, x, y)
         return p, q, psf
 
-    def rms(self, w=None, i=-1, ref=None):
+    def rms(self, i=-1, ref=None):
         y = self.y[i, :, :2]
         if ref is None:
             y0 = y.mean(0)
         else:
             y0 = y[ref]
         r = np.square(y - y0).sum(1)
-        if w is None:
-            r = r.sum()/y.shape[0]
+        if self.w is not None:
+            w = self.w
         else:
-            r = (r*w).sum()
+            w = np.ones_like(r)/r.shape[0]
+        r = (r*w).sum()
         return np.sqrt(r)
 
     def rays_paraxial(self, paraxial):
@@ -172,18 +188,18 @@ class GeometricTrace(Trace):
         self.propagate()
 
     def rays(self, yo, yp, wavelength, stop=None, filter=True,
-            clip=False):
+            clip=False, weight=None, ref=0):
         z, p = self.system.pupil(yo, l=wavelength, stop=stop)
         y, u = self.system.aim(yo, yp, z, p, filter=filter)
-        self.rays_given(y, u, wavelength)
+        self.rays_given(y, u, wavelength, weight, ref)
         self.propagate(clip=clip)
 
     def rays_point(self, yo, wavelength=None, nrays=11,
             distribution="meridional", filter=True, stop=None,
             clip=False):
         ref, yp, weight = pupil_distribution(distribution, nrays)
-        self.rays(yo, yp, wavelength, filter=filter, stop=stop, clip=clip)
-        return ref, weight
+        self.rays(yo, yp, wavelength, filter=filter, stop=stop,
+                clip=clip, weight=weight, ref=ref)
 
     def rays_clipping(self, yo, wavelength=None, axis=(1,)):
         z, p = self.system.pupil(yo, l=wavelength, stop=-1)
@@ -211,11 +227,6 @@ class GeometricTrace(Trace):
             y[:, i], u[:, i] = self.system.aim(yi[i], e, z, p)
         self.rays_given(y.reshape(-1, 3), u.reshape(-1, 3), wavelength)
         self.propagate()
-
-    def rays_quadrature(self, height, wavelength=None, nrays=13,
-            distribution="radau", filter=False, **kwargs):
-        return self.rays_point(height, wavelength, nrays, distribution,
-                filter=filter, **kwargs)
 
     def resize(self, fn=lambda a, b: a):
         r = np.hypot(self.y[:, :, 0], self.y[:, :, 1])

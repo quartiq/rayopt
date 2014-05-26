@@ -398,7 +398,7 @@ class ParaxialTrace(Trace):
         self.system[0].radius = self.system.object.height
         self.system.image.pupil_distance = -z[1]
         self.system.image.pupil_radius = a[1]
-        self.system.image.height = self.y[-1, 1]
+        self.system.image.height = np.fabs(self.y[-1, 1])
         self.system[-1].radius = self.system.image.height
 
     def update_stop(self, end="image"):

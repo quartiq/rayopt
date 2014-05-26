@@ -146,24 +146,19 @@ def pupil_distribution(distribution, nrays):
     """
     d = distribution
     n = nrays
+    weight = None
+    ref = 0
     if n == 1:
-        ref = 0
         xy = np.zeros((n, 2))
-        weight = np.ones(n)/n
     elif d == "half-meridional":
-        ref = 0
         xy = np.c_[np.zeros(n), np.linspace(0, 1, n)]
-        weight = np.ones(n)/n
     elif d == "meridional":
         n -= n % 2
-        ref = 0
         xy = np.c_[np.zeros(n + 1), np.linspace(-1, 1, n + 1)]
-        weight = np.ones(n)/n
     elif d == "sagittal":
         n -= n % 2
         ref = n/2
         xy = np.c_[np.linspace(-1, 1, n + 1), np.zeros(n + 1)]
-        weight = np.ones(n)/n
     elif d == "cross":
         n -= n % 4
         ref = n/4
@@ -171,7 +166,6 @@ def pupil_distribution(distribution, nrays):
             np.c_[np.zeros(n/2 + 1), np.linspace(-1, 1, n/2 + 1)],
             np.c_[np.linspace(-1, 1, n/2 + 1), np.zeros(n/2 + 1)],
             ])
-        weight = np.ones(n)/n
     elif d == "tee":
         n = (n - 2)/3
         ref = 2*n + 1
@@ -179,50 +173,39 @@ def pupil_distribution(distribution, nrays):
             np.c_[np.zeros(2*n + 1), np.linspace(-1, 1, 2*n + 1)],
             np.c_[np.linspace(0, 1, n + 1), np.zeros(n + 1)],
             ])
-        weight = np.ones(n)/n
     elif d == "random":
         r, phi = np.random.rand(2, n)
         xy = np.exp(2j*np.pi*phi)*np.sqrt(r)
         xy = np.c_[xy.real, xy.imag]
-        ref = 0
         xy = np.concatenate([[[0, 0]], xy])
-        weight = np.ones(n)/n
     elif d == "square":
         n = int(np.sqrt(n*4/np.pi))
         xy = np.mgrid[-1:1:1j*n, -1:1:1j*n].reshape(2, -1)
         xy = xy[:, (xy**2).sum(0) <= 1].T
-        ref = 0
         xy = np.concatenate([[[0, 0]], xy])
-        weight = np.ones(n)/n
     elif d == "triangular":
         n = int(np.sqrt(n*4/np.pi))
         xy = np.mgrid[-1:1:1j*n, -1:1:1j*n]
         xy[0] += (np.arange(n) % 2.)*(2./n)
         xy = xy.reshape(2, -1)
         xy = xy[:, (xy**2).sum(0)<=1].T
-        ref = 0
         xy = np.concatenate([[[0, 0]], xy])
-        weight = np.ones(n)/n
     elif d == "hexapolar":
         n = int(np.sqrt(n/3.-1/12.)-1/2.)
         l = [np.zeros((2, 1))]
         for i in np.arange(1, n + 1.):
             a = np.linspace(0, 2*np.pi, 6*i, endpoint=False)
             l.append([np.sin(a)*i/n, np.cos(a)*i/n])
-        ref = 0
         xy = np.concatenate(l, axis=1).T
-        weight = np.ones(n)/n
     elif d == "radau":
         n = int(np.sqrt(n) + 1)
         x, w = gr_roots(n)
         r, p, weight = interval_to_circle(x, w)
-        ref = 0
         xy = np.c_[r*np.cos(p), r*np.sin(p)]
     elif d == "lobatto":
         n = int(np.sqrt(n) + 1)
         x, w = gl_roots(n)
         r, p, weight = interval_to_circle(x, w)
-        ref = 0
         xy = np.c_[r*np.cos(p), r*np.sin(p)]
     return ref, xy, weight
 

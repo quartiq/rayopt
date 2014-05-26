@@ -190,8 +190,9 @@ class DemotripCase(unittest.TestCase):
     def test_quadrature(self):
         p, g = self.traces()
         p.update_conjugates()
-        i, w = g.rays_quadrature((0, 1.), nrays=13)
-        a = g.rms(w)
+        g.rays_point((0, 1.), nrays=13, distribution="radau",
+                filter=False)
+        a = g.rms()
         nptest.assert_allclose(a, .062, rtol=2e-2)
         g.rays_point((0, 1.), nrays=500, distribution="square",
                 clip=False, filter=True)

@@ -43,6 +43,7 @@ class Analysis(object):
     resize = False
     align = True
     close = None
+    update_conjugates = True
     refocus_paraxial = True
     trace_gaussian = True
     print_gaussian = False
@@ -80,10 +81,11 @@ class Analysis(object):
             self.paraxial.align()
         if self.refocus_paraxial:
             self.paraxial.refocus()
+        if self.update_conjugates:
+            self.paraxial.update_conjugates()
         if self.resize:
             self.paraxial.resize()
             self.system.fix_sizes()
-        self.system.image.radius = abs(self.paraxial.height[1])
         if self.trace_gaussian and self.system.object.finite:
             self.gaussian = GaussianTrace(self.system)
         if self.print_gaussian:
@@ -95,7 +97,8 @@ class Analysis(object):
             self.system.fix_sizes()
         if self.refocus_full:
             t = GeometricTrace(self.system)
-            t.rays_point((0, 0.), nrays=500, distribution="hexapolar", clip=True)
+            t.rays_point((0, 0.), nrays=13, distribution="radau",
+                    clip=False, filter=False)
             t.refocus()
             self.paraxial.propagate()
         if self.print_system:
@@ -178,7 +181,7 @@ class Analysis(object):
                 direction="out", axis="both")
         ax.xaxis.set_smart_bounds(True)
         ax.yaxis.set_smart_bounds(True)
-        ax.locator_params(tight=True, nbins=4)
+        ax.locator_params(tight=True, nbins=5)
         kw = dict(rotation="horizontal")
         if xlabel:
             ax.set_xlabel(xlabel, horizontalalignment="right",
@@ -236,13 +239,13 @@ class Analysis(object):
                 labelbottom=False, labelleft=False)
 
     def transverse(self, fig, heights=[1., .707, 0.],
-            wavelengths=None, nrays_line=302,
+            wavelengths=None, nrays_line=152,
             colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.wavelengths
         ax = self.pre_setup_fanplot(fig, len(heights))
-        p = paraxial.pupil_distance[0]
+        p = self.system.object.pupil_distance
         for hi, axi in zip(heights, ax):
             axm, axsm, axss = axi
             axm.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
@@ -250,22 +253,22 @@ class Analysis(object):
                     verticalalignment="center")
             for wi, ci in zip(wavelengths, colors):
                 t = GeometricTrace(self.system)
-                ref, weight = t.rays_point((0, hi), wi, nrays=nrays_line,
+                t.rays_point((0, hi), wi, nrays=nrays_line,
                         distribution="tee", clip=True)
                 # plot transverse image plane versus entrance pupil
                 # coordinates
-                y = t.y[-1, :, :2] - t.y[-1, ref, :2]
+                y = t.y[-1, :, :2] - t.y[-1, t.ref, :2]
                 py = t.y[1, :, :2] + p*tanarcsin(t.i[1])
-                py -= py[ref]
-                axm.plot(py[:ref, 1], y[:ref, 1], "-%s" % ci, label="%s" % wi)
-                axsm.plot(py[ref:, 0], y[ref:, 1], "-%s" % ci, label="%s" % wi)
-                axss.plot(py[ref:, 0], y[ref:, 0], "-%s" % ci, label="%s" % wi)
+                py -= py[t.ref]
+                axm.plot(py[:t.ref, 1], y[:t.ref, 1], "-%s" % ci, label="%s" % wi)
+                axsm.plot(py[t.ref:, 0], y[t.ref:, 1], "-%s" % ci, label="%s" % wi)
+                axss.plot(py[t.ref:, 0], y[t.ref:, 0], "-%s" % ci, label="%s" % wi)
         for axi in ax:
             for axii in axi:
                 self.post_setup_axes(axii)
 
     def spots(self, ax, heights=[1., .707, 0.],
-            wavelengths=None, nrays=300, colors="grbcmyk"):
+            wavelengths=None, nrays=150, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.wavelengths
@@ -287,17 +290,17 @@ class Analysis(object):
             for wi, ci in zip(wavelengths, colors):
                 r = paraxial.airy_radius[1]/paraxial.l*wi
                 t = GeometricTrace(self.system)
-                ref, weight = t.rays_point((0, hi), wi, nrays=nrays,
+                t.rays_point((0, hi), wi, nrays=nrays,
                         distribution="hexapolar", clip=True)
                 # plot transverse image plane hit pattern (ray spot)
-                y = t.y[-1, :, :2] - t.y[-1, ref, :2]
+                y = t.y[-1, :, :2] - t.y[-1, t.ref, :2]
                 u = tanarcsin(t.i[-1])
                 for axij, zi in zip(axi, z):
                     axij.add_patch(mpl.patches.Circle((0, 0), r, edgecolor=ci,
                         facecolor="none"))
                     yi = y + zi*u
                     axij.plot(yi[:, 0], yi[:, 1], ".%s" % ci,
-                            markersize=2, markeredgewidth=0, label="%s" % wi)
+                            markersize=3, markeredgewidth=0, label="%s" % wi)
         for axi in ax:
             for axii in axi:
                 self.post_setup_axes(axii)
@@ -321,10 +324,10 @@ class Analysis(object):
             self.setup_axes(axe, "R", "E")
             self.setup_axes(axm, "F", "C")
             t = GeometricTrace(self.system)
-            ref, weight = t.rays_point((0, hi), wavelength, nrays=nrays,
+            t.rays_point((0, hi), wavelength, nrays=nrays,
                     distribution="hexapolar", clip=True)
             try:
-                x, y, o = t.opd(ref)
+                x, y, o = t.opd()
             except ValueError:
                 continue
             og = o[np.isfinite(o)]
@@ -338,7 +341,7 @@ class Analysis(object):
             r = paraxial.airy_radius[1]/paraxial.l*wavelength
             axp.add_patch(mpl.patches.Circle((0, 0), r,
                     edgecolor="green", facecolor="none"))
-            x, y, psf = map(np.fft.fftshift, t.psf(ref))
+            x, y, psf = map(np.fft.fftshift, t.psf())
             x0 = (psf*x).sum()
             y0 = (psf*y).sum()
             x, y = x - x0, y - y0
@@ -373,7 +376,7 @@ class Analysis(object):
                 self.post_setup_axes(axij)
 
     def longitudinal(self, ax, height=1.,
-            wavelengths=None, nrays=31, colors="grbcmyk"):
+            wavelengths=None, nrays=21, colors="grbcmyk"):
         paraxial = self.paraxial
         # lateral color: image relative to image at wl[0]
         # focus shift paraxial focus vs wl
@@ -389,7 +392,7 @@ class Analysis(object):
                 (axa, "L", "DEZ", "LCOLOR"),
                 ]:
             self.setup_axes(axi, xl, yl, tl, yzero=False, xzero=False)
-        h = np.linspace(0, height*paraxial.height[1], nrays)
+        h = np.linspace(0, height*self.system.image.radius, nrays)
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
             t = GeometricTrace(self.system)
             t.rays_line((0, height), wi, nrays=nrays)
@@ -407,12 +410,12 @@ class Analysis(object):
             xs = -(c[0]-a[0])/(r[0]-p[0])
             axf.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
             t = GeometricTrace(self.system)
-            ref, weight = t.rays_point((0, 0.), wi, nrays=nrays,
+            t.rays_point((0, 0.), wi, nrays=nrays,
                     distribution="half-meridional")
-            p = paraxial.pupil_distance[0]
+            p = self.system.object.pupil_distance
             py = t.y[1, :, 1] + p*tanarcsin(t.i[1])[:, 1]
             z = -t.y[-1, :, 1]/tanarcsin(t.i[-1])[:, 1]
-            z[ref] = np.nan
+            z[t.ref] = np.nan
             axs.plot(py, z, ci+"-", label="%s" % wi)
         wl, wu = min(wavelengths), max(wavelengths)
         ww = np.linspace(wl - (wu - wl)/4, wu + (wu - wl)/4, nrays)
