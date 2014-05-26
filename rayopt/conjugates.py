@@ -145,7 +145,8 @@ class FiniteConjugate(Conjugate):
         for _ in super(FiniteConjugate, self).text():
             yield _
         yield "Radius: %.3g" % self.radius
-        yield "NA: %.3g" % self.na
+        if self._na is not None:
+            yield "NA: %.3g" % self.na
 
     def rescale(self, scale):
         super(FiniteConjugate, self).rescale(scale)
@@ -253,7 +254,8 @@ class InfiniteConjugate(Conjugate):
         for _ in super(InfiniteConjugate, self).text():
             yield _
         yield "Angle: %.3g" % np.rad2deg(self.angle)
-        yield "Pupil: %.3g" % self.pupil_radius
+        if self._pupil_radius is not None:
+            yield "Pupil: %.3g" % self.pupil_radius
 
     @property
     def pupil_radius(self):
