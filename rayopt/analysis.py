@@ -45,7 +45,7 @@ class Analysis(object):
     close = None
     update_conjugates = True
     refocus_paraxial = True
-    trace_gaussian = True
+    trace_gaussian = False
     print_gaussian = False
     print_system = True
     print_paraxial = True
@@ -55,7 +55,7 @@ class Analysis(object):
     plot_paraxial = False
     plot_gaussian = False
     plot_full = False
-    plot_heights = [1., .707, 0.]
+    plot_heights = [0, .707, 1.]
     plot_rays = 3
     plot_transverse = True
     plot_spots = True
@@ -149,7 +149,7 @@ class Analysis(object):
                     figsize=(self.figwidth, figheight), sharex=True,
                     sharey=True)
             self.figures.append(fig)
-            self.spots(ax, self.plot_spots)
+            self.spots(ax[::-1], self.plot_spots)
 
         if self.plot_opds is True:
             self.plot_opds = self.plot_heights
@@ -159,7 +159,7 @@ class Analysis(object):
                     figsize=(self.figwidth, figheight))
             #, sharex=True, sharey=True)
             self.figures.append(fig)
-            self.opds(ax, self.plot_opds)
+            self.opds(ax[::-1], self.plot_opds)
 
         return self.text, self.figures
 
@@ -227,7 +227,7 @@ class Analysis(object):
                     (axss, "PX", "EX"),
                     ]:
                 cls.setup_axes(axi, xl, yl)
-        return ax
+        return ax[::-1]
 
     @classmethod
     def pre_setup_xyplot(cls, axi, **kwargs):
@@ -238,7 +238,7 @@ class Analysis(object):
         axi.tick_params(bottom=False, left=False,
                 labelbottom=False, labelleft=False)
 
-    def transverse(self, fig, heights=[1., .707, 0.],
+    def transverse(self, fig, heights=[0., .707, 1.],
             wavelengths=None, nrays_line=152,
             colors="grbcmyk"):
         paraxial = self.paraxial
@@ -305,7 +305,7 @@ class Analysis(object):
             for axii in axi:
                 self.post_setup_axes(axii)
 
-    def opds(self, ax, heights=[1., .707, 0.],
+    def opds(self, ax, heights=[0., .707, 1.],
             wavelength=None, nrays=1000, colors="grbcmyk"):
         paraxial = self.paraxial
         if wavelength is None:
@@ -316,7 +316,7 @@ class Analysis(object):
             axi.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
                     transform=axi.transAxes,
                     verticalalignment="center")
-        for hi, axi in zip(heights, ax):
+        for hi, axi in reversed(zip(heights, ax)):
             axo, axp, axe, axm = axi
             # TODO: link axes
             self.pre_setup_xyplot(axo)

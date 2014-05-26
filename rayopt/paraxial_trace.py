@@ -392,10 +392,12 @@ class ParaxialTrace(Trace):
         z = self.pupil_distance
         z += self.system[1].distance, -self.system[-1].distance
         a = self.pupil_height
+        self.system.object.refractive_index = self.n[0]
         self.system.object.pupil_distance = z[0]
         self.system.object.pupil_radius = a[0]
-        self.system.object.height = self.y[0, 1]
+        self.system.object.height = np.fabs(self.y[0, 1])
         self.system[0].radius = self.system.object.height
+        self.system.image.refractive_index = self.n[-1]
         self.system.image.pupil_distance = -z[1]
         self.system.image.pupil_radius = a[1]
         self.system.image.height = np.fabs(self.y[-1, 1])
