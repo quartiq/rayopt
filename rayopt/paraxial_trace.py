@@ -232,9 +232,14 @@ class ParaxialTrace(Trace):
 
     @property
     def numerical_aperture(self):
-        # we plot u as a slope (tanU)
-        # even though it is paraxial (sinu=tanu=u) we must convert here
-        return np.fabs(self.n.take((0, -2))*sinarctan(self.u[(0, -2), 0]))
+        n = self.n.take((0, -2))
+        u = sinarctan(self.u[(0, -2), 0])
+        na = np.fabs(n*u)
+        if self.system.object.finite and self.system.image.finite:
+            # use abbe sine condition assuming we are tracing from long
+            # to short conjugate
+            na[1] = na[0]/np.fabs(self.magnification[0])
+        return na
 
     @property
     def f_number(self):
@@ -392,16 +397,15 @@ class ParaxialTrace(Trace):
         z = self.pupil_distance
         z += self.system[1].distance, -self.system[-1].distance
         a = self.pupil_height
-        self.system.object.refractive_index = self.n[0]
+        y = np.fabs(self.height)
         self.system.object.pupil_distance = z[0]
-        self.system.object.pupil_radius = a[0]
-        self.system.object.height = np.fabs(self.y[0, 1])
-        self.system[0].radius = self.system.object.height
-        self.system.image.refractive_index = self.n[-1]
         self.system.image.pupil_distance = -z[1]
+        self.system.object.pupil_radius = a[0]
         self.system.image.pupil_radius = a[1]
-        self.system.image.height = np.fabs(self.y[-1, 1])
-        self.system[-1].radius = self.system.image.height
+        self.system.object.height = y[0]
+        self.system.image.height = y[1]
+        self.system[0].radius = y[0]
+        self.system[-1].radius = y[1]
 
     def update_stop(self, end="image"):
         ai = self.system.stop
