@@ -459,6 +459,8 @@ class System(list):
         return self.object.aim(*args, surface=self[0], **kwargs)
 
     def aim_chief(self, yo, z, l=None, stop=None, **kwargs):
+        if self.object.finite and self.object.telecentric:
+            return z
         if l is None:
             l = self.wavelengths[0]
         n = self[0].refractive_index(l)

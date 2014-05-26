@@ -87,6 +87,9 @@ class Conjugate(NameMixin):
         yield "Index: %.3g" % self.refractive_index
         yield "Entrance: %.3g dia at %.3g" % (2*self.entrance_radius,
                 self.entrance_distance)
+        if self._pupil_distance:
+            yield "Pupil: %.3g dia at %.3g" % (2*self.pupil_radius,
+                    self.pupil_distance)
 
     def map_pupil(self, y, a, filter=True):
         # a = [[-sag, -mer], [+sag, +mer]]
@@ -122,10 +125,11 @@ class FiniteConjugate(Conjugate):
     finite = True
 
     def __init__(self, radius=0., na=None, fno=None, slope=None,
-            pupil_radius=None, **kwargs):
+            pupil_radius=None, telecentric=False, **kwargs):
         super(FiniteConjugate, self).__init__(**kwargs)
         self.radius = radius
         self._na = na
+        self.telecentric = telecentric
         if fno is not None:
             self.fno = fno
         if slope is not None:
@@ -139,6 +143,8 @@ class FiniteConjugate(Conjugate):
             dat["radius"] = float(self.radius)
         if self._na is not None:
             dat["na"] = float(self._na)
+        if self.telecentric:
+            dat["telecentric"] = self.telecentric
         return dat
 
     def text(self):
@@ -147,6 +153,8 @@ class FiniteConjugate(Conjugate):
         yield "Radius: %.3g" % self.radius
         if self._na is not None:
             yield "NA: %.3g" % self.na
+        if self.telecentric:
+            yield "Telecentric: True"
 
     def rescale(self, scale):
         super(FiniteConjugate, self).rescale(scale)
@@ -215,7 +223,10 @@ class FiniteConjugate(Conjugate):
         if surface:
             y[..., 2] = -surface.surface_sag(y)
         uz = (0, 0, z)
-        u = uz - y
+        if self.telecentric:
+            u = uz
+        else:
+            u = uz - y
         if yp is not None:
             s, m = sagittal_meridional(u, uz)
             u += yp[..., 0, None]*s + yp[..., 1, None]*m
