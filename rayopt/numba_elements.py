@@ -77,21 +77,9 @@ def refract(y, u0, mu, c, k):
         u = muf*u0 + g*r
     return u
 
-@jit("double(object_, double[:, :], double[:, :], double, double, "
+@jit("void(double, double, double, double, double[:, :], double[:, :], double, double, "
         "bool_, double[:, :], double[:, :], double[:])")
-def fast_propagate(obj, y0, u0, n0, l, do_clip, y, u, t):
-    curvature = obj.curvature
-    conic = obj.conic
-    radius = obj.radius
-    n = n0
-    mu = 1.
-    mat = obj.material
-    if mat != None:
-        if mat.mirror:
-            mu = -1.
-        else:
-            n = mat.refractive_index(l)
-            mu = n0/n
+def fast_propagate(curvature, conic, radius, mu, y0, u0, n0, l, do_clip, y, u, t):
     for i in range(y0.shape[0]):
         y0i, u0i = y0[i], u0[i]
         s = intercept(y0i, u0i, curvature, conic)
@@ -101,4 +89,3 @@ def fast_propagate(obj, y0, u0, n0, l, do_clip, y, u, t):
             u[i] = np.nan
         else:
             u[i] = refract(y[i], u0i, mu, curvature, conic)
-    return n
