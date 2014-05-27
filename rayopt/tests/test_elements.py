@@ -122,7 +122,7 @@ class ParaxToRealCase(unittest.TestCase):
         de = self.s.excidence(1/self.s.material.nd)
         self.sa = Spheroid(direction=de)
 
-    def test_real_similar_to_parax(self, n=10, e=1e-8):
+    def test_real_similar_to_parax(self, n=100, e=1e-3):
         y0p = np.random.randn(n, 2.)*e
         u0p = np.random.randn(n, 2.)*e
         y0r = np.hstack((y0p, np.ones((n, 1))*-self.s.distance))
@@ -134,6 +134,6 @@ class ParaxToRealCase(unittest.TestCase):
         yr, ur, nr, tr  = self.s.propagate(y0r, u0r, 1., 1.)
         #yr, ur = self.s.from_normal(yr, ur)
         yr, ur = self.sa.to_axis(yr, ur)
-        nptest.assert_allclose(nr, np_)
-        nptest.assert_allclose(yr[:, :2], yp)
-        nptest.assert_allclose(tanarcsin(ur), up)
+        nptest.assert_allclose(nr, np_, rtol=1e-4, atol=1e-9)
+        nptest.assert_allclose(yr[:, :2], yp, rtol=1e-4, atol=1e-9)
+        nptest.assert_allclose(tanarcsin(ur), up, rtol=1e-4, atol=1e-9)
