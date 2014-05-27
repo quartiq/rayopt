@@ -21,7 +21,7 @@ from __future__ import print_function, absolute_import, division
 import warnings
 
 import numpy as np
-from scipy.optimize import newton
+from scipy.optimize import newton, brentq
 
 from .elements import Element
 from .conjugates import Conjugate, FiniteConjugate, InfiniteConjugate
@@ -179,7 +179,7 @@ class System(list):
             def func(x):
                 setter(x)
                 self.pickup()
-                return target - getter()
+                return getter() - target
             x = newton(func, init, tol=solve.get("tol", 1e-8),
                     maxiter=solve.get("maxiter", 20))
             func(x)
@@ -209,6 +209,8 @@ class System(list):
                 value = eval(validator["get_eval"])
             if "get_func" in validator:
                 value = validator["get_func"](self, validator, value)
+            if "exec" in validator:
+                exec validator["exec"]
             if "minimum" in validator:
                 v = validator["minimum"]
                 if value < v:
@@ -244,9 +246,6 @@ class System(list):
             e.material = m[i]
         self.object, self.image = self.image, self.object
         self[:] = reversed(self)
-        self.pickups = []
-        self.solves = []
-        self.validators = []
 
     def rescale(self, scale=None):
         if scale is None:
@@ -271,6 +270,7 @@ class System(list):
         yield u"Image:"
         for line in self.image.text():
             yield u" " + line
+        yield u"Stop: %i" % self.stop
         yield u"Elements:"
         yield u"%2s %1s %10s %10s %10s %17s %7s %7s %7s" % (
                 "#", "T", "Distance", "Rad Curv", "Diameter",
@@ -438,27 +438,48 @@ class System(list):
             yield y, u, n, i, t
             y, u = e.from_normal(y, u)
 
-    def solve_ray(self, merit, tol=1e-3, maxiter=100):
-        def find_start(fun, a0=1.):
+    def solve_newton(self, merit, a=0., tol=1e-3, maxiter=30):
+        def find_start(fun, a0):
             f0 = fun(a0)
             if not np.isnan(f0):
                 return a0, f0
-            for scale in np.logspace(-1, 2, 16):
+            for scale in np.arange(1, maxiter):
                 for ai in -scale, scale:
                     fi = fun(a0 + ai)
                     if not np.isnan(fi):
                         return a0 + ai, fi
-            raise RuntimeError("no starting ray found")
+            raise ValueError("no starting ray found")
 
-        a, f = find_start(merit)
+        a, f = find_start(merit, a)
         if abs(f) > tol:
             a = newton(merit, a, tol=tol, maxiter=maxiter)
+        return a
+
+    def solve_brentq(self, merit, a=0., b=1., tol=1e-3, maxiter=30):
+        for i in range(maxiter):
+            fb = merit(b)
+            if abs(fb) <= tol:
+                return b
+            elif np.isnan(fb):
+                b /= 2
+            elif fb < 0:
+                a = b
+                b *= 1 - 2*fb
+            else:
+                break
+        if i == maxiter - 1:
+            raise ValueError("no inteval found")
+        fa = merit(a)
+        if abs(fa) <= tol:
+            return a
+        assert fa < 0
+        a = brentq(merit, a, b, rtol=tol, xtol=tol, maxiter=maxiter)
         return a
 
     def aim(self, *args, **kwargs):
         return self.object.aim(*args, surface=self[0], **kwargs)
 
-    def aim_chief(self, yo, z, l=None, stop=None, **kwargs):
+    def aim_chief(self, yo, z, p=1., l=None, stop=None, **kwargs):
         if self.object.finite and self.object.telecentric:
             return z
         if l is None:
@@ -466,61 +487,69 @@ class System(list):
         n = self[0].refractive_index(l)
         if stop in (-1, None):
             stop = self.stop
+        rad = self[self.stop].radius
         def dist(a):
-            y, u = self.aim(yo, None, z*a, filter=False)
+            y, u = self.aim(yo, None, z + a*p, filter=False)
             res = [yunit[0] for yunit in self.propagate(
                 y, u, n, l, stop=stop + 1)][-1][0, :2]
-            return (yo*res).sum()
-        a = self.solve_ray(simple_cache(dist), **kwargs)
-        return a*z
+            d = (yo*res).sum()/rad
+            return d
+        a = self.solve_newton(simple_cache(dist), **kwargs)
+        return z + a*p
 
-    def aim_marginal(self, yo, yp, z, p, l=None, stop=None, **kwargs):
+    def aim_marginal(self, yo, yp, z, p, l=None, stop=None,
+            **kwargs):
         if l is None:
             l = self.wavelengths[0]
         n = self[0].refractive_index(l)
-        if stop is None:
+        rim = stop == -1
+        if rim:
+            stop = len(self) - 2
+        elif stop is None:
             stop = self.stop
-        if stop == -1:
-            rad = np.array([e.radius for e in self[1:-1]])**2
-        else:
-            rad = self[stop].radius**2
+        rad = np.array([e.radius for e in self[1:stop + 1]])**2
         def dist(a):
-            y, u = self.aim(yo, yp, z, p*a, filter=False)
-            if stop == -1:
-                ys = [yunit[0][0, :2] for yunit in self.propagate(
-                    y, u, n, l, stop=-1)]
-                return (np.square(ys).sum(1)/rad - 1).max()
+            y, u = self.aim(yo, yp, z, a*p, filter=False)
+            ys = [yunit[0][0, :2] for yunit in self.propagate(
+                y, u, n, l, stop=stop + 1)]
+            d = np.square(ys).sum(1)/rad - 1
+            if rim:
+                return d.max()
             else:
-                ys = [yunit[0][0, :2] for yunit in self.propagate(
-                    y, u, n, l, stop=stop + 1)][-1]
-                return np.square(ys).sum()/rad - 1
-        a = self.solve_ray(simple_cache(dist), **kwargs)
+                return d[-1]
+        a = self.solve_brentq(simple_cache(dist), **kwargs)
         return a*p
 
     def _aim_pupil(self, xo, yo, guess, **kwargs):
         y = np.array((xo, yo))
         if guess is None:
-            z = self.object.pupil_distance
-            a = np.ones((2, 2))*self.object.pupil_radius
+            if not self.object.finite and self.object.wideangle:
+                z = self.object.entrance_distance
+            else:
+                z = self.object.pupil_distance
+            a = self.object.pupil_radius
+            a = a*np.ones((2, 2))
         else:
             q = guess
             z, a = q[0], q[1:].reshape(2, 2)
         if not np.allclose(y, 0):
-            z = self.aim_chief(y, z, **kwargs)
-        a[1, 1] = self.aim_marginal(y, (0, 1), z, a[1, 1], **kwargs)
-        if guess is None:
-            a[0, 1] = -a[1, 1]
-        a[0, 1] = self.aim_marginal(y, (0, -1), z, a[0, 1], **kwargs)
-        if guess is None:
-            a[1, 0] = a[1, 1]
-        a[1, 0] = self.aim_marginal(y, (1, 0), z, a[1, 0], **kwargs)
-        if guess is None:
-            a[0, 0] = -a[1, 0]
-        a[0, 0] = self.aim_marginal(y, (-1, 0), z, a[0, 0], **kwargs)
+            z1 = self.aim_chief(y, z, np.fabs(a).max(), **kwargs)
+            if self.object.finite:
+                a *= np.fabs(z1/z) # improve guess
+            z = z1
+        for ax, sig in (1, 1), (1, 0), (0, 1), (0, 0):
+            yp = [0, 0]
+            yp[ax] = 2*sig - 1.
+            a1 = self.aim_marginal(y, yp, z, a[sig, ax], **kwargs)
+            a[sig, ax] = a1
+            if sig == 1: # and guess is None
+                a[0, ax] = -a[1, ax]
+            if (sig, ax) == (1, 1) and guess is None:
+                a[1, 0] = a[1, 1]
         return np.r_[z, a.flat]
 
     def pupil(self, yo, l=None, stop=None, **kwargs):
-        k = (l, stop)
+        k = l, stop
         try:
             c = self._pupil_cache[k]
         except KeyError:

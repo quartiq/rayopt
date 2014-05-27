@@ -40,8 +40,9 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 
 class Analysis(object):
     figwidth = 12.
+    update = False
     resize = False
-    align = True
+    align = False
     close = None
     update_conjugates = True
     refocus_paraxial = True
@@ -74,6 +75,8 @@ class Analysis(object):
             self.run()
 
     def run(self):
+        if self.update:
+            self.system.update()
         if self.close is not None:
             self.system.close(self.close)
         self.paraxial = ParaxialTrace(self.system)
@@ -411,7 +414,7 @@ class Analysis(object):
             axf.plot(a[1], xs, ci+"--", label="EZs %s" % wi)
             t = GeometricTrace(self.system)
             t.rays_point((0, 0.), wi, nrays=nrays,
-                    distribution="half-meridional")
+                    distribution="half-meridional", clip=True)
             p = self.system.object.pupil_distance
             py = t.y[1, :, 1] + p*tanarcsin(t.i[1])[:, 1]
             z = -t.y[-1, :, 1]/tanarcsin(t.i[-1])[:, 1]

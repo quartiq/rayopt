@@ -243,30 +243,37 @@ class InfiniteConjugate(Conjugate):
     finite = False
 
     def __init__(self, angle=0., angle_deg=None, pupil_radius=None,
-            projection="rectilinear", **kwargs):
+            projection="rectilinear", wideangle=None, **kwargs):
         super(InfiniteConjugate, self).__init__(**kwargs)
         if angle_deg is not None:
             angle = np.deg2rad(angle_deg)
         self.angle = angle
+        if wideangle is None:
+            wideangle = self.angle > np.deg2rad(45)
+        self.wideangle = wideangle
         self.projection = projection
         self._pupil_radius = pupil_radius
 
     def dict(self):
         dat = super(InfiniteConjugate, self).dict()
         if self.angle:
-            dat["angle_deg"] = float(np.rad2deg(self.angle))
+            dat["angle"] = float(self.angle)
         if self._pupil_radius is not None:
             dat["pupil_radius"] = float(self._pupil_radius)
         if self.projection != "rectilinear":
             dat["projection"] = self.projection
+        if self.wideangle:
+            dat["wideangle"] = self.wideangle
         return dat
 
     def text(self):
         for _ in super(InfiniteConjugate, self).text():
             yield _
-        yield "Angle: %.3g" % np.rad2deg(self.angle)
-        if self._pupil_radius is not None:
-            yield "Pupil: %.3g" % self.pupil_radius
+        yield "Semi-Angle: %.3g" % np.rad2deg(self.angle)
+        if self.projection is not "rectilinear":
+            yield "Projection: %s" % self.projection
+        if self.wideangle:
+            yield "Wideangle: True"
 
     @property
     def pupil_radius(self):
@@ -326,7 +333,6 @@ class InfiniteConjugate(Conjugate):
             yp = np.atleast_2d(yp)
             yp = self.map_pupil(yp, a, filter)
             yo, yp = np.broadcast_arrays(yo, yp)
-
         u = self.map_object(yo, self.angle)
         yz = (0, 0, z)
         y = yz - z*u
@@ -334,5 +340,5 @@ class InfiniteConjugate(Conjugate):
             s, m = sagittal_meridional(u, yz)
             y += yp[..., 0, None]*s + yp[..., 1, None]*m
         if surface:
-            y += surface.intercept(y, u)[:, None]*u
+            y += surface.intercept(y, u)[..., None]*u
         return y, u

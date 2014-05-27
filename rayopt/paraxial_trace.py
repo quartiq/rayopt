@@ -89,7 +89,10 @@ class ParaxialTrace(Trace):
             c = self.system.object.radius
             y[0], u[0] = (0, -c), (r/b, a*c/b)
         else:
-            c = tanarcsin(self.system.object.angle)
+            if self.system.object.wideangle:
+                c = 1.
+            else:
+                c = tanarcsin(self.system.object.angle)
             y[0], u[0] = (r/a, -b*c/a), (0, c)
 
     def propagate(self, start=1, stop=None):
@@ -402,10 +405,11 @@ class ParaxialTrace(Trace):
         self.system.image.pupil_distance = -z[1]
         self.system.object.pupil_radius = a[0]
         self.system.image.pupil_radius = a[1]
-        self.system.object.height = y[0]
+        #self.system.object.height = y[0]
         self.system.image.height = y[1]
-        self.system[0].radius = y[0]
+        #self.system[0].radius = y[0]
         self.system[-1].radius = y[1]
+        self.system.update()
 
     def update_stop(self, end="image"):
         ai = self.system.stop

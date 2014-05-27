@@ -348,10 +348,11 @@ class Interface(Element):
 @Element.register
 class Spheroid(Interface):
     def __init__(self, curvature=0., conic=1., aspherics=None, roc=None,
-            **kwargs):
+            alternate_intersection=False, **kwargs):
         super(Spheroid, self).__init__(**kwargs)
         if roc is not None:
             curvature = 1./roc
+        self.alternate_intersection = alternate_intersection
         self.curvature = curvature
         self.conic = conic
         if aspherics is not None:
@@ -368,6 +369,8 @@ class Spheroid(Interface):
             dat["conic"] = float(self.conic)
         if self.aspherics is not None:
             dat["aspherics"] = list(map(float, self.aspherics))
+        if self.alternate_intersection:
+            dat["alternate_intersection"] = True
         return dat
 
     def surface_sag(self, xyz):
@@ -405,16 +408,24 @@ class Spheroid(Interface):
         c, k = self.curvature, self.conic
         if c == 0:
             return -y[:, 2]/u[:, 2] # flat
-        ky, ku = y, u
-        if k != 1:
-            ky, ku = ky.copy(), ku.copy()
-            ky[:, 2] *= k
-            ku[:, 2] *= k
-        d = c*(u*ky).sum(1) - u[:, 2]
-        e = c*(u*ku).sum(1)
-        f = c*(y*ky).sum(1) - 2*y[:, 2]
-        s = -(d + np.sign(u[:, 2])*np.sqrt(d**2 - e*f))/e
-        return s #np.where(s*np.sign(self.distance)>=0, s, np.nan)
+        if k == 1:
+            uy = (u*y).sum(1)
+            uu = 1.
+            yy = np.square(y).sum(1)
+        else:
+            k = np.array([(1, 1, k)])
+            uy = (u*y*k).sum(1)
+            uu = (np.square(u)*k).sum(1)
+            yy = (np.square(y)*k).sum(1)
+        d = c*uy - u[:, 2]
+        e = c*uu
+        f = c*yy - 2*y[:, 2]
+        g = np.sqrt(np.square(d) - e*f)
+        if self.alternate_intersection:
+            g *= -1
+        #g *= np.sign(u[:, 2])
+        s = -(d + g)/e
+        return s
 
     def paraxial_matrix(self, n0, l):
         # [y', u'] = M * [y, u]

@@ -187,33 +187,27 @@ class GeometricTrace(Trace):
         self.rays_given(y, u)
         self.propagate()
 
-    def rays(self, yo, yp, wavelength, stop=None, filter=True,
+    def rays(self, yo, yp, wavelength, stop=None, filter=None,
             clip=False, weight=None, ref=0):
+        if filter is None:
+            filter = not clip
         z, p = self.system.pupil(yo, l=wavelength, stop=stop)
         y, u = self.system.aim(yo, yp, z, p, filter=filter)
         self.rays_given(y, u, wavelength, weight, ref)
         self.propagate(clip=clip)
 
     def rays_point(self, yo, wavelength=None, nrays=11,
-            distribution="meridional", filter=True, stop=None,
+            distribution="meridional", filter=None, stop=None,
             clip=False):
         ref, yp, weight = pupil_distribution(distribution, nrays)
         self.rays(yo, yp, wavelength, filter=filter, stop=stop,
                 clip=clip, weight=weight, ref=ref)
 
-    def rays_clipping(self, yo, wavelength=None, axis=(1,)):
+    def rays_clipping(self, yo, wavelength=None, axis=1):
         z, p = self.system.pupil(yo, l=wavelength, stop=-1)
-        ys, us = [], []
-        for ax in axis:
-            for t in 0, p[0, ax], p[1, ax]:
-                yp = [0, 0]
-                yp[ax] = t/np.fabs(p).max()
-                y, u = self.system.aim(yo, yp, z, p, filter=False)
-                ys.append(y)
-                us.append(u)
-        y, u = np.vstack(ys), np.vstack(us)
-        self.rays_given(y, u, wavelength)
-        self.propagate()
+        yp = np.zeros((3, 2))
+        yp[1:, axis] = p[:, axis]/np.fabs(p).max()
+        self.rays(yo, yp, wavelength, stop=-1, filter=False)
 
     def rays_line(self, yo, wavelength=None, nrays=21, eps=1e-2):
         yi = np.linspace(0, 1, nrays)[:, None]*np.atleast_2d(yo)
@@ -223,7 +217,8 @@ class GeometricTrace(Trace):
         e[(1, 2), (1, 0)] = eps
         z, p = self.system.pupil((0, 0), l=wavelength)
         for i in range(yi.shape[0]):
-            z = self.system.aim_chief(yi[i], z, l=wavelength)
+            z = self.system.aim_chief(yi[i], z, np.fabs(p).max(),
+                    l=wavelength)
             y[:, i], u[:, i] = self.system.aim(yi[i], e, z, p)
         self.rays_given(y.reshape(-1, 3), u.reshape(-1, 3), wavelength)
         self.propagate()
