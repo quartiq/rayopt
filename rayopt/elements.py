@@ -431,7 +431,7 @@ class Spheroid(Interface):
         # [y', u'] = M * [y, u]
         c = self.curvature
         if self.aspherics is not None:
-            c += 2*self.aspherics[0]
+            c = c + 2*self.aspherics[0]
         d = self.distance
         md = np.eye(4)
         md[0, 2] = md[1, 3] = d

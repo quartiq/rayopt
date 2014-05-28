@@ -384,12 +384,27 @@ class ParaxialTrace(Trace):
             e.radius = np.fabs(y).sum() # marginal+chief
 
     def focal_length_solve(self, f, i=-2):
-        # TODO only works for last surface
+        assert i == -2, "only works for the last surface" # TODO
         y0, y = self.y[(i - 1, i), 0]
         u0, u = self.u[i - 1, 0], -self.y[0, 0]/f
-        n0, n = self.n[(i - 1, i), :]
-        c = (n0*u0 - n*u)/(y*(n - n0))
+        n0, n = self.n.take((i - 1, i))
+        c = (n*u - n0*u0)/(y*(n0 - n))
         self.system[i].curvature = c
+        self.propagate()
+
+    def _focal_length_solve(self, f, i=None): # TODO: not exact
+        if i is None:
+            i = len(self.system) - 2
+        seq = (1, i), (i, i + 1), (i + 1, None)
+        m0, m1, m2 = (self.system.paraxial_matrix(self.l, start=a, stop=b)
+            [self.axis::2, self.axis::2] for a, b in seq)
+        n0, n = self.n.take((i - 1, i))
+        c = -(1/(n0*f)
+                + m0[1, 0]*m1[0, 0]*m2[0, 0]
+                + m0[1, 0]*m1[0, 1]*m2[1, 0]
+                + m0[1, 1]*m1[1, 1]*m2[1, 0]
+                )/(m0[1, 1]*m2[0, 0])
+        self.system[i].curvature = c/(n0 - n)*n
         self.propagate()
 
     def refocus(self):
