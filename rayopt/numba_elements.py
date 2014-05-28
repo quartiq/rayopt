@@ -40,13 +40,13 @@ def clip(y, radius):
 @jit("double(double[:], double, double)")
 def sag(y, c, k):
     r2 = y[0]*y[0] + y[1]*y[1]
-    e = c*r2/(1 + np.sqrt(1 - k*c*c*r2))
+    e = c*r2/(1 + np.sqrt(1 - (1 + k)*c*c*r2))
     return y[2] - e
 
 @jit("double[:](double[:], double, double)")
 def sag_normal(y, c, k):
     r2 = y[0]*y[0] + y[1]*y[1]
-    e = c/np.sqrt(1 - k*c*c*r2)
+    e = c/np.sqrt(1 - (1 + k)*c*c*r2)
     n = np.array([-y[0]*e, -y[1]*e, 1])
     return n
 
@@ -54,9 +54,9 @@ def sag_normal(y, c, k):
 def intercept(y, u, c, k):
     if c == 0:
         return -y[2]/u[2]
-    d = c*(u[0]*y[0] + u[1]*y[1] + u[2]*k*y[2]) - u[2]
-    e = c*(u[0]*u[0] + u[1]*u[1] + u[2]*k*u[2])
-    f = c*(y[0]*y[0] + y[1]*y[1] + y[2]*k*y[2]) - 2*y[2]
+    d = c*(u[0]*y[0] + u[1]*y[1] + u[2]*(1 + k)*y[2]) - u[2]
+    e = c*(u[0]*u[0] + u[1]*u[1] + u[2]*(1 + k)*u[2])
+    f = c*(y[0]*y[0] + y[1]*y[1] + y[2]*(1 + k)*y[2]) - 2*y[2]
     s = (-d - np.sign(u[2])*np.sqrt(d*d - e*f))/e
     return s
 

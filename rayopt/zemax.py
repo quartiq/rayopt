@@ -144,7 +144,7 @@ def zmx_to_system(fil):
         elif cmd == "COAT":
             e.coating = args.split()[0]
         elif cmd == "CONI":
-            e.conic = 1 + float(args.split()[0])
+            e.conic = float(args.split()[0])
         elif cmd == "PARM":
             i, j = args.split()
             i = int(i) - 2

@@ -347,7 +347,7 @@ class Interface(Element):
 @public
 @Element.register
 class Spheroid(Interface):
-    def __init__(self, curvature=0., conic=1., aspherics=None, roc=None,
+    def __init__(self, curvature=0., conic=0., aspherics=None, roc=None,
             alternate_intersection=False, **kwargs):
         super(Spheroid, self).__init__(**kwargs)
         if roc is not None:
@@ -359,13 +359,13 @@ class Spheroid(Interface):
             aspherics = list(aspherics)
         self.aspherics = aspherics
         if self.curvature and np.isfinite(self.radius):
-            assert self.radius**2 <= 1/(self.conic*self.curvature**2)
+            assert self.radius**2 <= 1/((1 + self.conic)*self.curvature**2)
 
     def dict(self):
         dat = super(Spheroid, self).dict()
         if self.curvature:
             dat["curvature"] = float(self.curvature)
-        if self.conic != 1.:
+        if self.conic:
             dat["conic"] = float(self.conic)
         if self.aspherics is not None:
             dat["aspherics"] = list(map(float, self.aspherics))
@@ -379,7 +379,7 @@ class Spheroid(Interface):
             return z
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
-        e = c*r2/(1 + np.sqrt(1 - k*c**2*r2))
+        e = c*r2/(1 + np.sqrt(1 - (1 + k)*c**2*r2))
         if self.aspherics is not None:
             for i, ai in enumerate(self.aspherics):
                 e += ai*r2**(i + 2)
@@ -393,7 +393,7 @@ class Spheroid(Interface):
             return q
         r2 = x**2 + y**2
         c, k = self.curvature, self.conic
-        e = c/np.sqrt(1 - k*c**2*r2)
+        e = c/np.sqrt(1 - (1 + k)*c**2*r2)
         if self.aspherics is not None:
             for i, ai in enumerate(self.aspherics):
                 e += 2*ai*(i + 2)*r2**(i + 1)
@@ -408,12 +408,12 @@ class Spheroid(Interface):
         c, k = self.curvature, self.conic
         if c == 0:
             return -y[:, 2]/u[:, 2] # flat
-        if k == 1:
+        if not k:
             uy = (u*y).sum(1)
             uu = 1.
             yy = np.square(y).sum(1)
         else:
-            k = np.array([(1, 1, k)])
+            k = np.array([(1, 1, 1 + k)])
             uy = (u*y*k).sum(1)
             uu = (np.square(u)*k).sum(1)
             yy = (np.square(y)*k).sum(1)
