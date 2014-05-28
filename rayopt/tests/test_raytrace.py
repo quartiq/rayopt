@@ -111,7 +111,7 @@ class DemotripCase(unittest.TestCase):
 
     def test_paraxial(self):
         p = ParaxialTrace(self.s)
-        #print(unicode(p).encode("ascii", errors="replace"))
+        #print(str(p))
         nptest.assert_allclose(p.u[0, 0], 0)
         nptest.assert_allclose(p.u[0, 1], tanarcsin(self.s.object.angle))
         nptest.assert_allclose(p.y[self.s.stop, 0],
@@ -127,7 +127,7 @@ class DemotripCase(unittest.TestCase):
         p = ParaxialTrace(self.s)
         p.update_conjugates()
         print(system_to_yaml(self.s))
-        print(unicode(p).encode("ascii", errors="replace"))
+        print(str(p))
 
     def test_reverse_size(self):
         p = ParaxialTrace(self.s)
@@ -135,7 +135,7 @@ class DemotripCase(unittest.TestCase):
         self.s.reverse()
         p = ParaxialTrace(self.s)
         #print(system_to_yaml(self.s))
-        #print(unicode(p).encode("ascii", errors="replace"))
+        #print(str(p))
 
     def traces(self):
         p = ParaxialTrace(self.s)

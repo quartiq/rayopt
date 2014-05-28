@@ -92,7 +92,7 @@ class Analysis(object):
         if self.trace_gaussian and self.system.object.finite:
             self.gaussian = GaussianTrace(self.system)
         if self.print_gaussian:
-            self.text.append(unicode(self.gaussian))
+            self.text.append(str(self.gaussian))
         if self.resize_full:
             t = GeometricTrace(self.system)
             t.rays_paraxial(self.paraxial)
@@ -105,13 +105,13 @@ class Analysis(object):
             t.refocus()
             self.paraxial.propagate()
         if self.print_system:
-            self.text.append(unicode(self.system))
+            self.text.append(str(self.system))
         if self.print_paraxial:
-            self.text.append(unicode(self.paraxial))
+            self.text.append(str(self.paraxial))
         t = GeometricTrace(self.system)
         t.rays_paraxial(self.paraxial)
         if self.print_full:
-            self.text.append(unicode(t))
+            self.text.append(str(t))
         figheight = 2*max(e.radius for e in self.system if
                 np.isfinite(e.radius))
         figheight = min(figheight/self.paraxial.z[-1]*self.figwidth,
@@ -319,7 +319,7 @@ class Analysis(object):
             axi.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
                     transform=axi.transAxes,
                     verticalalignment="center")
-        for hi, axi in reversed(zip(heights, ax)):
+        for hi, axi in reversed(list(zip(heights, ax))):
             axo, axp, axe, axm = axi
             # TODO: link axes
             self.pre_setup_xyplot(axo)
@@ -338,7 +338,7 @@ class Analysis(object):
                 mm = np.fabs(og).max()
                 v = np.linspace(-mm, mm, 21)
             axo.contour(x, y, o, v, cmap=plt.cm.RdBu_r)
-            axo.text(.5, -.1, u"PTP: %.3g" % og.ptp(),
+            axo.text(.5, -.1, "PTP: %.3g" % og.ptp(),
                     transform=axo.transAxes,
                     horizontalalignment="center")
             r = paraxial.airy_radius[1]/paraxial.l*wavelength

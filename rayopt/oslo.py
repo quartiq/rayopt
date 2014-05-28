@@ -212,7 +212,7 @@ def glc_to_material(l):
     del line[:6]
     del line[:2]
     a, num = sint(line.pop(0)), sint(line.pop(0))
-    sellmeier = np.array(map(sfloat, line[:num]))
+    sellmeier = np.array([sfloat(_) for _ in line[:num]])
     if a in (1, 2):
         sellmeier = sellmeier.reshape(2, -1).T
     del line[:num]
@@ -229,7 +229,7 @@ def glc_to_material(l):
     a, num = sint(line.pop(0)), sint(line.pop(0))
     assert a == 1, l
     num *= 2
-    transmission = np.array(map(sfloat, line[:num])).reshape(-1, 2)
+    transmission = np.array([sfloat(_) for _ in line[:num]]).reshape(-1, 2)
     del line[:num]
     return mat
 

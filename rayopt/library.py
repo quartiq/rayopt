@@ -50,7 +50,7 @@ class Library(object):
 
     def db_get(self, db):
         conn = sqlite3.connect(db)
-        conn.text_factory = unicode
+        conn.text_factory = str
         self.conn = conn
         self.cursor = conn.cursor()
 

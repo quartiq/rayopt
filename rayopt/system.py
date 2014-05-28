@@ -149,7 +149,7 @@ class System(list):
             if "set" in pickup:
                 self.set_path(pickup["set"], value)
             if "set_exec" in pickup:
-                exec pickup["set_exec"]
+                exec(pickup["set_exec"])
 
     def solve(self):
         for solve in self.solves:
@@ -166,7 +166,9 @@ class System(list):
             elif "set_exec" in solve:
                 def setter(value):
                     loc = dict(value=value, self=self, solve=solve)
-                    exec solve["set_exec"] in loc, globals()
+                    raise NotImplementedError
+                    # http://bugs.python.org/issue21591
+                    #exec(solve["set_exec"], globals(), loc)
             elif "set_func" in solve:
                 setter = lambda x: solve["set_func"](self, solve, x)
             target = solve.get("target", 0.)
@@ -210,7 +212,7 @@ class System(list):
             if "get_func" in validator:
                 value = validator["get_func"](self, validator, value)
             if "exec" in validator:
-                exec validator["exec"]
+                exec(validator["exec"])
             if "minimum" in validator:
                 v = validator["minimum"]
                 if value < v:
@@ -260,19 +262,19 @@ class System(list):
         return "\n".join(self.text())
 
     def text(self):
-        yield u"System: %s" % self.description
-        yield u"Scale: %s mm" % (self.scale/1e-3)
-        yield u"Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
+        yield "System: %s" % self.description
+        yield "Scale: %s mm" % (self.scale/1e-3)
+        yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.wavelengths)
-        yield u"Object:"
+        yield "Object:"
         for line in self.object.text():
-            yield u" " + line
-        yield u"Image:"
+            yield " " + line
+        yield "Image:"
         for line in self.image.text():
-            yield u" " + line
-        yield u"Stop: %i" % self.stop
-        yield u"Elements:"
-        yield u"%2s %1s %10s %10s %10s %17s %7s %7s %7s" % (
+            yield " " + line
+        yield "Stop: %i" % self.stop
+        yield "Elements:"
+        yield "%2s %1s %10s %10s %10s %17s %7s %7s %7s" % (
                 "#", "T", "Distance", "Rad Curv", "Diameter",
                 "Material", "n", "nd", "Vd")
         for i,e in enumerate(self):
@@ -286,7 +288,7 @@ class System(list):
                 n = mat.refractive_index(self.wavelengths[0])
             else:
                 n = nd
-            yield u"%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
+            yield "%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
                     i, e.typeletter, e.distance, roc, rad*2, mat, n, nd, vd)
 
     def edge_thickness(self, axis=1):

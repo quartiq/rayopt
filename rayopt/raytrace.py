@@ -53,13 +53,13 @@ class Trace(object):
         return ys
 
     def print_coeffs(self, coeff, labels, sum=True):
-        yield (u"%2s %1s" + u"% 10s" * len(labels)) % (
-                (u"#", u"T") + tuple(labels))
-        fmt = u"%2s %1s" + u"% 10.4g" * len(labels)
+        yield ("%2s %1s" + "% 10s" * len(labels)) % (
+                ("#", "T") + tuple(labels))
+        fmt = "%2s %1s" + "% 10.4g" * len(labels)
         for i, a in enumerate(coeff):
             yield fmt % ((i, self.system[i].typeletter) + tuple(a))
         if sum:
-            yield fmt % ((u" ∑", u"") + tuple(coeff.sum(0)))
+            yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
 
     def align(self):
         self.system.align(self.n)

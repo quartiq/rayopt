@@ -125,7 +125,7 @@ class ModelMaterial(Material):
     @classmethod
     def from_string(cls, txt, name=None):
         txt = str(txt)
-        v = map(float, txt.split("/"))
+        v = [float(_) for _ in txt.split("/")]
         if len(v) == 1:
             nd, = v
             vd = np.inf
@@ -182,7 +182,7 @@ class SellmeierMaterial(Material):
 
     def dict(self):
         dat = super(SellmeierMaterial, self).dict()
-        dat["sellmeier"] = map(list, self.sellmeier)
+        dat["sellmeier"] = [list(_) for _ in self.sellmeier]
         if self.thermal:
             dat["thermal"] = self.thermal
         dat["nd"] = self.nd
