@@ -103,7 +103,9 @@ def zmf_to_library(fil, library, collision="or replace"):
 def zmx_to_system(fil):
     s = System()
     next_pos = 0.
+    s.append(Spheroid(material=air))
     for line in fil.splitlines():
+        e = s[-1]
         if not line.strip():
             continue
         line = line.strip().split(" ", 1)
@@ -118,8 +120,7 @@ def zmx_to_system(fil):
         elif cmd == "NAME":
             s.description = args.strip("\"")
         elif cmd == "SURF":
-            e = Spheroid(distance=next_pos, material=air)
-            s.append(e)
+            s.append(Spheroid(distance=next_pos, material=air))
         elif cmd == "CURV":
             e.curvature = float(args.split()[0])
         elif cmd == "DISZ":
@@ -269,30 +270,29 @@ def agf_to_material(dat):
         cmd, args = line[:2], line[3:]
         if cmd == "NM":
             args = args.split()
-            g = SellmeierMaterial(name=args[0], nd=sfloat(args[3]),
-                    vd=sfloat(args[4]), sellmeier=[])
+            g = SellmeierMaterial(name=args[0], sellmeier=[])
             g.glasscode = sfloat(args[2])
         elif cmd == "GC":
             g.comment = args.strip()
         elif cmd == "ED":
-            args = map(sfloat, args.split())
+            args = list(map(sfloat, args.split()))
             g.alpham3070, g.alpha20300, g.density = args[0:3]
         elif cmd == "CD":
-            s = np.array(map(sfloat, args.split())).reshape((-1,2))
+            s = np.array(list(map(sfloat, args.split()))).reshape((-1,2))
             g.sellmeier = np.array([si for si in s if not si[0] == 0])
         elif cmd == "TD":
-            s = map(sfloat, args.split())
+            s = list(map(sfloat, args.split()))
             g.thermal = s
         elif cmd == "OD":
-            g.chemical = map(sfloat, args[1:])
+            g.chemical = list(map(sfloat, args[1:]))
             g.price = sfloat(args[0])
         elif cmd == "LD":
-            s = map(sfloat, args.split())
+            s = list(map(sfloat, args.split()))
         elif cmd == "IT":
-            s = map(sfloat, args.split())
+            s = list(map(sfloat, args.split()))
             if not hasattr(g, "transmission"):
                 g.transmission = {}
-            g.transmission[(s[0], s[2])] = s[1]
+            g.transmission[(s[0], tuple(s[2:]))] = s[1]
         else:
             print(cmd, args, "not handled")
     return g

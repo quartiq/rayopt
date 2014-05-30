@@ -65,7 +65,7 @@ class TransformCase(unittest.TestCase):
 
 class ParaxialCase(unittest.TestCase):
     def setUp(self):
-        self.mat = mat = ModelMaterial(nd=1.5, vd=np.inf)
+        self.mat = mat = ModelMaterial(n=1.5)
         self.s0 = Spheroid(curvature=0., distance=0., material=mat)
         self.s = Spheroid(curvature=.1, distance=0, material=mat)
         self.sm0 = Spheroid(curvature=0, distance=0, material=mirror)
@@ -85,7 +85,7 @@ class ParaxialCase(unittest.TestCase):
         y0, u0 = (1, 2), (.2, .1)
         yu, n = self.s0.propagate_paraxial(np.hstack((y0, u0)), 1., 1.)
         y, u = np.hsplit(yu, 2)
-        mu = 1/self.s0.material.nd
+        mu = 1/self.s0.material.n
         nptest.assert_allclose(y, y0)
         nptest.assert_allclose(u/mu, u0)
 
@@ -99,7 +99,7 @@ class ParaxialCase(unittest.TestCase):
     def test_align(self):
         d = 0, -.1, 1
         d /= np.linalg.norm(d)
-        mu = 1/self.s0.material.nd
+        mu = 1/self.s0.material.n
         self.s0.align(d, mu)
         e = self.s0.from_normal(self.s0.excidence(mu))
         nptest.assert_allclose(e, d)
@@ -113,13 +113,13 @@ class ParaxialCase(unittest.TestCase):
 
 class ParaxToRealCase(unittest.TestCase):
     def setUp(self):
-        self.mat = mat = ModelMaterial(nd=1.5, vd=np.inf)
+        self.mat = mat = ModelMaterial(n=1.5)
         d = np.random.randn(3)*1e-1 + (0, 0, 1.)
         a = np.random.randn(3)*1e-8
         a[1:] = 0
         self.s = Spheroid(curvature=.1, distance=.2, material=mat,
                 direction=d, angles=a)
-        de = self.s.excidence(1/self.s.material.nd)
+        de = self.s.excidence(1/self.s.material.n)
         self.sa = Spheroid(direction=de)
 
     def test_real_similar_to_parax(self, n=100, e=1e-3):

@@ -185,7 +185,7 @@ class ParaxialTrace(Trace):
     @property
     def height(self):
         """object and image ray height"""
-        return self.y[(0, -1), 1]
+        return np.fabs(self.y[(0, -1), 1])
         #self.lagrange/(self.n[-2]*self.u[-2,0])
 
     @property
@@ -196,7 +196,7 @@ class ParaxialTrace(Trace):
     @property
     def pupil_height(self):
         p = self.pupil_distance
-        return self.y[(1, -2), 0] + p*self.u[(0, -2), 0]
+        return np.fabs(self.y[(1, -2), 0] + p*self.u[(0, -2), 0])
 
     @property
     def lagrange(self):
@@ -237,12 +237,12 @@ class ParaxialTrace(Trace):
     def numerical_aperture(self):
         n = self.n.take((0, -2))
         u = sinarctan(self.u[(0, -2), 0])
-        na = np.fabs(n*u)
+        na = n*u
         if self.system.object.finite and self.system.image.finite:
             # use abbe sine condition assuming we are tracing from long
             # to short conjugate
-            na[1] = na[0]/np.fabs(self.magnification[0])
-        return na
+            na[1] = na[0]/self.magnification[0]
+        return np.fabs(na)
 
     @property
     def f_number(self):
@@ -304,13 +304,13 @@ class ParaxialTrace(Trace):
         yield "lagrange: %.5g" % self.lagrange
         yield "track length: %.5g" % self.track
         yield "object, image height: %s" % self.height
-        yield "front, back focal length: %s" % self.focal_length
         yield "petzval radius: %.5g" % (1/self.petzval_curvature)
+        yield "front, back focal length (from PP): %s" % self.focal_length
+        yield "entry, exit pupil height: %s" % self.pupil_height
+        yield "entry, exit pupil distance: %s" % self.pupil_distance
         yield "front, back focal distance: %s" % self.focal_distance
         yield "front, back principal distance: %s" % self.principal_distance
         yield "front, back nodal distance: %s" % self.nodal_distance
-        yield "entry, exit pupil distance: %s" % self.pupil_distance
-        yield "entry, exit pupil height: %s" % self.pupil_height
         yield "front, back numerical aperture: %s" % self.numerical_aperture
         yield "front, back f number: %s" % self.f_number
         yield "front, back working f number: %s" % self.working_f_number

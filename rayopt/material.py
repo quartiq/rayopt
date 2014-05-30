@@ -57,16 +57,16 @@ class Material(NameMixin):
     def make(cls, name):
         if name is None:
             return None
-        if isinstance(name, dict):
-            return super(Material, self).make(name)
         if isinstance(name, Material):
             return name
+        if isinstance(name, dict):
+            return super(Material, self).make(name)
         if type(name) is float:
-            return ModelMaterial(nd=name)
+            return ModelMaterial(n=name)
         if type(name) is tuple:
-            return ModelMaterial(nd=name[0], vd=name[1])
+            return AbbeMaterial(nd=name[0], vd=name[1])
         try:
-            return ModelMaterial.from_string(name)
+            return AbbeMaterial.from_string(name)
         except ValueError:
             pass
         name = name.lower().split("/")
@@ -115,59 +115,76 @@ class Material(NameMixin):
     def delta_n(self, short, long):
         return (self.refractive_index(short) - self.refractive_index(long))
 
- 
+
 class ModelMaterial(Material):
-    def __init__(self, nd=1., vd=np.inf, **kwargs):
+    def __init__(self, n=1., **kwargs):
         super(ModelMaterial, self).__init__(**kwargs)
-        self.nd = nd
-        self.vd = vd
+        self.n = n
+
+    def refractive_index(self, wavelength):
+        return self.n
+
+    def dict(self):
+        dat = super(ModelMaterial, self).dict()
+        dat["n"] = self.n
+        return dat
+
+
+class AbbeMaterial(Material):
+    def __init__(self, n=1., v=np.inf, lambda_ref=lambda_d,
+            lambda_long=lambda_C, lambda_short=lambda_F, **kwargs):
+        super(AbbeMaterial, self).__init__(**kwargs)
+        self.n = n
+        self.v = v
+        self.lambda_ref = lambda_ref
+        self.lambda_short = lambda_short
+        self.lambda_long = lambda_long
 
     @classmethod
     def from_string(cls, txt, name=None):
         txt = str(txt)
-        v = [float(_) for _ in txt.split("/")]
-        if len(v) == 1:
-            nd, = v
-            vd = np.inf
-        if len(v) == 2:
-            nd, vd = v
+        val = [float(_) for _ in txt.split("/")]
+        if len(val) == 1:
+            n, = val
+            v = np.inf
+        if len(val) == 2:
+            n, v = val
         else:
             raise ValueError
         if name is None:
             name = "-"
-        return cls(name=name, nd=nd, vd=vd)
+        return cls(name=name, n=n, v=v)
 
     @simple_cache
     def refractive_index(self, wavelength):
-        return (self.nd + (wavelength - lambda_d)/(lambda_C - lambda_F)
-                *(1 - self.nd)/self.vd)
+        return (self.d + (wavelength - self.lambda_ref)
+            /(self.lambda_long - self.lambda_short)
+            *(1 - self.n)/self.v)
 
     def dict(self):
-        dat = super(ModelMaterial, self).dict()
-        dat["nd"] = self.nd
-        dat["vd"] = self.vd
+        dat = super(AbbeMaterial, self).dict()
+        dat["n"] = self.n
+        dat["v"] = self.v
+        if self.lambda_ref != lambda_d:
+            dat["lambda_ref"] = self.lambda_ref
+        if self.lambda_short != lambda_F:
+            dat["lambda_short"] = self.lambda_short
+        if self.lambda_long != lambda_C:
+            dat["lambda_long"] = self.lambda_long
         return dat
 
 
 class SellmeierMaterial(Material):
-    def __init__(self, sellmeier, thermal=None, nd=None, vd=None, **kwargs):
+    def __init__(self, sellmeier, thermal=None, **kwargs):
         super(SellmeierMaterial, self).__init__(**kwargs)
         self.sellmeier = np.atleast_2d(sellmeier)
-        if nd is None:
-            nd = self.refractive_index(lambda_d)
-        self.nd = nd
-        if vd is None:
-            vd = self.dispersion(lambda_F, lambda_d, lambda_C)
-        self.vd = vd
         self.thermal = thermal
 
     @simple_cache
     def refractive_index(self, wavelength):
         w2 = (wavelength/1e-6)**2
-        c0 = self.sellmeier[:, 0]
-        c1 = self.sellmeier[:, 1]
-        n2 = 1. + (c0*w2/(w2 - c1)).sum()
-        n = np.sqrt(n2)
+        c0, c1 = self.sellmeier.T
+        n = np.sqrt(1. + (c0*w2/(w2 - c1)).sum())
         if self.mirror:
             n = -n
         return n
@@ -185,8 +202,6 @@ class SellmeierMaterial(Material):
         dat["sellmeier"] = [list(_) for _ in self.sellmeier]
         if self.thermal:
             dat["thermal"] = self.thermal
-        dat["nd"] = self.nd
-        dat["vd"] = self.vd
         return dat
 
 
@@ -196,11 +211,8 @@ class GasMaterial(SellmeierMaterial):
 
     @simple_cache
     def refractive_index(self, wavelength):
-        w2 = (wavelength/1e-6)**2
-        c0 = self.sellmeier[:, 0]
-        c1 = self.sellmeier[:, 1]
-        #n2 = 1. + (c0*w2/(w2 - c1)).sum()
-        #n = np.sqrt(n2)
+        w2 = (wavelength/1e-6)**-2
+        c0, c1 = self.sellmeier.T
         n  = 1. + (c0/(c1 - w2)).sum()
         if self.mirror:
             n = -n
@@ -209,11 +221,11 @@ class GasMaterial(SellmeierMaterial):
 
 # http://refractiveindex.info
 vacuum = ModelMaterial(name="vacuum", catalog="basic",
-        nd=1., vd=np.inf, solid=False)
+        solid=False)
+mirror = Material(name="mirror", catalog="basic",
+        solid=False, mirror=True)
 air = GasMaterial(name="air", catalog="basic",
         sellmeier=[[5792105E-8, 238.0185], [167917E-8, 57.362]])
-mirror = Material(name="mirror", catalog="basic",
-        mirror=True, solid=False)
 
 basic = dict((m.name, m) for m in (vacuum, air, mirror))
 

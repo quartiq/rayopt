@@ -20,7 +20,7 @@ from __future__ import (print_function, absolute_import, division,
     unicode_literals)
 
 import sqlite3
-import os
+import os, sys
 
 from rayopt import zemax, oslo
 
@@ -50,7 +50,10 @@ class Library(object):
 
     def db_get(self, db):
         conn = sqlite3.connect(db)
-        conn.text_factory = str
+        if sys.version >= "3":
+            conn.text_factory = str
+        else:
+            conn.text_factory = unicode
         self.conn = conn
         self.cursor = conn.cursor()
 
@@ -220,4 +223,4 @@ if __name__ == "__main__":
             ]
     l = Library.one()
     l.load_all(fs)
-    #_test(l)
+    _test(l)

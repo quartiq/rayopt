@@ -34,7 +34,7 @@ from .cachend import PolarCacheND
 class System(list):
     def __init__(self, elements=None,
             description="", scale=1e-3, wavelengths=None,
-            stop=None, object=None, image=None,
+            stop=1, object=None, image=None,
             pickups=None, validators=None, solves=None):
         elements = map(Element.make, elements or [])
         super(System, self).__init__(elements)
@@ -60,7 +60,7 @@ class System(list):
         dat = {}
         if self.description:
             dat["description"] = self.description
-        if self.stop is not None:
+        if self.stop != 1:
             dat["stop"] = self.stop
         if self.scale != 1e-3:
             dat["scale"] = float(self.scale)

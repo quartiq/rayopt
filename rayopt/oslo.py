@@ -216,7 +216,7 @@ def glc_to_material(l):
     if a in (1, 2):
         sellmeier = sellmeier.reshape(2, -1).T
     del line[:num]
-    mat = SellmeierMaterial(name=name, sellmeier=sellmeier, nd=nd, vd=vd)
+    mat = SellmeierMaterial(name=name, sellmeier=sellmeier)
     #if not np.allclose(nd, mat.nd):
     #    print(name, nd, mat.nd)
     mat.density = density
