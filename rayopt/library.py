@@ -22,14 +22,11 @@ from __future__ import (print_function, absolute_import, division,
 import os, sys, io, hashlib, time
 
 from sqlalchemy import (Column, Integer, String, Float,
-            ForeignKey, desc, asc, Boolean)
+            ForeignKey, Boolean)
 from sqlalchemy.engine import Engine
 from sqlalchemy import event, create_engine, orm
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
-from sqlalchemy.ext.associationproxy import association_proxy
-from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.orm import relationship, backref
 
 from rayopt import zemax, oslo
