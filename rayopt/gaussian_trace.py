@@ -254,7 +254,8 @@ class GaussianTrace(Trace):
             e.radius = y*waists
 
     def refocus(self, axis=1):
-        self.system.image.distance += self.waist_position[-1, axis]
+        self.system[-1].distance += self.waist_position[-1, axis]
+        self.system.update()
         self.propagate()
 
     def plot(self, ax, axis=1, npoints=5001, waist=True, scale=10, **kwargs):
