@@ -108,7 +108,7 @@ def zmx_to_system(fil):
                 except Exception as e:
                     print("material not found", name, e)
         elif cmd == "DIAM":
-            e.radius = float(args.split()[0])/2
+            e.radius = float(args.split()[0])
         elif cmd == "STOP":
             e.stop = True
         elif cmd == "WAVL":
