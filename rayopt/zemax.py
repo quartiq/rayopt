@@ -25,7 +25,6 @@ import os
 import codecs
 import io
 import time
-import hashlib
 
 import numpy as np
 
@@ -70,34 +69,6 @@ def zmf_obfuscate(data, a, b):
     data = np.fromstring(data, np.uint8)
     data ^= np.fromiter(k, np.uint8, len(data))
     return data.tostring()
-
-
-def zmf_to_library(fil, library, collision="or replace"):
-    stat = os.stat(fil)
-    sha1 = hashlib.sha1()
-    sha1.update(open(fil, "rb").read())
-    sha1 = sha1.hexdigest()
-    cu = library.conn.cursor()
-    catalog = os.path.basename(fil)
-    catalog = os.path.splitext(catalog)[0]
-    cu.execute("""insert into catalog
-        (name, type, source, format, version, file, date, size,
-        sha1, import)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "lens", "zemax", "zmx", 1001, fil,
-            stat.st_mtime, stat.st_size, sha1, time.time()))
-    catalog_id = cu.lastrowid
-    cat = list(zmf_read(open(fil, "rb")))
-    cu.executemany("""insert %s into lens
-        (name, catalog, version, elements, shape,
-        aspheric, toroidal, grin, efl, enp, data)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""" % collision, ((
-            lens.name, catalog_id, lens.version,
-            lens.elements, lens.shape,
-            lens.aspheric, lens.toroidal, lens.grin,
-            lens.efl, lens.enp, lens.description)
-            for lens in cat))
-    library.conn.commit()
 
 
 def zmx_to_system(fil):
@@ -235,32 +206,6 @@ def agf_read(fil):
     if g:
         yield Glas(name, nd, vd, density, code, comment, status, tce,
                 "".join(g))
-
-
-def agf_to_library(fil, library, collision="or replace"):
-    stat = os.stat(fil)
-    sha1 = hashlib.sha1()
-    sha1.update(open(fil, "rb").read())
-    sha1 = sha1.hexdigest()
-    cu = library.conn.cursor()
-    catalog = os.path.basename(fil)
-    catalog = os.path.splitext(catalog)[0]
-    cu.execute("""insert into catalog
-        (name, type, source, format, version, file, date, size,
-        sha1, import)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "glass", "zemax", "agf", 0, fil, stat.st_mtime,
-            stat.st_size, sha1, time.time()))
-    catalog_id = cu.lastrowid
-    cat = list(agf_read(fil))
-    cu.executemany("""insert %s into glass
-        (name, catalog, nd, vd, density, code, status, tce, comment, data)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""" % collision, ((
-            glass.name, catalog_id, glass.nd, glass.vd, glass.density,
-            glass.code, glass.status, glass.tce, glass.comment,
-            glass.description)
-            for glass in cat))
-    library.conn.commit()
 
 
 def agf_to_material(dat):

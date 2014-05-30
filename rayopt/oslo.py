@@ -21,7 +21,6 @@ from collections import namedtuple
 import os.path
 import time
 import io
-import hashlib
 
 import numpy as np
 
@@ -70,32 +69,6 @@ def olc_read(dir):
         yield Lens(part, int(ele), float(efl), float(dia/2.), float(thick),
                 comment, section, lensdat)
 
-
-def olc_to_library(fil, library, collision="or replace"):
-    stat = os.stat(fil)
-    sha1 = hashlib.sha1()
-    sha1.update(open(fil, "rb").read())
-    sha1 = sha1.hexdigest()
-    cu = library.conn.cursor()
-    catalog = os.path.basename(fil)
-    catalog = os.path.splitext(catalog)[0]
-    cu.execute("""insert into catalog
-        (name, type, source, format, version, file, date, size,
-        sha1, import)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "lens", "oslo", "olc", 0, fil,
-            stat.st_mtime, stat.st_size, sha1, time.time()))
-    catalog_id = cu.lastrowid
-    cat = list(olc_read(fil))
-    cu.executemany("""insert %s into lens
-        (name, catalog, elements, thickness, comment,
-        efl, radius, section, data)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?)""" % collision, ((
-            lens.name, catalog_id, lens.elements, lens.thickness,
-            lens.comment, lens.efl, lens.radius, lens.section,
-            lens.description)
-            for lens in cat))
-    library.conn.commit()
 
 
 oslo_glass_map = {
@@ -232,29 +205,3 @@ def glc_to_material(l):
     transmission = np.array([sfloat(_) for _ in line[:num]]).reshape(-1, 2)
     del line[:num]
     return mat
-
-
-def glc_to_library(fil, library, collision="or replace"):
-    stat = os.stat(fil)
-    sha1 = hashlib.sha1()
-    sha1.update(open(fil, "rb").read())
-    sha1 = sha1.hexdigest()
-    cu = library.conn.cursor()
-    ver, num, catalog = io.open(fil, "r").readline().split()[:3]
-    cu.execute("""insert into catalog
-        (name, type, source, format, version, file, date, size,
-        sha1, import)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (
-            catalog, "glass", "oslo", "glc", float(ver), fil, 
-            stat.st_mtime, stat.st_size, sha1, time.time()))
-    catalog_id = cu.lastrowid
-    cat = list(glc_read(fil))
-    cu.executemany("""insert %s into glass
-        (name, catalog, nd, vd, density, data)
-        values (?, ?, ?, ?, ?, ?)""" % collision, ((
-            glass.name, catalog_id, glass.nd, glass.vd, glass.density,
-            glass.description) for glass in cat))
-    n = cu.execute("select count() from glass where catalog = ?",
-            (catalog_id,)).fetchone()[0]
-    #assert n == int(num), (n, int(num))
-    library.conn.commit()
