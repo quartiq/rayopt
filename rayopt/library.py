@@ -33,6 +33,7 @@ from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.orm import relationship, backref
 
 from rayopt import zemax, oslo
+from rayopt.utils import public
 
 
 class Tablename(object):
@@ -53,15 +54,18 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 class LoaderParser:
     parsers = {}
 
-    def parse(self, **kwargs):
-        try:
-            return self.parsed
-        except AttributeError:
-            obj = self.parsers[self.catalog.format](self.data, **kwargs)
-            self.parsed = obj
-            return obj
+    def parse(self, force_parse=False, **kwargs):
+        if not force_parse:
+            try:
+                return self.parsed
+            except AttributeError:
+                pass
+        obj = self.parsers[self.catalog.format](self.data, **kwargs)
+        self.parsed = obj
+        return obj
 
 
+@public
 class Glass(Base, LoaderParser):
     id = Column(Integer, primary_key=True)
     name = Column(String(collation="nocase"), nullable=False)
@@ -86,6 +90,7 @@ class Glass(Base, LoaderParser):
     }
 
 
+@public
 class Lens(Base, LoaderParser):
     id = Column(Integer, primary_key=True)
     name = Column(String(collation="nocase"), nullable=False)
@@ -113,6 +118,7 @@ class Lens(Base, LoaderParser):
     }
 
 
+@public
 class Catalog(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(collation="nocase"), nullable=False)
@@ -198,6 +204,7 @@ class Catalog(Base):
         #assert len(self.glasses) == int(num), (len(self.glasses, num)
 
 
+@public
 class Library(object):
     def __init__(self, db=None):
         if db is None:
