@@ -44,6 +44,7 @@ class Analysis(object):
     resize = False
     align = False
     close = None
+    print = True
     update_conjugates = True
     refocus_paraxial = True
     trace_gaussian = False
@@ -73,6 +74,9 @@ class Analysis(object):
             setattr(self, k, v)
         if run:
             self.run()
+        if self.print:
+            for t in self.text:
+                print(t)
 
     def run(self):
         if self.update:
