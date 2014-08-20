@@ -157,7 +157,7 @@ class AbbeMaterial(Material):
 
     @simple_cache
     def refractive_index(self, wavelength):
-        return (self.d + (wavelength - self.lambda_ref)
+        return (self.n + (wavelength - self.lambda_ref)
             /(self.lambda_long - self.lambda_short)
             *(1 - self.n)/self.v)
 
