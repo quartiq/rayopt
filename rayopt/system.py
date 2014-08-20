@@ -470,7 +470,7 @@ class System(list):
             else:
                 break
         if i == maxiter - 1:
-            raise ValueError("no inteval found")
+            raise ValueError("no viable interval found")
         fa = merit(a)
         if abs(fa) <= tol:
             return a
