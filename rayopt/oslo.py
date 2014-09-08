@@ -138,6 +138,8 @@ def len_to_system(fil):
             if th > 1e2:
                 th = np.inf
         elif cmd == "AP":
+            if args[0] == "CHK":
+                del args[0]
             e.radius = float(args[0])
         elif cmd == "GLA":
             e.material = Material.make(args[0])
