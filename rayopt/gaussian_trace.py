@@ -61,8 +61,12 @@ class GaussianTrace(Trace):
         n = self.system[0].refractive_index(l)
         if qi is None:
             obj = self.system.object
-            assert obj.finite # otherwise need pupil
-            qi = self.make_qi(l, n, obj.radius)
+            if obj.finite:
+                qi = self.make_qi(l, n, obj.radius)
+            else:
+                qi = self.make_qi(l, n, obj.pupil_radius,
+                                  (-obj.pupil_distance,
+                                   -obj.pupil_distance))
         assert np.allclose(qi.T, qi), qi
         self.l = l
         self.n[0] = n
