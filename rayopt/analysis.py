@@ -32,6 +32,7 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
     """Acts exactly like the default Scalar Formatter, but yields an empty
     label for ticks at "center"."""
     center = 0.
+
     def __call__(self, value, pos=None):
         if value == self.center:
             return ""
@@ -248,7 +249,6 @@ class Analysis(object):
     def transverse(self, fig, heights=[0., .707, 1.],
             wavelengths=None, nrays_line=152,
             colors="grbcmyk"):
-        paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.wavelengths
         ax = self.pre_setup_fanplot(fig, len(heights))
@@ -280,7 +280,6 @@ class Analysis(object):
         paraxial = self.paraxial
         if wavelengths is None:
             wavelengths = self.system.wavelengths
-        nh = len(heights)
         nd = ax.shape[1]
         for axi in ax.flat:
             self.pre_setup_xyplot(axi)
@@ -385,7 +384,6 @@ class Analysis(object):
 
     def longitudinal(self, ax, height=1.,
             wavelengths=None, nrays=21, colors="grbcmyk"):
-        paraxial = self.paraxial
         # lateral color: image relative to image at wl[0]
         # focus shift paraxial focus vs wl
         # longitudinal spherical: marginal focus vs height (vs wl)
