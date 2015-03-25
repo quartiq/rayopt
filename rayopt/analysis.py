@@ -307,7 +307,7 @@ class Analysis(object):
                         facecolor="none"))
                     yi = y + zi*u
                     axij.plot(yi[:, 0], yi[:, 1], ".%s" % ci,
-                            markersize=3, markeredgewidth=0, label="%s" % wi)
+                            markersize=1, markeredgewidth=1, label="%s" % wi)
         for axi in ax:
             for axii in axi:
                 self.post_setup_axes(axii)
