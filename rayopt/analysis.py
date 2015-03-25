@@ -252,7 +252,8 @@ class Analysis(object):
         if wavelengths is None:
             wavelengths = self.system.wavelengths
         ax = self.pre_setup_fanplot(fig, len(heights))
-        p = self.system.object.pupil_distance
+        p = (self.system.object.pupil_distance
+             - self.system.object.entrance_distance)
         for hi, axi in zip(heights, ax):
             axm, axsm, axss = axi
             axm.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
@@ -419,7 +420,8 @@ class Analysis(object):
             t = GeometricTrace(self.system)
             t.rays_point((0, 0.), wi, nrays=nrays,
                     distribution="half-meridional", clip=True)
-            p = self.system.object.pupil_distance
+            p = (self.system.object.pupil_distance
+                 - self.system.object.entrance_distance)
             py = t.y[1, :, 1] + p*tanarcsin(t.i[1])[:, 1]
             z = -t.y[-1, :, 1]/tanarcsin(t.i[-1])[:, 1]
             z[t.ref] = np.nan
