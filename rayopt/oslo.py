@@ -51,7 +51,7 @@ def olc_read(dir):
                       dtype="S64,S128", ndmin=1)
             for k, n in name:
                 sect_lens.append(len(k))
-                sections[k] = n.strip("\" '")
+                sections[k] = str(n).strip("\" '")
         except IndexError:
             pass
     sect_lens = sorted(sect_lens)[::-1]

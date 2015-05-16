@@ -180,6 +180,8 @@ def agf_read(fil):
     g = []
     density, comment, status, tce = None, None, None, None
     for line in dat:
+        if not line.strip():
+            continue
         cmd, args = line.split(" ", 1)
         if cmd == "CC":
             continue
