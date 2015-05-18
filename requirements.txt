@@ -1,6 +1,0 @@
-numpy>=1.6
-scipy>=0.9
-nose>=1
-Cython>=0.15
-Sphinx>=1
-numpydoc>=0.3
