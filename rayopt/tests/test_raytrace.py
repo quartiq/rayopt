@@ -39,12 +39,12 @@ object: {angle_deg: 20}
 image: {type: finite, fno: 4.}
 elements:
 - {material: air}
-- {roc: 21.25, distance: 5.0, material: SK16, radius: 6.5}
+- {roc: 21.25, distance: 5.0, material: schott/SK16, radius: 6.5}
 - {roc: -158.65, distance: 2.0, material: air, radius: 6.5}
-- {roc: -20.25, distance: 6.0, material: F4, radius: 5.0}
+- {roc: -20.25, distance: 6.0, material: schott/F4, radius: 5.0}
 - {roc: 19.3, distance: 1.0, material: air, radius: 5.0}
-- {material: basic/air, radius: 4.75}
-- {roc: 141.25, distance: 6.0, material: SK16, radius: 6.5}
+- {material: air, radius: 4.75}
+- {roc: 141.25, distance: 6.0, material: schott/SK16, radius: 6.5}
 - {roc: -17.285, distance: 2.0, material: air, radius: 6.5}
 - {distance: 42.95, radius: 0.364}
 stop: 5

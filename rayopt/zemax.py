@@ -29,7 +29,7 @@ import time
 import numpy as np
 
 from .utils import sfloat, sint
-from .material import Material, air, SellmeierMaterial
+from .material import Material, air, CoefficientsMaterial, Thermal
 from .elements import Spheroid
 from .system import System
 
@@ -158,7 +158,7 @@ def zmx_to_system(fil):
                      "WAVN", "WAVM", "XFLD", "YFLD", "MNCA", "MNEA",
                      "MNCG", "MNEG", "MXCA", "MXCG", "RGLA", "TRAC",
                      "FLAP", "TCMM", "FLOA", "PMAG", "TOTR", "SLAB",
-                     "POPS", "COMM", "PZUP",
+                     "POPS", "COMM", "PZUP", "LANG", "FIMP",
                      ):
             pass
         else:
@@ -167,7 +167,7 @@ def zmx_to_system(fil):
     return s
 
 
-Glas = namedtuple("Glas", "name nd vd density code comment status "
+Glass = namedtuple("Glass", "name nd vd density code comment status "
         "tce description")
 
 
@@ -187,7 +187,7 @@ def agf_read(fil):
             continue
         if cmd == "NM":
             if g:
-                yield Glas(name, nd, vd, density, code, comment, status,
+                yield Glass(name, nd, vd, density, code, comment, status,
                         tce, "".join(g))
                 g = []
                 density, comment, status, tce = None, None, None, None
@@ -206,18 +206,23 @@ def agf_read(fil):
             density = sfloat(args[2])
         g.append(line)
     if g:
-        yield Glas(name, nd, vd, density, code, comment, status, tce,
+        yield Glass(name, nd, vd, density, code, comment, status, tce,
                 "".join(g))
 
 
 def agf_to_material(dat):
+    typs = ("schott sellmeier_squared herzberger sellmeier2 conrady "
+            "sellmeier_squared handbook_of_optics1 handbook_of_optics2 "
+            "sellmeier_squared_offset extended1 sellmeier5 extended2 hikari"
+            ).split()
     for line in dat.splitlines():
         if not line:
             continue
         cmd, args = line[:2], line[3:]
         if cmd == "NM":
             args = args.split()
-            g = SellmeierMaterial(name=args[0], sellmeier=[])
+            typ = typs[int(float(args[1])) - 1]
+            g = CoefficientsMaterial(name=args[0], typ=typ, coefficients=[])
             g.glasscode = sfloat(args[2])
         elif cmd == "GC":
             g.comment = args.strip()
@@ -225,16 +230,16 @@ def agf_to_material(dat):
             args = list(map(sfloat, args.split()))
             g.alpham3070, g.alpha20300, g.density = args[0:3]
         elif cmd == "CD":
-            s = np.array(list(map(sfloat, args.split()))).reshape((-1,2))
-            g.sellmeier = np.array([si for si in s if not si[0] == 0])
+            g.coefficients = np.array([sfloat(_) for _ in args.split()])
         elif cmd == "TD":
-            s = list(map(sfloat, args.split()))
-            g.thermal = s
+            s = [sfloat(_) for _ in args.split()]
+            g.thermal = Thermal(s[:3], s[3:5], *s[5:])
         elif cmd == "OD":
             g.chemical = list(map(sfloat, args[1:]))
             g.price = sfloat(args[0])
         elif cmd == "LD":
-            s = list(map(sfloat, args.split()))
+            g.lambda_min = sfloat(args[0])
+            g.lambda_max = sfloat(args[1])
         elif cmd == "IT":
             s = list(map(sfloat, args.split()))
             if not hasattr(g, "transmission"):

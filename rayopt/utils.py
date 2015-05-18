@@ -48,6 +48,7 @@ def simple_cache(f):
             cache[args] = v = f(*args)
             return v
     wrapper.cache = cache
+    wrapper.orig = f
     return wrapper
 
 

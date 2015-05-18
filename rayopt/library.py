@@ -17,26 +17,29 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import (print_function, absolute_import, division,
-    unicode_literals)
+                        unicode_literals)
 
-import os, sys, io, hashlib, time
+import os
+import io
+import hashlib
+import time
 
 from sqlalchemy import (Column, Integer, String, Float,
-            ForeignKey, Boolean)
+                        ForeignKey, Boolean)
 from sqlalchemy.engine import Engine
 from sqlalchemy import event, create_engine, orm
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 
-from rayopt import zemax, oslo
-from rayopt.utils import public
+from . import zemax, oslo
+from .utils import public
 
 
 class Tablename(object):
     @declared_attr
     def __tablename__(cls):
-       return cls.__name__.lower()
+        return cls.__name__.lower()
 Base = declarative_base(cls=Tablename)
 
 
@@ -75,8 +78,8 @@ class Glass(Base, LoaderParser):
     #  unique (name, catalog)
 
     parsers = {
-            "agf": zemax.agf_to_material,
-            "glc": oslo.glc_to_material,
+        "agf": zemax.agf_to_material,
+        "glc": oslo.glc_to_material,
     }
 
 
@@ -102,9 +105,9 @@ class Lens(Base, LoaderParser):
     #  unique (catalog, name)
 
     parsers = {
-            "zmx": zemax.zmx_to_system,
-            "olc": oslo.olc_to_system,
-            "len": oslo.len_to_system,
+        "zmx": zemax.zmx_to_system,
+        "olc": oslo.olc_to_system,
+        "len": oslo.len_to_system,
     }
 
 
@@ -124,9 +127,9 @@ class Catalog(Base):
     imported = Column(Float)
 
     lenses = relationship(Lens, lazy="dynamic", backref="catalog",
-            cascade="all, delete-orphan")
+                          cascade="all, delete-orphan")
     glasses = relationship(Glass, lazy="dynamic", backref="catalog",
-            cascade="all, delete-orphan")
+                           cascade="all, delete-orphan")
 
     def load(self, fil, **kwargs):
         dir, base = os.path.split(fil)
@@ -152,11 +155,12 @@ class Catalog(Base):
         self.type, self.source, self.format = "lens", "zemax", "zmx"
         self.version = 1001
         for lens in zemax.zmf_read(open(self.file, "rb")):
-            self.lenses.append(Lens(name=lens.name, version=lens.version,
-                elements=lens.elements, shape=lens.shape,
-                aspheric=lens.aspheric, toroidal=lens.toroidal,
-                grin=lens.grin, efl=lens.efl, enp=lens.enp,
-                data=lens.description))
+            l = Lens(name=lens.name, version=lens.version,
+                     elements=lens.elements, shape=lens.shape,
+                     aspheric=lens.aspheric, toroidal=lens.toroidal,
+                     grin=lens.grin, efl=lens.efl, enp=lens.enp,
+                     data=lens.description)
+            self.lenses.append(l)
 
     def load_agf(self, **kwargs):
         catalog = os.path.basename(self.file)
@@ -165,10 +169,11 @@ class Catalog(Base):
         self.type, self.source, self.format = "glass", "zemax", "agf"
         self.version = 0
         for glass in zemax.agf_read(self.file):
-            self.glasses.append(Glass(name=glass.name,
-                nd=glass.nd, vd=glass.vd, density=glass.density,
-                code=glass.code, status=glass.status, tce=glass.tce,
-                comment=glass.comment, data=glass.description))
+            g = Glass(name=glass.name,
+                      nd=glass.nd, vd=glass.vd, density=glass.density,
+                      code=glass.code, status=glass.status, tce=glass.tce,
+                      comment=glass.comment, data=glass.description)
+            self.glasses.append(g)
 
     def load_dir(self, **kwargs):
         catalog = os.path.basename(self.file)
@@ -177,10 +182,11 @@ class Catalog(Base):
         self.type, self.source, self.format = "lens", "oslo", "olc"
         self.version = 0
         for lens in oslo.olc_read(self.file):
-            self.lenses.append(Lens(name=lens.name,
-                elements=lens.elements, thickness=lens.thickness,
-                comment=lens.comment, efl=lens.efl, radius=lens.radius,
-                section=lens.section, data=lens.description))
+            l = Lens(name=lens.name,
+                     elements=lens.elements, thickness=lens.thickness,
+                     comment=lens.comment, efl=lens.efl, radius=lens.radius,
+                     section=lens.section, data=lens.description)
+            self.lenses.append(l)
 
     def load_glc(self, **kwargs):
         ver, num, catalog = io.open(self.file, "r").readline().split()[:3]
@@ -188,9 +194,10 @@ class Catalog(Base):
         self.type, self.source, self.format = "glass", "oslo", "glc"
         self.version = float(ver)
         for glass in oslo.glc_read(self.file):
-            self.glasses.append(Glass(name=glass.name, nd=glass.nd,
-                vd=glass.vd, density=glass.density,
-                data=glass.description))
+            g = Glass(name=glass.name, nd=glass.nd,
+                      vd=glass.vd, density=glass.density,
+                      data=glass.description)
+            self.glasses.append(g)
         #assert len(self.glasses) == int(num), (len(self.glasses, num)
 
 
@@ -218,8 +225,7 @@ class Library(object):
                     pass
 
     def load(self, fil, mode="refresh"):
-        res = self.session.query(Catalog).filter(
-                Catalog.file == fil).first()
+        res = self.session.query(Catalog).filter(Catalog.file == fil).first()
         if not res:
             pass
         elif mode == "refresh":
@@ -261,23 +267,35 @@ class Library(object):
 
 
 def _test(l):
-    print(l.get("glass", "BK7"))
-    print(l.get("lens", "AC127-025-A", "thorlabs"))
-    for cat in l.session.query(Catalog):
-        for glass in cat.glasses:
-            glass.parse()
-        for lens in cat.lenses:
-            lens.parse()
+    for glass in l.session.query(Glass):
+        glass.parse()
+    for lens in l.session.query(Lens):
+        lens.parse()
+
+
+def _test_nd(l):
+    from .material import lambda_d
+    for g in l.session.query(Glass):
+        if hasattr(g, "nd"):
+            try:
+                nd0 = g.parse().refractive_index(lambda_d)
+            except:
+                continue
+            if 1. in (nd0, g.nd) or 0. in (nd0, g.nd):
+                continue
+            if abs(g.nd - nd0) > .001:
+                print(g.name, g.catalog.source, g.catalog.name,
+                      g.nd, nd0, g.parse().coefficients, g.parse().typ)
 
 
 if __name__ == "__main__":
-    import glob, sys
-    fs = sys.argv[1:] or [
-            "catalog/oslo_glass",
-            "catalog/zemax_glass",
-            "catalog/oslo_lens",
-            "catalog/zemax_lens",
-            ]
+    import sys
     l = Library.one()
+    fs = sys.argv[1:]
+    # fs = ["catalog/oslo_glass", "catalog/zemax_glass",
+    # "catalog/oslo_lens", "catalog/zemax_lens"]
     l.load_all(fs)
+    print(l.get("glass", "BK7"))
+    print(l.get("lens", "AC127-025-A", "thorlabs"))
+    _test_nd(l)
     _test(l)

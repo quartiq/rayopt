@@ -18,9 +18,7 @@
 
 from __future__ import print_function, absolute_import, division
 
-from .material import (fraunhofer, ModelMaterial, Material,
-    SellmeierMaterial, GasMaterial, mirror, air, vacuum)
-
+from .material import *
 from .elements import *
 from .conjugates import *
 from .system import *

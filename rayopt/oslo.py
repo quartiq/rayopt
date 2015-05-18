@@ -27,7 +27,7 @@ import numpy as np
 from .utils import sfloat, sint
 from .elements import Spheroid
 from .system import System
-from .material import air, Material, SellmeierMaterial
+from .material import air, Material, CoefficientsMaterial
 
 
 Lens = namedtuple("Lens", "name elements efl radius thickness comment "
@@ -158,7 +158,7 @@ def len_to_system(fil):
     return s
 
 
-Glas = namedtuple("Glas", "name nd vd density description")
+Glass = namedtuple("Glass", "name nd vd density description")
 
 
 def glc_read(f):
@@ -175,7 +175,7 @@ def glc_read(f):
         nd = sfloat(line.pop(0))
         vd = sfloat(line.pop(0))
         density = sfloat(line.pop(0))
-        yield Glas(name, nd, vd, density, l.strip())
+        yield Glass(name, nd, vd, density, l.strip())
 
 
 def glc_to_material(l):
@@ -187,11 +187,14 @@ def glc_to_material(l):
     del line[:6]
     del line[:2]
     a, num = sint(line.pop(0)), sint(line.pop(0))
-    sellmeier = np.array([sfloat(_) for _ in line[:num]])
-    if a in (1, 2):
-        sellmeier = sellmeier.reshape(2, -1).T
+    coeff = np.array([sfloat(_) for _ in line[:num]])
     del line[:num]
-    mat = SellmeierMaterial(name=name, sellmeier=sellmeier)
+    try:
+        typ = ("schott sellmeier_squared_transposed conrady "
+               "unknown unknown hikari").split()[a - 1]
+    except IndexError:
+        typ = "unknown"
+    mat = CoefficientsMaterial(name=name, coefficients=coeff, typ=typ)
     #if not np.allclose(nd, mat.nd):
     #    print(name, nd, mat.nd)
     mat.density = density
