@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # transformations.py
 
-# Copyright (c) 2006-2013, Christoph Gohlke
-# Copyright (c) 2006-2013, The Regents of the University of California
+# Copyright (c) 2006-2015, Christoph Gohlke
+# Copyright (c) 2006-2015, The Regents of the University of California
 # Produced at the Laboratory for Fluorescence Dynamics
 # All rights reserved.
 #
@@ -44,13 +44,13 @@ functions to decompose transformation matrices.
 :Organization:
   Laboratory for Fluorescence Dynamics, University of California, Irvine
 
-:Version: 2013.06.29
+:Version: 2015.03.19
 
 Requirements
 ------------
-* `CPython 2.7 or 3.3 <http://www.python.org>`_
-* `Numpy 1.7 <http://www.numpy.org>`_
-* `Transformations.c 2013.01.18 <http://www.lfd.uci.edu/~gohlke/>`_
+* `CPython 2.7 or 3.4 <http://www.python.org>`_
+* `Numpy 1.9 <http://www.numpy.org>`_
+* `Transformations.c 2015.03.19 <http://www.lfd.uci.edu/~gohlke/>`_
   (recommended for speedup of some functions)
 
 Notes
@@ -99,6 +99,13 @@ be specified using a 4 character string or encoded 4-tuple:
     by 'z', or 'z' is followed by 'x'. Otherwise odd (1).
   - repetition : first and last axis are same (1) or different (0).
   - frame : rotations are applied to static (0) or rotating (1) frame.
+
+Other Python packages and modules for 3D transformations and quaternions:
+
+* `Transforms3d <https://pypi.python.org/pypi/transforms3d>`_
+   includes most code of this module.
+* `Blender.mathutils <http://www.blender.org/api/blender_python_api>`_
+* `numpy-dtypes <https://github.com/numpy/numpy-dtypes>`_
 
 References
 ----------
@@ -192,9 +199,9 @@ import math
 
 import numpy
 
-__version__ = '2013.06.29'
+__version__ = '2015.03.19'
 __docformat__ = 'restructuredtext en'
-__all__ = []
+__all__ = ()
 
 
 def identity_matrix():
@@ -1906,3 +1913,4 @@ if __name__ == "__main__":
     import random  # used in doctests
     numpy.set_printoptions(suppress=True, precision=5)
     doctest.testmod()
+
