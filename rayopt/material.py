@@ -289,6 +289,7 @@ class CoefficientsMaterial(Material):
 
     def dict(self):
         dat = super(CoefficientsMaterial, self).dict()
+        dat["typ"] = self.typ
         dat["coefficients"] = list(self.coefficients)
         return dat
 

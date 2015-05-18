@@ -54,8 +54,11 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 class LoaderParser:
     parsers = {}
 
-    def parse(self, **kwargs):
-        return self.parsers[self.catalog.format](self.data, **kwargs)
+    def parse(self):
+        obj = self.parsers[self.catalog.format](self.data)
+        obj.catalog = self.catalog.name
+        obj.source = self.catalog.source
+        return obj
 
 
 @public
