@@ -358,7 +358,7 @@ class Spheroid(Interface):
         if aspherics is not None:
             aspherics = list(aspherics)
         self.aspherics = aspherics
-        if self.curvature and np.isfinite(self.radius):
+        if self.curvature and np.isfinite(self.radius) and self.conic > -1:
             assert self.radius**2 <= 1/((1 + self.conic)*self.curvature**2)
 
     def dict(self):
