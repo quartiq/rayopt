@@ -280,14 +280,13 @@ class System(list):
         for i,e in enumerate(self):
             curv = getattr(e, "curvature", 0)
             roc = curv == 0 and np.inf or 1./curv
-            mat = getattr(e, "material", "")
             rad = e.radius
+            mat = getattr(e, "material", "")
             nd = getattr(mat, "nd", np.nan)
             vd = getattr(mat, "vd", np.nan)
+            n = nd
             if mat:
                 n = mat.refractive_index(self.wavelengths[0])
-            else:
-                n = nd
             yield "%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
                     i, e.typeletter, e.distance, roc, rad*2, mat, n, nd, vd)
 

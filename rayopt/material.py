@@ -141,10 +141,22 @@ class Material(NameMixin):
         return 1.
 
     def dispersion(self, short, mid, long):
-        return (self.refractive_index(mid) - 1)/self.delta_n(short, long)
+        dn = self.delta_n(short, long)
+        if dn:
+            return (self.refractive_index(mid) - 1)/dn
+        else:
+            return np.inf
 
     def delta_n(self, short, long):
         return (self.refractive_index(short) - self.refractive_index(long))
+
+    @property
+    def nd(self):
+        return self.refractive_index(lambda_d)
+
+    @property
+    def vd(self):
+        return self.dispersion(lambda_F, lambda_d, lambda_C)
 
 
 @public
