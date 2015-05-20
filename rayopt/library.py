@@ -32,7 +32,7 @@ from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
 from sqlalchemy.orm import relationship
 
-from . import zemax, oslo
+from . import zemax, oslo, rii
 from .utils import public
 
 
@@ -83,6 +83,7 @@ class Glass(Base, LoaderParser):
     parsers = {
         "agf": zemax.agf_to_material,
         "glc": oslo.glc_to_material,
+        "rii": rii.rii_to_material,
     }
 
 
@@ -202,6 +203,9 @@ class Catalog(Base):
                       data=glass.description)
             self.glasses.append(g)
         #assert len(self.glasses) == int(num), (len(self.glasses, num)
+
+    def load_yml(self, **kwargs):
+        pass
 
 
 @public
