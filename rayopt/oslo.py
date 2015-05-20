@@ -76,7 +76,7 @@ oslo_glass_map = {
 
 
 def olc_to_system(dat, glass_map=oslo_glass_map):
-    sys = []
+    sys = System()
     s = Spheroid()
     sys.append(s)
     for cmd in dat.split(";"):
