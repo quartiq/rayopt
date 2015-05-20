@@ -40,15 +40,15 @@ class ParaxialTrace(Trace):
     # sine condition, magnification is equal to optical input ray sine
     # over optical output sine for all rays:
     # m = n0 sin u0/ (nk sin uk)
-    def __init__(self, system, aberration_orders=3, axis=1):
+    def __init__(self, system, kmax=2, axis=1):
         super(ParaxialTrace, self).__init__(system)
         self.axis = axis
-        self.allocate(aberration_orders)
+        self.allocate(kmax)
         self.rays()
         self.propagate()
         self.aberrations()
 
-    def allocate(self, k):
+    def allocate(self, kmax):
         super(ParaxialTrace, self).allocate()
         l = self.system.wavelengths
         self.l = l[0]
@@ -59,24 +59,8 @@ class ParaxialTrace(Trace):
         self.y = np.empty((n, 2))
         self.u = np.empty((n, 2))
         self.v = np.empty(n)
-        self.c = np.empty((n, 2, 2, k, k, k))
+        self.c = np.empty((n, 2, 2, kmax + 1, kmax + 1, kmax + 1))
         self.d = np.empty_like(self.c)
-
-    def __aim(self):
-        ai = self.system.stop
-        m = self.system.paraxial_matrix(self.l, stop=ai + 1)
-        m = m[self.axis::2, self.axis::2]
-        a, b, c, d = m.flat
-        r = self.system[ai].radius
-        self.system.object.pupil_distance = b/a
-        self.system.object.pupil_radius = r/b
-
-    def __rays(self):
-        y, u = self.y, self.u
-        ai = self.system.stop
-        y, u = self.system.object.aim([0, 0], [], )
-        self.y[0] = 0
-        self.n[0] = self.system[0].refractive_index(self.l)
 
     def rays(self):
         self.n[0] = self.system[0].refractive_index(self.l)
@@ -100,7 +84,7 @@ class ParaxialTrace(Trace):
         init = start - 1
         # FIXME not really round for gen astig...
         yu = np.vstack((self.y[init], self.y[init],
-            self.u[init], self.u[init])).T
+                        self.u[init], self.u[init])).T
         n = self.n[init]
         for j, (yu, n) in enumerate(self.system.propagate_paraxial(
                 yu, n, self.l, start, stop)):
@@ -109,73 +93,76 @@ class ParaxialTrace(Trace):
             self.n[j] = n
 
     def aberrations(self, start=1, stop=None):
+        kmax = self.c.shape[-1] - 1
         els = self.system[start:stop or self.length]
         self.c[start - 1] = self.v[start - 1] = 0
         for i, el in enumerate(els):
             i += start
             self.v[i] = el.dispersion(self.lmin, self.lmax)
             self.c[i] = el.aberration(self.y[i], self.u[i - 1],
-                    self.n[i - 1], self.n[i], self.c.shape[-1])
+                                      self.n[i - 1], self.n[i], kmax)
         self.extrinsic_aberrations()
 
     def extrinsic_aberrations(self):
-        # FIXME: wrong
+        # FIXME: wrong?
         self.d[:] = 0
-        st = self.system.stop
+        a = self.system.stop
         t, s = 0, 1
-        kmax = self.d.shape[-1]
-        r = np.empty_like(self.d)
-        for k in range(1, kmax - 1):
-            for j in range(k + 1):
-                for i in range(k - j + 1):
-                    b = (self.c[:, :, :, k - j - i, j, i]
-                       + self.d[:, :, :, k - j - i, j, i])
-                    b[st-1::-1, s] = -np.cumsum(b[st:0:-1, s], axis=0)
-                    b[st+1:, s] = np.cumsum(b[st:-1, s], axis=0)
-                    b[st, s] = 0
-                    b[1:, t] = np.cumsum(b[:-1, t], axis=0)
-                    r[:, t, :, k - j - i, j, i] = b[:, t]
-                    r[:, s, :, k - j - i, j, i] = b[:, s]
-            for i in range(1, self.length):
-                aberration_extrinsic(self.c[i], r[i], self.d[i], k + 1)
+        kmax = self.d.shape[-1] - 1
+        b = np.empty_like(self.d)
+        for k0 in range(1, kmax):
+            for j in range(k0 + 1):
+                for i in range(k0 - j + 1):
+                    k = k0 - j - i
+                    b[:, :, :, k, j, i] = np.cumsum(
+                        self.c[:, :, :, k, j, i] + self.d[:, :, :, k, j, i],
+                        axis=0)/self.lagrange
+                    b[:, s, :, k, j, i] -= b[a, s, :, k, j, i]
+                    b[:, t, :, k, j, i] -= b[0, t, :, k, j, i]
+                    if True:
+                        b[:a, s, :, k, j, i] -= b[a-1, s, :, k, j, i]
+                        b[a+1:, s, :, k, j, i] -= b[a+1, s, :, k, j, i]
+                        b[1:, t, :, k, j, i] -= b[1, t, :, k, j, i]
+            for i in range(self.length):
+                aberration_extrinsic(self.c[i], b[i], self.d[i], k0 + 1)
 
     @property
     def seidel3(self):
-        c = self.c
-        c = np.array([
-                -2*c[:, 0, 1, 1, 0, 0], # SA3
-                -c[:, 0, 1, 0, 1, 0], # CMA3
-                -c[:, 0, 0, 0, 1, 0], # AST3
-                c[:, 0, 0, 0, 1, 0] - 2*c[:, 0, 1, 0, 0, 1], # PTZ3
-                -2*c[:, 0, 0, 0, 0, 1], # DIS3
-                ])
+        b = self.c
+        s = np.array([
+            -2*b[:, 0, 1, 1, 0, 0],  # SA3
+            -b[:, 0, 1, 0, 1, 0],  # CMA3
+            -b[:, 0, 0, 0, 1, 0],  # AST3
+            b[:, 0, 0, 0, 1, 0] - 2*b[:, 0, 1, 0, 0, 1],  # PTZ3
+            -2*b[:, 0, 0, 0, 0, 1],  # DIS3
+        ])
         # transverse image seidel (like oslo)
-        return c.T*self.height[1]/2/self.lagrange
+        return s.T*self.height[1]/2/self.lagrange
 
     @property
     def seidel5(self):
-        c = self.c + self.d
-        c = np.array([
-                -2*c[:, 0, 1, 2, 0, 0], # MU1
-                -1*c[:, 0, 1, 1, 1, 0], # MU3
-                -2*c[:, 0, 0, 1, 1, 0] - 2*c[:, 0, 1, 1, 0, 1] # MU5
-                    + 2*c[:, 0, 1, 0, 2, 0], # MU6
-                2*c[:, 0, 1, 1, 0, 1], # MU5
-                # -2*c[:, 0, 0, 1, 0, 1]-c[:, 0, 0, 0, 2, 0]
-                # -c[:, 0, 1, 0, 1, 1], # MU7
-                # -c[:, 0, 1, 0, 1, 1]-c[:, 0, 0, 0, 2, 0], # MU8
-                -2*c[:, 0, 0, 1, 0, 1] - 2*c[:, 0, 0, 0, 2, 0]
-                    - 2*c[:, 0, 1, 0, 1, 1], # MU7+MU8
-                -1*c[:, 0, 1, 0, 1, 1], # MU9
-                -c[:, 0, 0, 0, 1, 1]/2, # (MU10-MU11)/4
-                -2*c[:, 0, 1, 0, 0, 2] + c[:, 0, 0, 0, 1, 1]/2,
-                # (5*MU11-MU10)/4
-                # -2*c[:, 0, 0, 0, 1, 1]-2*c[:, 0, 1, 0, 0, 2], # MU10
-                # -2*c[:, 0, 1, 0, 0, 2], # MU11
-                -2*c[:, 0, 0, 0, 0, 2], # MU12
-                ])
+        b = self.c + self.d
+        s = np.array([
+            -2*b[:, 0, 1, 2, 0, 0],  # MU1
+            -1*b[:, 0, 1, 1, 1, 0],  # MU3
+            -2*b[:, 0, 0, 1, 1, 0] - 2*b[:, 0, 1, 1, 0, 1]  # MU5
+            + 2*b[:, 0, 1, 0, 2, 0],  # MU6
+            2*b[:, 0, 1, 1, 0, 1],  # MU5
+            # -2*b[:, 0, 0, 1, 0, 1]-b[:, 0, 0, 0, 2, 0]
+            # -b[:, 0, 1, 0, 1, 1],  # MU7
+            # -b[:, 0, 1, 0, 1, 1]-b[:, 0, 0, 0, 2, 0],  # MU8
+            -2*b[:, 0, 0, 1, 0, 1] - 2*b[:, 0, 0, 0, 2, 0]
+            - 2*b[:, 0, 1, 0, 1, 1],  # MU7+MU8
+            -1*b[:, 0, 1, 0, 1, 1],  # MU9
+            -b[:, 0, 0, 0, 1, 1]/2,  # (MU10-MU11)/4
+            -2*b[:, 0, 1, 0, 0, 2] + b[:, 0, 0, 0, 1, 1]/2,
+            # (5*MU11-MU10)/4
+            # -2*b[:, 0, 0, 0, 1, 1]-2*b[:, 0, 1, 0, 0, 2],  # MU10
+            # -2*b[:, 0, 1, 0, 0, 2],  # MU11
+            -2*b[:, 0, 0, 0, 0, 2],  # MU12
+        ])
         # transverse image seidel (like oslo)
-        return c.T*self.height[1]/2/self.lagrange
+        return s.T*self.height[1]/2/self.lagrange
 
     @property
     def track(self):
@@ -391,6 +378,7 @@ class ParaxialTrace(Trace):
         c = (n*u - n0*u0)/(y*(n0 - n))
         self.system[i].curvature = c
         self.propagate()
+        self.aberrations()
 
     def _focal_length_solve(self, f, i=None): # TODO: not exact
         if i is None:
@@ -406,10 +394,12 @@ class ParaxialTrace(Trace):
                 )/(m0[1, 1]*m2[0, 0])
         self.system[i].curvature = c/(n0 - n)*n
         self.propagate()
+        self.aberrations()
 
     def refocus(self):
         self.system[-1].distance -= self.y[-1, 0]/self.u[-1, 0]
         self.propagate()
+        self.aberrations()
 
     def update_conjugates(self):
         z = self.pupil_distance

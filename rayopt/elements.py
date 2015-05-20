@@ -480,18 +480,18 @@ class Spheroid(Interface):
         self.curvature /= scale
         if self.aspherics is not None:
             self.aspherics = [ai/scale**(2*i + 3) for i, ai in
-                    enumerate(self.aspherics)]
+                              enumerate(self.aspherics)]
 
     def aberration(self, y, u, n0, n, kmax):
         y, yb = y
         u, ub = u
-        c = self.curvature
-        f, g = (c*y + u)*n0, (c*yb + ub)*n0
+        r = self.curvature
+        f, g = (r*y + u)*n0, (r*yb + ub)*n0
         if self.material is not None and self.material.mirror:
-            n = -n # FIXME appear incorrect
-        a = np.zeros((2, 2, kmax, kmax, kmax))
-        aberration_intrinsic(c, f, g, y, yb, 1/n0, 1/n, a, kmax - 1)
-        return a
+            n = -n  # FIXME check, cleanup
+        c = np.zeros((2, 2, kmax + 1, kmax + 1, kmax + 1))
+        aberration_intrinsic(r, f, g, y, yb, 1/n0, 1/n, c, kmax)
+        return c
 
 
 try:
@@ -500,6 +500,7 @@ try:
     raise ImportError
     from .numba_elements import fast_propagate
     del Element._types[(Element, "spheroid")]
+
     @public
     @Element.register
     class FastSpheroid(Spheroid):
