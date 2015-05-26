@@ -192,6 +192,9 @@ class Element(NameMixin, TransformMixin):
         # given angles is set correctly, mask s
         return s
 
+    def refract(self, y, u0, mu):
+        return u0
+
     def clip(self, y, u):
         good = np.square(y[:, :2]).sum(1) <= self.radius**2
         u = np.where(good[:, None], u, np.nan)
@@ -214,13 +217,16 @@ class Element(NameMixin, TransformMixin):
         m[0, 2] = m[1, 3] = d
         return n0, m
 
-    def propagate(self, y0, u0, n0, l):
+    def propagate(self, y0, u0, n0, l, clip=True):
         t = self.intercept(y0, u0)
         y = y0 + t[:, None]*u0
         if clip:
             u0 = self.clip(y, u0)
         n = n0
         return y, u0, n, t*n0
+
+    def propagate_poly(self, r, p, k, n0, l):
+        raise NotImplementedError
 
     def reverse(self):
         pass
@@ -265,9 +271,6 @@ class Interface(Element):
             n = self.refractive_index(l)
         return n, m
 
-    def refract(self, y, u0, mu):
-        return u0
-
     def propagate(self, y0, u0, n0, l, clip=True):
         t = self.intercept(y0, u0)
         y = y0 + t[:, None]*u0
@@ -282,6 +285,9 @@ class Interface(Element):
                 mu = n0/n
             u = self.refract(y, u0, mu)
         return y, u, n, t*n0
+
+    def propagate_poly(self, r, p, k, n0, l):
+        raise NotImplementedError
 
     def dispersion(self, lmin, lmax):
         if self.material is not None:
@@ -468,7 +474,61 @@ class Spheroid(Interface):
             m = np.dot(r, np.dot(m, r.T))
 
         return n, m
-   
+
+    def propagate_poly(self, r, p, k):
+        S = r.__class__
+        if self.aspherics is not None:
+            u = self.expand()
+            rt = r
+            for i in range(len(u)):  # (28)
+                f = S()
+                for uj in reversed(u):
+                    f = f.shift(uj)*rt
+                rt = r + (p*f + 2*k)*f
+            fr = S()
+            for i in reversed(range(len(u))):
+                fr = (fr*rt).shift((i + 1)*u[i])
+            g = (4*rt*fr*fr).shift(1)**-.5
+        else:
+            u = self.curvature
+            p1 = p.copy().shift(1)
+            a = (-u*k).shift(1)
+            a -= (a*a - p1*r*u**2)**.5
+            a = a*p1**-1  # (44)
+            f = a/u
+            #rt = a*(-a).shift(2)  # (45)
+            g = (-a).shift(1)  # (47)
+            fr = .5*u*g**-1  # (46)
+        return f, g, fr
+
+    def aberration_poly(self, r, p, k, s, t, v, w, o, n0, mp, l):
+        # FIXME r0 p0 k0
+        d = self.distance  # FIXME: shifted
+        f, g, fr = self.propagate_poly(r, p, k)
+        n = self.refractive_index(l)
+        m = n0/n
+        n = p.copy().shift(1)**-.5  # (30)
+        ct = m*g*n*(-2*(k + p*f)*fr).shift(1.)  # (31)
+        ctp = (ct*ct).shift(1 - m**2)**.5  # (32)
+        gctpmct = g*(ctp - ct)
+        n1 = m*n + gctpmct  # (33)
+        n1i = n1**-1
+        ni = n**-1
+        a = -2*n1i*gctpmct*fr  # (34), (1, 0)
+        b = m*n*n1i + a*f  # (1,1)
+        v1 = a*s + b*v  # (39)
+        w1 = a*t + b*w
+        a = (-f).shift(d)
+        s += a*v1 + f*v
+        t += a*w1 + f*w
+        v, w = v1, w1
+        r = r0*s*s + (p0*t + 2*k0*s)*t  # (40.1)
+        p = (n1i*n1i).shift(-1)  # (40.2)
+        k = (r0*s + k0*t)*v + (p0*t + k0*s)*w  # 40.3
+        mp /= n
+        o += mp*(((m*n1*ni).shift(-1)*f).shift(d)*n1i)  # (58)
+        return r, p, k, s, t, v, w, n, mp
+
     def reverse(self):
         super(Spheroid, self).reverse()
         self.curvature *= -1
