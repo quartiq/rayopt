@@ -2,6 +2,7 @@
 /dist
 /build
 /rayopt/*.so
+/rayopt/simplex_accel.c
 *.~*
 *.zmx
 *.ZMX
