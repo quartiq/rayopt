@@ -20,7 +20,7 @@ from __future__ import print_function, absolute_import, division
 
 import numpy as np
 
-from .simplex_accel import simplex_mul
+from .simplex_accel import *
 
 
 def simplex_iter(d, m):
@@ -83,18 +83,13 @@ def simplex_pow(abi, m, a, p):
 def simplex_eval(n, j, a, x):
     x = np.broadcast_arrays(*x)
     y = np.zeros_like(x[0])
-    xp = []
-    for xi in x:
-        xpi = [1, xi]
-        for i in range(n - 2):
-            xpi.append(xpi[-1]*xi)
-        xp.append(xpi)
+    xp = np.empty((n, len(x)) + x[0].shape)
+    xp[0] = 1
+    xp[1] = x
+    for i in range(2, n):
+        xp[i] = xp[1]*xp[i - 1]
     for p, ji in zip(a, j):
-        yi = p
-        for k, jik in enumerate(ji):
-            if jik:
-                yi *= xp[k][jik]
-        y += yi
+        y += p*np.prod(xp[ji, range(len(ji))], axis=0)
     return y
 
 
@@ -139,4 +134,22 @@ def make_simplex(d0, n0):
             assert len(x) == self.d
             return simplex_eval(self.n, self.j, self, x)
 
+    Simplex.__name__ = "Simplex{}x{}".format(d0, n0)
     return Simplex
+
+
+def simplex_transform_slow(S, r, u, w, s, t):
+    bst = np.zeros((S.q, 2))
+    for (i, j, k), s1, t1 in zip(S.j, r*s - u*t, -w*t):
+        for l in range(k + 1):
+            for m in range(j + 1):
+                for n in range(m + 1):
+                    c = (r**(2*i + k)*u**(2*j - 2*m + l + n)*w**(2*m + k - l - n)*
+                         2**n*(-1)**k*binom(k, l)*binom(j, m)*binom(m, n))
+                    bst[S.i[i + j + l - m, m - n, k - l + n]] += c*s1, c*t1
+    return bst[:, 0].view(S), bst[:, 1].view(S)
+
+
+def simplex_transform(S, r, u, w, s, t):
+    bst = simplex_transform_fast(S.i, S.j, r, u, w, s, t)
+    return bst[:, 0].view(S), bst[:, 1].view(S)
