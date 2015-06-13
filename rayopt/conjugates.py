@@ -204,6 +204,14 @@ class FiniteConjugate(Conjugate):
     def height(self, h):
         self.radius = h
 
+    @property
+    def chief_slope(self):
+        return self.radius/self.pupil_distance
+
+    @chief_slope.setter
+    def chief_slope(self, c):
+        self.radius = abs(self.pupil_distance*c)
+
     def aim(self, yo, yp=None, z=None, a=None, surface=None, filter=True):
         if z is None:
             z = self.pupil_distance
