@@ -197,9 +197,9 @@ class System(list):
                     self[0].refractive_index(self.wavelengths[0])
             self.image.refractive_index = \
                     self[-2].refractive_index(self.wavelengths[0])
-            self.object.entrance_distance = self[1].distance
+            self.object._entrance_distance = self[1].distance
             self.object.entrance_radius = self[1].radius
-            self.image.entrance_distance = self[-1].distance
+            self.image._entrance_distance = self[-1].distance
             self.image.entrance_radius = self[-2].radius
 
     def validate(self, fix=False):
@@ -383,7 +383,7 @@ class System(list):
 
     def paraxial_matrices(self, l, start=1, stop=None):
         n = self[start - 1].refractive_index(l)
-        for e in self[start:stop or len(self)]:
+        for e in self[start:stop]:
             n, m = e.paraxial_matrix(n, l)
             yield n, m
 
@@ -420,19 +420,21 @@ class System(list):
             "mirror", False) else 1 for el in self])
 
     def propagate_paraxial(self, yu, n, l, start=1, stop=None):
-        stop = stop or len(self)
         for e in self[start:stop]:
             yu, n = e.propagate_paraxial(yu, n, l)
             yield yu, n
 
     def propagate_gaussian(self, q, n, l, start=1, stop=None):
-        stop = stop or len(self)
         for e in self[start:stop]:
             q, n = e.propagate_gaussian(q, n, l)
             yield q, n
 
+    def propagate_poly(self, state, l, start=1, stop=None):
+        for e in self[start:stop]:
+            state = e.propagate_poly(state, l)
+            yield state
+
     def propagate(self, y, u, n, l, start=1, stop=None, clip=False):
-        stop = stop or len(self)
         for e in self[start:stop]:
             y, i = e.to_normal(y - e.offset, u)
             y, u, n, t = e.propagate(y, i, n, l, clip)

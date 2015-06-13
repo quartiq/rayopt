@@ -225,7 +225,21 @@ class Element(NameMixin, TransformMixin):
         n = n0
         return y, u0, n, t*n0
 
-    def propagate_poly(self, r, p, k, n0, l):
+    def transfer_poly(self, state):
+        fd = (-state.f).shift(self.distance)
+        fdp = fd*state.p
+        r = state.r + fd*(2*state.k + fdp)
+        k = state.k + fdp
+        return fd, r, k
+
+    def intercept_poly(self, r, p, k):
+        S = r.__class__
+        f = S()
+        fr = S()
+        g = S().shift(1)
+        return r, f, fr, g
+
+    def propagate_poly(self, state, l):
         raise NotImplementedError
 
     def reverse(self):
@@ -256,6 +270,17 @@ class Interface(Element):
             material = Material.make(material)
         self.material = material
 
+    def get_n_mu(self, n0, l):
+        n = n0
+        mu = 1.
+        if self.material:
+            if self.material.mirror:
+                mu = -1.
+            else:
+                n = self.material.refractive_index(l)
+                mu = n0/n
+        return n, mu
+
     def dict(self):
         dat = super(Interface, self).dict()
         if self.material is not None:
@@ -276,18 +301,11 @@ class Interface(Element):
         y = y0 + t[:, None]*u0
         if clip:
             u0 = self.clip(y, u0)
-        u, n = u0, n0
-        if self.material is not None:
-            if self.material.mirror:
-                mu = -1.
-            else:
-                n = self.refractive_index(l)
-                mu = n0/n
+        u = u0
+        n, mu = self.get_n_mu(n0, l)
+        if mu:
             u = self.refract(y, u0, mu)
         return y, u, n, t*n0
-
-    def propagate_poly(self, r, p, k, n0, l):
-        raise NotImplementedError
 
     def dispersion(self, lmin, lmax):
         if self.material is not None:
@@ -348,6 +366,36 @@ class Interface(Element):
         xyz[:, axis] = np.linspace(-rad, rad, points)
         xyz[:, 2] = -self.surface_sag(xyz)
         return xyz
+
+    def intercept_poly(self, r, p, k):
+        raise NotImplementedError
+
+    def propagate_poly(self, state, l):
+        fd, rt, kt = self.transfer_poly(state)
+        r, f, fr, g = self.intercept_poly(rt, state.p, kt)
+        n, mu = self.get_n_mu(state.n, l)
+
+        p1 = state.p.copy().shift(1)
+        mun = mu*p1**-.5  # (30)
+        ct = g*mun*(-2*(kt + f*state.p)*fr).shift(1)  # (31)
+        gdct = g*((ct*ct).shift(1 - mu**2)**.5 - ct)  # (32)
+        n1i = (mun + gdct)**-1.  # (33)
+        a = f + fd
+        b = -2*n1i*gdct*fr  # (34)
+        c = mun*n1i
+        ap = a*state.p
+
+        r = state.r + a*(2*state.k + ap)  # (~35)
+        p = (n1i*n1i).shift(-1)  # (40.2)
+        k = b*r + c*(state.k + ap)
+
+        s = state.s + a*state.v  # (39)
+        t = state.t + a*state.w
+        v = b*s + c*state.v
+        w = b*t + c*state.w
+        o = state.o + state.n*a*p1**.5  # (57)
+        PolyState = state.__class__
+        return PolyState(f=f, n=n, r=r, k=k, p=p, s=s, t=t, v=v, w=w, o=o)
 
 
 @public
@@ -475,60 +523,6 @@ class Spheroid(Interface):
 
         return n, m
 
-    def propagate_poly(self, r, p, k):
-        S = r.__class__
-        if self.aspherics is not None:
-            u = self.expand()
-            rt = r
-            for i in range(len(u)):  # (28)
-                f = S()
-                for uj in reversed(u):
-                    f = f.shift(uj)*rt
-                rt = r + (p*f + 2*k)*f
-            fr = S()
-            for i in reversed(range(len(u))):
-                fr = (fr*rt).shift((i + 1)*u[i])
-            g = (4*rt*fr*fr).shift(1)**-.5
-        else:
-            u = self.curvature
-            p1 = p.copy().shift(1)
-            a = (-u*k).shift(1)
-            a -= (a*a - p1*r*u**2)**.5
-            a = a*p1**-1  # (44)
-            f = a/u
-            #rt = a*(-a).shift(2)  # (45)
-            g = (-a).shift(1)  # (47)
-            fr = .5*u*g**-1  # (46)
-        return f, g, fr
-
-    def aberration_poly(self, r, p, k, s, t, v, w, o, n0, mp, l):
-        # FIXME r0 p0 k0
-        d = self.distance  # FIXME: shifted
-        f, g, fr = self.propagate_poly(r, p, k)
-        n = self.refractive_index(l)
-        m = n0/n
-        n = p.copy().shift(1)**-.5  # (30)
-        ct = m*g*n*(-2*(k + p*f)*fr).shift(1.)  # (31)
-        ctp = (ct*ct).shift(1 - m**2)**.5  # (32)
-        gctpmct = g*(ctp - ct)
-        n1 = m*n + gctpmct  # (33)
-        n1i = n1**-1
-        ni = n**-1
-        a = -2*n1i*gctpmct*fr  # (34), (1, 0)
-        b = m*n*n1i + a*f  # (1,1)
-        v1 = a*s + b*v  # (39)
-        w1 = a*t + b*w
-        a = (-f).shift(d)
-        s += a*v1 + f*v
-        t += a*w1 + f*w
-        v, w = v1, w1
-        r = r0*s*s + (p0*t + 2*k0*s)*t  # (40.1)
-        p = (n1i*n1i).shift(-1)  # (40.2)
-        k = (r0*s + k0*t)*v + (p0*t + k0*s)*w  # 40.3
-        mp /= n
-        o += mp*(((m*n1*ni).shift(-1)*f).shift(d)*n1i)  # (58)
-        return r, p, k, s, t, v, w, n, mp
-
     def reverse(self):
         super(Spheroid, self).reverse()
         self.curvature *= -1
@@ -552,6 +546,37 @@ class Spheroid(Interface):
         c = np.zeros((2, 2, kmax + 1, kmax + 1, kmax + 1))
         aberration_intrinsic(r, f, g, y, yb, 1/n0, 1/n, c, kmax)
         return c
+
+    def intercept_poly(self, r, p, k):
+        S = r.__class__
+        u = self.curvature
+        if u == 0.:
+            r, f, fr, g = Element.intercept_poly(self, r, p, k)
+        else:
+            p1 = p.copy().shift(1)
+            a = (-u*k).shift(1)
+            a -= (a*a - p1*r*u**2)**.5
+            a = a*p1**-1  # (44)
+            f = a/u
+            r = a*(-a).shift(2)  # (45)
+            g = (-a).shift(1)  # (47)
+            fr = .5*u*g**-1.  # (46)
+        if self.aspherics:
+            r0 = r
+            for i in range(len(u)):  # (28)
+                df = S()
+                for uj in reversed(u):
+                    df = df.shift(uj)*r
+                # FIXME: real Newton Raphson
+                r = r0 + df*(2*k + df*p)
+            dfr = S()
+            for i in reversed(range(len(u))):
+                dfr = (dfr*r).shift((i + 1)*u[i])
+            # FIXME
+            f += df
+            fr += dfr
+            g = (4*r*dfr*dfr).shift(1)**-.5
+        return r, f, fr, g
 
 
 try:

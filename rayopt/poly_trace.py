@@ -19,77 +19,114 @@
 from __future__ import print_function, absolute_import, division
 
 import itertools
+from collections import namedtuple
 
 import numpy as np
 
 from .utils import sinarctan, tanarcsin, public
 from .raytrace import Trace
-from .simplex import make_simplex
+from .simplex import make_simplex, simplex_transform
 
+
+PolyState = public(namedtuple("PolyState", "f n r p k s t v w o"))
 
 
 @public
 class PolyTrace(Trace):
-    def __init__(self, system, kmax=7):
+    def __init__(self, system, kmax=7, wavelength=0):
         super(PolyTrace, self).__init__(system)
-        self.Simplex = make_simplex(3, kmax)
-        self.allocate(kmax)
+        self.kmax = kmax
+        self.l = self.system.wavelengths[wavelength]
+        self.allocate()
         self.rays()
         self.propagate()
 
-    def allocate(self, kmax):
+    def allocate(self):
         super(PolyTrace, self).allocate()
-        l = self.system.wavelengths
+        self.Simplex = make_simplex(3, self.kmax)
         n = self.length
+        self.n = np.empty(n)
+        self.stvwo = np.empty((n, 5, self.Simplex.q))
 
     def rays(self):
-        pass
+        self.n[0] = self.system[0].refractive_index(self.l)
+        S = self.Simplex
+        state = PolyState(f=S().shift(self.system.object.pupil_distance),
+                          n=self.n[0], r=S(), p=S(), k=S(),
+                          s=S().shift(1), t=S(), v=S(), w=S().shift(1), o=S())
+        state.r[1], state.p[2], state.k[3] = 1, 1, 1
+        self._state = state
 
     def propagate(self, start=1, stop=None):
         super(PolyTrace, self).propagate()
         init = start - 1
-        # FIXME not really round for gen astig...
-        yu = np.vstack((self.y[init], self.y[init],
-                        self.u[init], self.u[init])).T
-        n = self.n[init]
-        for j, (yu, n) in enumerate(self.system.propagate_paraxial(
-                yu, n, self.l, start, stop)):
+        state = self._state
+        self.stvwo[init] = state.s, state.t, state.v, state.w, state.o
+        for j, state in enumerate(self.system.propagate_poly(
+                state, self.l, start, stop)):
             j += start
-            self.y[j], self.u[j] = np.vsplit(yu[:, self.axis::2].T, 2)
-            self.n[j] = n
+            self.stvwo[j] = state.s, state.t, state.v, state.w, state.o
+            self.n[j] = state.n
 
-    def print_trace(self):
-        c = np.c_[self.z, self.y[:, 0], self.u[:, 0],
-                self.y[:, 1], self.u[:, 1]]
-        return self.print_coeffs(c,
-                "track/axial y/axial u/chief y/chief u".split("/"),
-                sum=False)
+    def transform(self, i=-1):
+        assert self.system.object.finite
+        s = self.stvwo[i, 0].view(self.Simplex)
+        t = self.stvwo[i, 1].view(self.Simplex)
+        r = self.system.object.pupil_radius
+        c = self.system.object.chief_slope
+        a = self.system.object.slope
+        u, uu = a, c
+        if abs(a) > abs(c):
+            u, uu = uu, u
+        bs, bt = simplex_transform(self.Simplex, r, u, uu, s, t)
+        if abs(a) > abs(c):
+            i, j, k = self.Simplex.j.T
+            ii = self.Simplex.i[j, i, k]
+            bs, bt = bt[ii], bs[ii]
+        return self.Simplex(bs), self.Simplex(bt)
+
+    def evaluate(self, xy, ab, i=-1):
+        if self.system.object.finite:
+            s, t = self.transform(i)
+        else:
+            s, t = self.stvwo[i, (0, 1), :]
+        s, t = self.Simplex(s), self.Simplex(t)
+        xy, ab = np.atleast_2d(xy, ab)
+        xy, ab = np.broadcast_arrays(xy, ab)
+        assert xy.shape[1] == 2
+        r = (xy**2).sum(1)
+        p = (ab**2).sum(1)
+        k = (xy*ab).sum(1)
+        return s(r, p, k)*xy + t(r, p, k)*ab
+
+    def print_params(self):
+        yield "maximum order: {:d}".format(self.Simplex.n)
+        yield "wavelength: {:g}".format(self.l/1e-9)
+
+    def print_trace(self, components="stvwo", elements=None, cutoff=None,
+                    width=12):
+        for n in components:
+            a = self.stvwo[:, "stvwo".index(n), :].T
+            if elements is None:
+                elements = range(1, a.shape[1])
+            if cutoff is None:
+                idx = slice(None)
+            else:
+                idx = self.Simplex.j.sum(1) < cutoff
+            yield "{:s}".format(n.upper())
+            yield "  n  i  j  k " + " ".join("{:12d}".format(i) for i in elements)
+            for (i, j, k), ai in zip(self.Simplex.j[idx], a[idx][:, elements]):
+                i = "{:3d}{:3d}{:3d}{:3d}".format(self.Simplex.i[i, j, k],
+                                                  i, j, k)
+                ai = " ".join("{:12.5e}".format(j) for j in ai)
+                yield "{:s} {:s}".format(i, ai)
+            yield ""
+        #return self.print_coeffs(
+        #    c, "track/axial y/axial u/chief y/chief u".split("/"),
+        #    sum=False)
 
     def __str__(self):
-        "\n".join(itertools.chain(
-                #self.print_params(), ("",),
-                self.print_trace(), ("",),
-                ))
-
-    def andersen(S, mdu, pos=0.):
-        mp = 1.
-
-        r0, p0, k0 = S(), S(), S()
-        r0[1], p0[2], k0[3] = 1, 1, 1
-
-        r, p, k = S(), S(), S()
-        r[1], p[2], k[3] = 1, 1, 1
-        r[2] = pos**2
-        r[3] = 2*pos
-        k[2] = pos
-
-        s = S().shift(1)
-        t = S().shift(pos)
-        v = S()
-        w = S().shift(1)
-
-        o = S().shift(1)
-        o[2] = 1
-        o = pos*o**.5
-
-        for m, d, u in mdu:
+        return "\n".join(itertools.chain(
+            self.print_params(), ("",),
+            self.print_trace(), ("",),
+        ))

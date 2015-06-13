@@ -52,7 +52,7 @@ cdef long binom_(long n, long k):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def simplex_transform_fasr(np.ndarray[np.uint16_t, ndim=3] idx,
+def simplex_transform_fast(np.ndarray[np.uint16_t, ndim=3] idx,
                            np.ndarray[np.uint16_t, ndim=2] jdx,
                            double r, double u, double w,
                            np.ndarray[np.double_t, ndim=1] s,

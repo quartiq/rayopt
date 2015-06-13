@@ -26,6 +26,7 @@ from .raytrace import *
 from .paraxial_trace import *
 from .gaussian_trace import *
 from .geometric_trace import *
+from .poly_trace import *
 
 from .library import Library
 from .analysis import Analysis
