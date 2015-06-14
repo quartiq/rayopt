@@ -72,7 +72,7 @@ class PolyTrace(Trace):
         assert self.system.object.finite
         s = self.stvwo[i, 0].view(self.Simplex)
         t = self.stvwo[i, 1].view(self.Simplex)
-        r = self.system.object.pupil_radius
+        r = -self.system.object.pupil_radius
         c = self.system.object.chief_slope
         a = self.system.object.slope
         u, uu = a, c

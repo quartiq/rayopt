@@ -54,8 +54,9 @@ class DoubletCase(unittest.TestCase):
         nptest.assert_allclose(self.s.object.slope, .001)
         nptest.assert_allclose(self.s.object.chief_slope, .01)
         nptest.assert_allclose(self.s.object.pupil_distance, 100.1)
+        #nptest.assert_allclose(self.s.object.pupil_radius, .1)
         #nptest.assert_allclose(self.s.object.radius, 1.)
-        print("\n".join(p.print_trace("st", [-1], 3)))
+        print("\n".join(p.print_trace("st")))
         s, t = p.transform()
         print(s[0])
         print(p.evaluate([[1.], [0]], [[0, 1], [0, 0]]))
@@ -69,4 +70,11 @@ class DoubletCase(unittest.TestCase):
     9.602e-01,   6.039e-02,  -6.956e-01,   3.486e-01,  -2.187e+01,  -4.773e+00,
     2.988e+01,  -2.475e-01,   1.584e+00,  -1.450e+01,  -2.700e-03,  -1.123e-01,
     1.680e+00,   1.265e+00], atol=0, rtol=1e-3)
-
+        nptest.assert_allclose(s.base[:17],
+[  1.566e-03,   6.604e-05,  -7.887e-06,  -6.033e-06,   8.539e-05,  -2.043e-08,
+  -8.564e-06,   4.549e-11,   1.235e-08,   9.510e-08,   8.520e-06,   1.422e-08,
+  -1.067e-06,   3.128e-12,  -9.188e-10,   4.163e-08,  -9.270e-15], atol=0, rtol=1e-3)
+        nptest.assert_allclose(t.base[:17],
+[  1.010e-02,  -2.450e-06,   9.027e-08,  -8.463e-06,  -2.152e-06,  -3.554e-09,
+   9.600e-08,   6.039e-12,  -6.932e-10,   3.347e-09,  -2.157e-07,  -4.757e-10,
+   2.949e-08,  -2.486e-13,   1.608e-11,  -1.443e-09,  -2.700e-17], atol=0, rtol=1e-3)
