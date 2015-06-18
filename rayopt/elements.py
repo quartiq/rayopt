@@ -562,6 +562,8 @@ class Spheroid(Interface):
             g = (-a).shift(1)  # (47)
             fr = .5*u*g**-1.  # (46)
         if self.aspherics:
+            # FIXME: not curve/conic
+            u = self.aspherics
             r0 = r
             for i in range(len(u)):  # (28)
                 df = S()
