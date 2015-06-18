@@ -70,20 +70,20 @@ class PolyTrace(Trace):
 
     def transform(self, i=-1):
         assert self.system.object.finite
-        s = self.stvwo[i, 0].view(self.Simplex)
-        t = self.stvwo[i, 1].view(self.Simplex)
-        r = -self.system.object.pupil_radius
-        c = self.system.object.chief_slope
+        r = self.system.object.pupil_radius
         a = self.system.object.slope
-        u, uu = a, c
-        if abs(a) > abs(c):
-            u, uu = uu, u
-        bs, bt = simplex_transform(self.Simplex, r, u, uu, s, t)
-        if abs(a) > abs(c):
+        c = self.system.object.chief_slope
+        telecentric = abs(a) > abs(c)
+        if telecentric:
+            a, c = c, a
+        m = np.array([[r**2, 0, 0], [a**2, c**2, 2*a*c], [r*a, 0, r*c]])
+        st = np.dot([[r, a], [0, c]], self.stvwo[i, :2])
+        bst = simplex_transform(self.Simplex.i.ravel(), self.Simplex.j, st, m)
+        if telecentric:
             i, j, k = self.Simplex.j.T
             ii = self.Simplex.i[j, i, k]
-            bs, bt = bt[ii], bs[ii]
-        return self.Simplex(bs), self.Simplex(bt)
+            bst = bst[::-1, ii].copy()
+        return bst[0].view(self.Simplex), bst[1].view(self.Simplex)
 
     def evaluate(self, xy, ab, i=-1):
         if self.system.object.finite:

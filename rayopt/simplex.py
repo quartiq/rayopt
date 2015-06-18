@@ -67,32 +67,6 @@ def simplex_idx(d, m):
     return i, j, abi
 
 
-def simplex_pow(abi, m, a, p):
-    x = a.copy()
-    x[0] = 0.
-    y = p*x
-    z = y.copy()
-    z[0] += 1.
-    for i in range(1, m):
-        y = simplex_mul(abi, x, y)
-        y *= (p - i)/(i + 1.)
-        z += y
-    return a[0]**p*z
-
-
-def simplex_eval(n, j, a, x):
-    x = np.broadcast_arrays(*x)
-    y = np.zeros_like(x[0])
-    xp = np.empty((n, len(x)) + x[0].shape)
-    xp[0] = 1
-    xp[1] = x
-    for i in range(2, n):
-        xp[i] = xp[1]*xp[i - 1]
-    for p, ji in zip(a, j):
-        y += p*np.prod(xp[ji, range(len(ji))], axis=0)
-    return y
-
-
 def make_simplex(d0, n0):
     class Simplex(np.ndarray):
         d, n = d0, n0
@@ -132,24 +106,8 @@ def make_simplex(d0, n0):
 
         def __call__(self, *x):
             assert len(x) == self.d
-            return simplex_eval(self.n, self.j, self, x)
+            x = np.array(np.broadcast_arrays(*x))
+            return simplex_eval(self.j, self, x)
 
-    Simplex.__name__ = "Simplex{}x{}".format(d0, n0)
+    Simplex.__name__ = "Simplex{}d{}n".format(d0, n0)
     return Simplex
-
-
-def simplex_transform_slow(S, r, u, w, s, t):
-    bst = np.zeros((S.q, 2))
-    for (i, j, k), s1, t1 in zip(S.j, r*s - u*t, -w*t):
-        for l in range(k + 1):
-            for m in range(j + 1):
-                for n in range(m + 1):
-                    c = (r**(2*i + k)*u**(2*j - 2*m + l + n)*w**(2*m + k - l - n)*
-                         2**n*(-1)**k*binom(k, l)*binom(j, m)*binom(m, n))
-                    bst[S.i[i + j + l - m, m - n, k - l + n]] += c*s1, c*t1
-    return bst[:, 0].view(S), bst[:, 1].view(S)
-
-
-def simplex_transform(S, r, u, w, s, t):
-    bst = simplex_transform_fast(S.i, S.j, r, u, w, s, t)
-    return bst[:, 0].view(S), bst[:, 1].view(S)
