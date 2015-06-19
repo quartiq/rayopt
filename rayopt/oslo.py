@@ -106,9 +106,9 @@ def olc_to_system(dat, glass_map=oslo_glass_map):
             s.conic = sfloat(args[0])
         elif cmd == "ASP":
             assert args[0] in ("ASR", "ARA"), args
-            s.aspherics = [0] * (int(args[1]) + 1)
+            s.aspherics = [0] * (int(args[1]) + 2)
         elif cmd[:2] == "AS":
-            i = int(cmd[2])
+            i = int(cmd[2]) + 1
             s.aspherics[i] = sfloat(args[0])
         elif cmd == "NXT":
             s = Spheroid(material=air, distance=th)

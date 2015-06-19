@@ -119,11 +119,11 @@ def zmx_to_system(fil):
             e.conic = float(args.split()[0])
         elif cmd == "PARM":
             i, j = args.split()
-            i = int(i) - 2
+            i = int(i) - 1
             j = float(j)
             if i < 0:
-                if j != 0:
-                    print("aspheric 2nd degree not supported", cmd, args)
+                if j:
+                    print("aspheric 0 degree not supported", cmd, args)
                 continue
             if e.aspherics is None:
                 e.aspherics = []
