@@ -428,31 +428,40 @@ class Spheroid(Interface):
         return dat
 
     def surface_sag(self, xyz):
-        x, y, z = xyz.T
-        if not self.curvature:
-            return z
-        r2 = x**2 + y**2
-        c, k = self.curvature, self.conic
-        e = c*r2/(1 + np.sqrt(1 - (1 + k)*c**2*r2))
+        e = xyz[..., 2].copy()
+        if not self.curvature and self.aspherics is None:
+            return e
+        xy = xyz[..., :2]
+        r2 = np.einsum("...i,...i", xy, xy)
+        if self.curvature:
+            c, k = self.curvature, self.conic
+            e -= c*r2/(1 + np.sqrt(1 - (1 + k)*c**2*r2))
         if self.aspherics is not None:
-            for i, ai in enumerate(self.aspherics):
-                e += ai*r2**(i + 2)
-        return z - e
+            d = 0.
+            for ai in reversed(self.aspherics):
+                d += ai
+                d *= r2
+            e -= d*r2
+        return e
 
     def surface_normal(self, xyz):
-        x, y, z = xyz.T
-        q = np.ones_like(xyz)
-        if not self.curvature:
-            q[:, :2] = 0
+        q = np.zeros_like(xyz)
+        q[..., 2] = 1
+        if not self.curvature and self.aspherics is None:
             return q
-        r2 = x**2 + y**2
-        c, k = self.curvature, self.conic
-        e = c/np.sqrt(1 - (1 + k)*c**2*r2)
+        xy = xyz[..., :2]
+        r2 = np.einsum("...i,...i", xy, xy)
+        e = 0.
+        if self.curvature:
+            c, k = self.curvature, self.conic
+            e -= c/np.sqrt(1 - (1 + k)*c**2*r2)
         if self.aspherics is not None:
-            for i, ai in enumerate(self.aspherics):
-                e += 2*ai*(i + 2)*r2**(i + 1)
-        q[:, 0] = -x*e
-        q[:, 1] = -y*e
+            d = 0.
+            for i in reversed(range(len(self.aspherics))):
+                d += 2*self.aspherics[i]*(i + 2)
+                d *= r2
+            e -= d
+        q[..., :2] = xy*e[..., None]
         return q
 
     def intercept(self, y, u):
