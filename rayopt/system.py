@@ -491,12 +491,12 @@ class System(list):
         if stop in (-1, None):
             stop = self.stop
         rad = self[self.stop].radius
+        assert rad
         def dist(a):
             y, u = self.aim(yo, None, z + a*p, filter=False)
-            res = [yunit[0] for yunit in self.propagate(
-                y, u, n, l, stop=stop + 1)][-1][0, :2]
-            d = (yo*res).sum()/rad
-            return d
+            for yunit in self.propagate(y, u, n, l, stop=stop + 1):
+                y = yunit[0]
+            return (yo*y[0, :2]).sum()/rad
         a = self.solve_newton(simple_cache(dist), **kwargs)
         return z + a*p
 
@@ -510,12 +510,13 @@ class System(list):
             stop = len(self) - 2
         elif stop is None:
             stop = self.stop
-        rad = np.array([e.radius for e in self[1:stop + 1]])**2
+        r2 = np.square([e.radius for e in self[:stop + 1]])
         def dist(a):
             y, u = self.aim(yo, yp, z, a*p, filter=False)
-            ys = [yunit[0][0, :2] for yunit in self.propagate(
-                y, u, n, l, stop=stop + 1)]
-            d = np.square(ys).sum(1)/rad - 1
+            ys = [y]
+            for yunit in self.propagate(y, u, n, l, stop=stop + 1):
+                ys.append(yunit[0])
+            d = np.square(ys)[:, 0, :2].sum(1)/r2 - 1
             if rim:
                 return d.max()
             else:
@@ -533,8 +534,7 @@ class System(list):
             a = self.object.pupil_radius
             a = a*np.ones((2, 2))
         else:
-            q = guess
-            z, a = q[0], q[1:].reshape(2, 2)
+            z, a = guess[0], guess[1:].reshape(2, 2)
         if not np.allclose(y, 0):
             z1 = self.aim_chief(y, z, np.fabs(a).max(), **kwargs)
             if self.object.finite:
