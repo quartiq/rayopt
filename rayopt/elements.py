@@ -441,7 +441,7 @@ class Spheroid(Interface):
             for ai in reversed(self.aspherics):
                 d += ai
                 d *= r2
-            e -= d*r2
+            e -= d
         return e
 
     def surface_normal(self, xyz):
@@ -458,8 +458,8 @@ class Spheroid(Interface):
         if self.aspherics is not None:
             d = 0.
             for i in reversed(range(len(self.aspherics))):
-                d += 2*self.aspherics[i]*(i + 2)
                 d *= r2
+                d += 2*(i + 1)*self.aspherics[i]
             e -= d
         q[..., :2] = xy*e[..., None]
         return q
@@ -542,7 +542,7 @@ class Spheroid(Interface):
         super(Spheroid, self).rescale(scale)
         self.curvature /= scale
         if self.aspherics is not None:
-            self.aspherics = [ai/scale**(2*i + 3) for i, ai in
+            self.aspherics = [ai/scale**(2*i + 1) for i, ai in
                               enumerate(self.aspherics)]
 
     def aberration(self, y, u, n0, n, kmax):
