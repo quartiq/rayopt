@@ -97,7 +97,7 @@ class PolyTrace(Trace):
         r = (xy**2).sum(1)
         p = (ab**2).sum(1)
         k = (xy*ab).sum(1)
-        return s(r, p, k)*xy + t(r, p, k)*ab
+        return s(r, p, k)[..., None]*xy + t(r, p, k)[..., None]*ab
 
     def print_params(self):
         yield "maximum order: {:d}".format(self.Simplex.n)

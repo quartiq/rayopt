@@ -226,7 +226,7 @@ class Element(NameMixin, TransformMixin):
         return y, u0, n, t*n0
 
     def transfer_poly(self, state):
-        fd = (-state.f).shift(self.distance)
+        fd = (-state.f).shift(self.offset[2])
         fdp = fd*state.p
         r = state.r + fd*(2*state.k + fdp)
         k = state.k + fdp
@@ -558,7 +558,7 @@ class Spheroid(Interface):
 
     def intercept_poly(self, r, p, k):
         S = r.__class__
-        u = self.curvature
+        u = self.curvature*np.sign(self.offset[2])
         if u == 0.:
             r, f, fr, g = Element.intercept_poly(self, r, p, k)
         else:
@@ -577,12 +577,12 @@ class Spheroid(Interface):
             for i in range(len(u)):  # (28)
                 df = S()
                 for uj in reversed(u):
-                    df = df.shift(uj)*r
+                    df = df.shift(uj*np.sign(self.offset[2]))*r
                 # FIXME: real Newton Raphson
                 r = r0 + df*(2*k + df*p)
             dfr = S()
             for i in reversed(range(len(u))):
-                dfr = (dfr*r).shift((i + 1)*u[i])
+                dfr = (dfr*r).shift((i + 1)*u[i]*np.sign(self.offset[2]))
             # FIXME
             f += df
             fr += dfr
