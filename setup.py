@@ -21,6 +21,7 @@ from __future__ import print_function, absolute_import, division
 
 from setuptools import setup, find_packages, Extension
 from Cython.Build import cythonize
+import numpy as np
 
 setup(
     name="pyrayopt",
@@ -46,6 +47,7 @@ setup(
         Extension("rayopt.simplex_accel",
                   sources=["rayopt/simplex_accel.pyx"]),
     ]),
+    include_dirs=[np.get_include()],
     entry_points={},
     include_package_data=True,
     classifiers=[f.strip() for f in """
