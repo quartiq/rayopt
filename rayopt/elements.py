@@ -55,7 +55,11 @@ class TransformMixin(object):
     @offset.setter
     def offset(self, offset):
         d = np.linalg.norm(offset)
-        self.update(d, offset/d, self._angles)
+        if d:
+            direction = offset/d
+        else:
+            direction = 0, 0, 1.
+        self.update(d, direction, self._angles)
 
     @property
     def angles(self):
@@ -117,14 +121,16 @@ class TransformMixin(object):
         dlen = np.linalg.norm(direction)
         if not dlen:
             direction = 0, 0, 1.
-        self._direction = u = np.array(direction)/dlen
+            dlen = 1.
+        u = np.array(direction)/dlen
         if distance < 0:
             distance *= -1
             u *= -1
-        self.straight = np.allclose(u, (0, 0, 1.))
         self._distance = d = distance
+        self._direction = u
         self._offset = o = d*u
         self._angles = a = np.array(angles)
+        self.straight = np.allclose(u, (0, 0, 1.))
         self.normal = np.allclose(a, 0.)
         self.rotated = not (self.normal and self.straight)
         if not self.rotated:

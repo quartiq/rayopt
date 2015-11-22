@@ -143,9 +143,9 @@ class System(list):
             if "get_func" in pickup:
                 value = pickup["get_func"](self, pickup, value)
             if "factor" in pickup:
-                value *= pickup["factor"]
+                value = value * pickup["factor"]
             if "offset" in pickup:
-                value += pickup["offset"]
+                value = value + pickup["offset"]
             if "set" in pickup:
                 self.set_path(pickup["set"], value)
             if "set_exec" in pickup:
@@ -492,16 +492,17 @@ class System(list):
             stop = self.stop
         rad = self[self.stop].radius
         assert rad
+
+        @simple_cache
         def dist(a):
             y, u = self.aim(yo, None, z + a*p, filter=False)
             for yunit in self.propagate(y, u, n, l, stop=stop + 1):
                 y = yunit[0]
             return (yo*y[0, :2]).sum()/rad
-        a = self.solve_newton(simple_cache(dist), **kwargs)
+        a = self.solve_newton(dist, **kwargs)
         return z + a*p
 
-    def aim_marginal(self, yo, yp, z, p, l=None, stop=None,
-            **kwargs):
+    def aim_marginal(self, yo, yp, z, p, l=None, stop=None, **kwargs):
         if l is None:
             l = self.wavelengths[0]
         n = self[0].refractive_index(l)
@@ -511,6 +512,8 @@ class System(list):
         elif stop is None:
             stop = self.stop
         r2 = np.square([e.radius for e in self[:stop + 1]])
+
+        @simple_cache
         def dist(a):
             y, u = self.aim(yo, yp, z, a*p, filter=False)
             ys = [y]
@@ -521,7 +524,7 @@ class System(list):
                 return d.max()
             else:
                 return d[-1]
-        a = self.solve_brentq(simple_cache(dist), **kwargs)
+        a = self.solve_brentq(dist, **kwargs)
         return a*p
 
     def _aim_pupil(self, xo, yo, guess, **kwargs):
