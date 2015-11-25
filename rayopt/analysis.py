@@ -130,7 +130,7 @@ class Analysis(object):
             self.gaussian.plot(ax)
         if self.plot_full:
             t.plot(ax)
-        for h in 0, max(self.plot_heights):
+        for h in min(self.plot_heights), max(self.plot_heights):
             t = GeometricTrace(self.system)
             t.rays_clipping((0, h))
             t.plot(ax)
