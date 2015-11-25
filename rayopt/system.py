@@ -141,7 +141,7 @@ class System(list):
             if "get_eval" in pickup:
                 value = eval(pickup["get_eval"])
             if "get_func" in pickup:
-                value = pickup["get_func"](self, pickup, value)
+                value = eval(pickup["get_func"])(self, pickup, value)
             if "factor" in pickup:
                 value = value * pickup["factor"]
             if "offset" in pickup:
@@ -210,7 +210,7 @@ class System(list):
             if "get_eval" in validator:
                 value = eval(validator["get_eval"])
             if "get_func" in validator:
-                value = validator["get_func"](self, validator, value)
+                value = eval(validator["get_func"])(self, validator, value)
             if "exec" in validator:
                 exec(validator["exec"])
             if "minimum" in validator:

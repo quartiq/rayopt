@@ -31,8 +31,11 @@ from .material import Material
 
 @public
 class TransformMixin(object):
-    def __init__(self, distance=0., direction=(0, 0, 1.), angles=(0, 0, 0)):
+    def __init__(self, distance=0., direction=(0, 0, 1.), angles=(0, 0, 0),
+                 offset=None):
         self.update(distance, direction, angles)
+        if offset is not None:
+            self.offset = offset
         # offset = distance*direction: in lab system, relative to last
         # element (thus cumulative in lab system)
         # angles: relative to unit offset (-incidence angle)
