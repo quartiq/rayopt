@@ -48,10 +48,18 @@ class PolyTrace(Trace):
         self.n = np.empty(n)
         self.stvwo = np.empty((n, 5, self.Simplex.q))
 
+    def telecentric(self):
+        return (abs(self.system.object.slope) >
+                abs(self.system.object.chief_slope))
+
     def rays(self):
         self.n[0] = self.system[0].refractive_index(self.l)
+        if self.telecentric():
+            pos = 0
+        else:
+            pos = self.system.object.pupil_distance
         S = self.Simplex
-        state = PolyState(f=S().shift(self.system.object.pupil_distance),
+        state = PolyState(f=S().shift(pos),
                           n=self.n[0], r=S(), p=S(), k=S(),
                           s=S().shift(1), t=S(), v=S(), w=S().shift(1), o=S())
         state.r[1], state.p[2], state.k[3] = 1, 1, 1
@@ -59,9 +67,8 @@ class PolyTrace(Trace):
 
     def propagate(self, start=1, stop=None):
         super(PolyTrace, self).propagate()
-        init = start - 1
         state = self._state
-        self.stvwo[init] = state.s, state.t, state.v, state.w, state.o
+        self.stvwo[start - 1] = state.s, state.t, state.v, state.w, state.o
         for j, state in enumerate(self.system.propagate_poly(
                 state, self.l, start, stop)):
             j += start
