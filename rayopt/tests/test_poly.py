@@ -29,37 +29,32 @@ from rayopt import system_from_yaml, PolyTrace, GeometricTrace
 
 
 doublet = """
-description: 'doublet'
-object: {type: finite, slope: .001, pupil_distance: 100.1}
-stop: 2
+description: "test doublet"
+object: {type: finite, slope: .001, pupil_distance: 100, radius: 1}
 elements:
-- {material: 1.}
-- {material: 1.51872, distance: 100., curvature: 1.611356421}
+- {material: vacuum}
+- {material: 1.51872, distance: 99.9, curvature: 1.611356421, radius: .1}
 - {material: 1.66238, distance: .1, curvature: -2.455396159}
-- {material: 1., distance: 0.0661308, curvature: -0.786448792}
-- {material: 1., distance: 0.93402287}
+- {material: vacuum, distance: 0.0661308, curvature: -0.786448792}
+- {distance: 0.93402287}
 """
 
 
 class DoubletCase(unittest.TestCase):
     def setUp(self):
         self.s = system_from_yaml(doublet)
-        self.s.object.chief_slope = .01
-        self.s.update()
     
     def test_poly(self):
         p = PolyTrace(self.s)
-        #print(p.stvwo[-1, 0, p.Simplex.i[2, 2, 2]])
-        #print(p)
         nptest.assert_allclose(self.s.object.slope, .001)
         nptest.assert_allclose(self.s.object.chief_slope, .01)
-        nptest.assert_allclose(self.s.object.pupil_distance, 100.1)
-        #nptest.assert_allclose(self.s.object.pupil_radius, .1)
-        #nptest.assert_allclose(self.s.object.radius, 1.)
-        print("\n".join(p.print_trace("st")))
+        nptest.assert_allclose(self.s.object.pupil_distance, 100.)
+        nptest.assert_allclose(self.s.object.pupil_radius, .1)
+        nptest.assert_allclose(self.s.object.radius, 1.)
+        #print("\n".join(p.print_trace("st")))
         s, t = p.transform()
-        print(s[0])
-        print(p.evaluate([[1.], [0]], [[0, 1], [0, 0]]))
+        #print(s[0])
+        #print(p.evaluate([[1.], [0]], [[0, 1], [0, 0]]))
         nptest.assert_allclose(p.stvwo[-1, 0, :20],
 [  5.560e-03,   6.672e-02,  -7.896e-01,  -3.607e-02,   8.647e+00,  -2.132e-01,
    -8.588e+00,   4.489e-02,   1.240e+00,   9.228e-01,   8.649e+01,   1.436e+01,
