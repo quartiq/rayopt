@@ -117,11 +117,7 @@ class Analysis(object):
         t.rays_paraxial(self.paraxial)
         if self.print_full:
             self.text.append(str(t))
-        figheight = 2*max(e.radius for e in self.system if
-                          np.isfinite(e.radius))
-        figheight = min(figheight/self.paraxial.z[-1]*self.figwidth,
-                        2*self.figwidth/3)
-        fig, ax = plt.subplots(figsize=(self.figwidth, figheight))
+        fig, ax = plt.subplots(figsize=(self.figwidth, self.figwidth))
         self.figures.append(fig)
         self.system.plot(ax)
         if self.plot_paraxial:
