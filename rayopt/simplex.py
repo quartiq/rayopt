@@ -22,10 +22,39 @@ import numpy as np
 
 from .simplex_accel import *
 
+"""Truncated multinomial tools.
+
+Notes on tests and functionality:
+
+Forward and backward transformations:
+
+    S = make_simplex(3, 7)
+    a = np.random.randn(1, S.q) #.view(S)
+    t = random_rotation_matrix()[:3, :3].copy()
+    b = simplex_transform(S.i.ravel(), S.j, a, t)
+    c = simplex_transform(S.i.ravel(), S.j, b, t.T.copy())
+    nptest.assert_allclose(a, c)
+
+Benchmarking and size scaling:
+
+    S = make_simplex(3, 11)
+    print([simplex_size(3, n) for n in np.arange(S.n + 1)])
+    print(S.abi[:, 0].max())
+    a = S().shift(3)
+    b = a*10
+    %timeit a*b
+    %timeit a**-.5
+
+    [0, 1, 4, 10, 20, 35, 56, 84, 120, 165, 220, 286]
+    80
+    10000 loops, best of 3: 20.2 µs per loop
+    10000 loops, best of 3: 154 µs per loop
+"""
+
 
 def simplex_iter(d, m):
-    """Yield indix tuples covering the simplex in N^d
-    with edge length m."""
+    """Yield index tuples covering the m-scaled d+1 simplex (
+    d+1 cube corner N^d with edge length m - 1."""
     if d == 0:
         yield ()
     else:
@@ -35,7 +64,7 @@ def simplex_iter(d, m):
 
 
 def simplex_size(d, m):
-    """Count points in the N^d simplex of edge length m."""
+    """Count points in the d-m simplex."""
     n = 1
     p = 1
     for i in range(d):
@@ -45,8 +74,8 @@ def simplex_size(d, m):
 
 
 def simplex_enum(d, m):
-    """Return an ordered forward and backward mapping of the points in the N^d
-    simplex with edge length m.
+    """Return an ordered forward and backward mapping of the points in the d-m
+    simplex.
 
     idx[j] == (i_0, i_1, ..., i_{d-1})
     jdx[i_0, i_1, ..., i_{d-1}] == j (only the simplex close to the origin is
@@ -82,9 +111,10 @@ def simplex_idx(d, m):
 def make_simplex(d0, n0):
     class Simplex(np.ndarray):
         """
-        Truncated multinomial in N^d of maximal order n.
+        Truncated multinomial over R^d of maximal order n.
 
-        The coefficients cover the simplex in N^d with edge length n.
+        The coefficients cover the n-scaled (d+1)-simplex (cube corner in
+        N^d with edge length n - 1).
 
         p(x_0, x_1, ..., x_{d - 1}) =
             \Sum_{i_{d - 1} = 0}^{n - 1 - i_0 - i_1 - ... - i_{d - 2}}
@@ -94,6 +124,7 @@ def make_simplex(d0, n0):
             p_{i_0, i_1, ..., i_{d - 1}}
             \Prod_{j = 0}^{d - 1} x_{j}^{i_j}
 
+        Number of coefficients in `p.q`.
         Allowed `i_0, i_1, ..., i_{d - 1}` indices are listed in `p.i`.
         Their reverse mapping is in `p.j`.
 
