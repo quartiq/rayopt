@@ -40,7 +40,7 @@ class ParaxialTrace(Trace):
     # sine condition, magnification is equal to optical input ray sine
     # over optical output sine for all rays:
     # m = n0 sin u0/ (nk sin uk)
-    def __init__(self, system, kmax=2, axis=1):
+    def __init__(self, system, kmax=1, axis=1):
         super(ParaxialTrace, self).__init__(system)
         self.axis = axis
         self.allocate(kmax)
@@ -317,7 +317,7 @@ class ParaxialTrace(Trace):
                 self.print_trace(), ("",),
                 self.print_c3(), ("",),
                 #self.print_h3(), ("",),
-                self.print_c5(), ("",),
+                #self.print_c5(), ("",),
                 )
         return "\n".join(t)
 
