@@ -51,6 +51,10 @@ class PolyTrace(Trace):
         self.stvwo = np.empty((n, 5, self.Simplex.q))
 
     def telecentric(self):
+        if not self.system.object.finite:
+            return False
+        if self.system.object.telecentric:
+            return True
         return (abs(self.system.object.slope) >
                 abs(self.system.object.chief_slope))
 
