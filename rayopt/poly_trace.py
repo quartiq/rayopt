@@ -40,6 +40,8 @@ class PolyTrace(Trace):
         self.allocate()
         self.rays()
         self.propagate()
+        if self.system.object.finite:
+            self.bst = self.transform()
 
     def allocate(self):
         super(PolyTrace, self).allocate()
@@ -82,6 +84,7 @@ class PolyTrace(Trace):
         c = self.system.object.chief_slope
         telecentric = abs(a) > abs(c)
         if telecentric:
+            r = -self.system.object.radius
             a, c = c, a
         m = np.array([[r**2, 0, 0], [a**2, c**2, 2*a*c], [r*a, 0, r*c]])
         st = np.dot([[r, a], [0, c]], self.stvwo[i, :2])
@@ -94,13 +97,16 @@ class PolyTrace(Trace):
 
     def evaluate(self, xy, ab, i=-1):
         if self.system.object.finite:
-            s, t = self.transform(i)
+            if i == -1:
+                s, t = self.bst
+            else:
+                s, t = self.transform(i)
         else:
             s, t = self.stvwo[i, (0, 1), :]
         s, t = self.Simplex(s), self.Simplex(t)
         xy, ab = np.atleast_2d(xy, ab)
         xy, ab = np.broadcast_arrays(xy, ab)
-        assert xy.shape[1] == 2
+        #assert xy.shape[1] == 2
         r = (xy**2).sum(1)
         p = (ab**2).sum(1)
         k = (xy*ab).sum(1)
