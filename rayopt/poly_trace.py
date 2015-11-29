@@ -33,7 +33,20 @@ PolyState = public(namedtuple("PolyState", "f n r p k s t v w o"))
 
 @public
 class PolyTrace(Trace):
-    def __init__(self, system, kmax=7, wavelength=0):
+    """Polynomial ray trace (after T. B. Andersen, Automatic computation of optical
+    aberration coefficients, Applied Optics 19, 3800-3816 (1980),
+    http://dx.doi.org/10.1364/AO.19.003800).
+
+    With generalizations to finite and telecentric objects (after F. Bociort, T. B.
+    Andersen, and L.H.J.F. Beckmann, High-order optical aberration
+    coefficients: extension to finite objects and to telecentricity in object
+    space, Applied Optics 47, 5691-5700 (2008),
+    http://dx.doi.org/10.1364/AO.47.005691).
+
+    And with generalizations to arbitrary orders (see simplex.py and
+    simplex_accel.pyx).
+    """
+    def __init__(self, system, kmax=3, wavelength=0):
         super(PolyTrace, self).__init__(system)
         self.kmax = kmax
         self.l = self.system.wavelengths[wavelength]
@@ -99,22 +112,74 @@ class PolyTrace(Trace):
             bst = bst[::-1, ii].copy()
         return bst[0].view(self.Simplex), bst[1].view(self.Simplex)
 
-    def evaluate(self, xy, ab, i=-1):
+    def st(self, i=-1):
         if self.system.object.finite:
             if i == -1:
-                s, t = self.bst
+                return self.bst
             else:
-                s, t = self.transform(i)
+                return self.transform(i)
         else:
-            s, t = self.stvwo[i, (0, 1), :]
-        s, t = self.Simplex(s), self.Simplex(t)
+            s, t = self.stvwo[i, :2, :]
+            return s.view(self.Simplex), t.view(self.Simplex)
+
+    def evaluate(self, xy, ab, i=-1):
+        """one-normalized xy and ab (field and pupil coordinates)"""
         xy, ab = np.atleast_2d(xy, ab)
         xy, ab = np.broadcast_arrays(xy, ab)
+        if not self.system.object.finite:
+            xy = xy*self.system.object.pupil_radius
+            ab = ab*self.system.object.angle
         #assert xy.shape[1] == 2
         r = (xy**2).sum(1)
         p = (ab**2).sum(1)
         k = (xy*ab).sum(1)
+
+        s, t = self.st(i)
         return s(r, p, k)[..., None]*xy + t(r, p, k)[..., None]*ab
+
+    def buchdahl(self, s, t):
+        n = "Ap Cp Bp S1p S3p S2p S6p S5p S4p".split()
+        n.extend("_" + _ for _ in n)
+        v = list(s[1:10]) + list(-t[1:10])
+        flip = 0, 1, 3, 4, 6, 8
+        for i in flip:
+            v[i] *= -1
+            v[i + 9] *= -1
+        return list(zip(n, v))
+
+    def seidel(self, s, t):
+        n = "s1 s2 s3 s4 s5 m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12".split()
+        v = [s[1], -t[1], t[3]/2, s[2] - t[3]/2, -t[2],
+             s[4], -t[4] - s[6]/2, -s[6]/2, t[6] + s[5], s[5], s[9],
+             -t[5] - t[9]/2 - s[8]/2, -t[9]/2 - s[8]/2, s[8]/2, s[7] + t[8],
+             s[7], -t[7]]
+        return list(zip(n, v))
+
+    def print_seidel(self):
+        for n, v in self.seidel(*self.st()):
+            yield "{:3s}: {:12.5e}".format(n, v)
+
+    names = [
+        # s/bs, t/bt [1:10]
+        ("spherical aberration", "sagittal coma"),
+        ("field curvature", "distortion"),
+        ("meridional coma", "field curvature"),
+        ("spherical aberration", "circular coma"),
+        ("sagittal oblique spherical aberration", "meridional elliptical coma"),
+        ("circular coma", "oblique spherical aberration"),
+        ("field curvature", "distortion"),
+        ("sagittal elliptical coma", "meridional field curvature"),
+        ("sagittal oblique spherical aberration", "meridional elliptical coma"),
+    ]
+
+    def print_names(self):
+        s, t = self.st()
+        for (ns, nt), s, t, (i, j, k) in zip(self.names, s[1:], t[1:],
+                                             self.Simplex.j[1:]):
+            yield "s{:1d}{:1d}{:1d}{:1d}: {:37s}: {:12.5e}".format(
+                self.Simplex.i[i, j, k], i, j, k, ns, s)
+            yield "t{:1d}{:1d}{:1d}{:1d}: {:37s}: {:12.5e}".format(
+                self.Simplex.i[i, j, k], i, j, k, nt, t)
 
     def print_params(self):
         yield "maximum order: {:d}".format(self.Simplex.n)
@@ -138,12 +203,11 @@ class PolyTrace(Trace):
                 ai = " ".join("{:12.5e}".format(j) for j in ai)
                 yield "{:s} {:s}".format(i, ai)
             yield ""
-        #return self.print_coeffs(
-        #    c, "track/axial y/axial u/chief y/chief u".split("/"),
-        #    sum=False)
 
     def __str__(self):
         return "\n".join(itertools.chain(
             self.print_params(), ("",),
-            self.print_trace(), ("",),
+        #    self.print_trace(), ("",),
+            self.print_seidel(), ("",),
+            self.print_names(), ("",),
         ))
