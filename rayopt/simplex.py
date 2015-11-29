@@ -24,6 +24,8 @@ from .simplex_accel import *
 
 
 def simplex_iter(d, m):
+    """Yield indix tuples covering the simplex in N^d
+    with edge length m."""
     if d == 0:
         yield ()
     else:
@@ -33,6 +35,7 @@ def simplex_iter(d, m):
 
 
 def simplex_size(d, m):
+    """Count points in the N^d simplex of edge length m."""
     n = 1
     p = 1
     for i in range(d):
@@ -42,6 +45,13 @@ def simplex_size(d, m):
 
 
 def simplex_enum(d, m):
+    """Return an ordered forward and backward mapping of the points in the N^d
+    simplex with edge length m.
+
+    idx[j] == (i_0, i_1, ..., i_{d-1})
+    jdx[i_0, i_1, ..., i_{d-1}] == j (only the simplex close to the origin is
+    valid).
+    """
     idx = np.zeros((m,)*d, dtype=np.uint16)
     jdx = np.zeros((simplex_size(d, m), d), dtype=np.uint16)
     for j, i in enumerate(simplex_iter(d, m)):
@@ -52,6 +62,8 @@ def simplex_enum(d, m):
 
 
 def simplex_idx(d, m):
+    """Build index arrays for multiplication. See `simplex_mul_i`.
+    """
     i, j = simplex_enum(d, m)
     a = (m - 1)//3
     b = (m - a - 1)//2
@@ -69,6 +81,29 @@ def simplex_idx(d, m):
 
 def make_simplex(d0, n0):
     class Simplex(np.ndarray):
+        """
+        Truncated multinomial in N^d of maximal order n.
+
+        The coefficients cover the simplex in N^d with edge length n.
+
+        p(x_0, x_1, ..., x_{d - 1}) =
+            \Sum_{i_{d - 1} = 0}^{n - 1 - i_0 - i_1 - ... - i_{d - 2}}
+            ...
+            \Sum_{i_1 = 0}^{n - 1 - i_0}
+            \Sum_{i_0 = 0}^{n - 1}
+            p_{i_0, i_1, ..., i_{d - 1}}
+            \Prod_{j = 0}^{d - 1} x_{j}^{i_j}
+
+        Allowed `i_0, i_1, ..., i_{d - 1}` indices are listed in `p.i`.
+        Their reverse mapping is in `p.j`.
+
+        Operations supported are addition, difference, products, rational
+        powers, evaluation, shifting, and linear transformations.
+        Division is not supported.
+
+        Multiplication and power are implemented in simplex_accel.pyx for
+        speed.
+        """
         d, n = d0, n0
         i, j, abi = simplex_idx(d, n)
         q = j.shape[0]
@@ -101,13 +136,30 @@ def make_simplex(d0, n0):
             return np.ndarray.__pow__(self, other)
 
         def shift(self, a):
+            """Shift multinomial by constant.
+
+            `p.shift(a)` offsets the multinomial `p` by constant `a`
+            in-place and returns the shifted multinomial.
+            """
             self[0] += a
             return self
 
         def __call__(self, *x):
+            """Evaluate multinomial.
+
+            `p(*x)` evaluates the multinomial at `x` (first dimensions
+            being `d`): R^d x R^m -> R^m.
+            """
             assert len(x) == self.d
             x = np.array(np.broadcast_arrays(*x))
             return simplex_eval(self.j, self, x)
+
+        def transform(self, t):
+            """Linear transformation with matrix `t`
+            """
+            p = simplex_transform(self.i.ravel(), self.j, self, t)
+            return p.view(self.__class__)
+
 
     Simplex.__name__ = "Simplex{}d{}n".format(d0, n0)
     return Simplex

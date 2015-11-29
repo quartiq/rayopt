@@ -40,6 +40,7 @@ cpdef inline int simplex_mul_i(unsigned short[:, :, ::1] abi,
 
 cpdef simplex_mul(unsigned short[:, :, ::1] abi,
                   double[::1] a, double[::1] b):
+    """Multiply two d-n simplex multinomials, `a * b`"""
     cdef int m = a.shape[0]
     cd = np.zeros((m,), np.double)
     cdef double[::1] c = cd
@@ -50,6 +51,7 @@ cpdef simplex_mul(unsigned short[:, :, ::1] abi,
 
 cpdef simplex_pow(unsigned short[:, :, ::1] abi,
                   int m, double[::1] a, double p):
+    """Return the `p`th power of the d-n simplex multinomial `a`"""
     cdef int i, j, n = a.shape[0]
     cdef double[::1] x = a.copy()
     cdef double[::1] w = np.empty((n,), np.double)
@@ -74,6 +76,7 @@ cpdef simplex_pow(unsigned short[:, :, ::1] abi,
 
 
 cpdef simplex_eval(unsigned short[:, ::1] jdx, double[::1] a, double[:, ::1] x):
+    """Evaluate d-n simplex multinomial `a` at points `x` in R^d"""
     cdef int i, j, k
     cdef int m = a.shape[0], d = x.shape[0], e = x.shape[1], n = jdx[-1, -1]
     cdef double yi
@@ -149,6 +152,8 @@ cpdef inline int supernom_next(unsigned short[::1] p,
 cpdef simplex_transform(unsigned short[::1] idx,
                         unsigned short[:, ::1] jdx,
                         double[:, ::1] x, double[:, ::1] t):
+    """Transform d-n simplex multinomial `x` with the linear transformation
+    matrix `t`: R^d -> R^d"""
     cdef int n = jdx.shape[0], d = jdx.shape[1], r = x.shape[0]
     cdef int s = jdx[n - 1, d - 1] + 1
     cdef int i, j, k, l
@@ -184,6 +189,7 @@ cpdef finite_object_fast(unsigned short[:, :, :] idx,
                     unsigned short[:, :] jdx,
                     double r, double u, double w,
                     double[:] s, double[:] t):
+    """Special case of simplex_transform"""
     cdef int i, j, k, l, m, n, p, v, q = s.shape[0]
     cdef double s1, t1, c
     bstd = np.zeros((q, 2), np.double)
