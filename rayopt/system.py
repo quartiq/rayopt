@@ -32,16 +32,18 @@ from .cachend import PolarCacheND
 
 @public
 class System(list):
-    def __init__(self, elements=None,
-            description="", scale=1e-3, wavelengths=None,
-            stop=1, object=None, image=None,
-            pickups=None, validators=None, solves=None):
+    def __init__(self, elements=None, description="", scale=1e-3,
+                 wavelengths=None, stop=1, aiming="paraxial",
+                 object=None, image=None,
+                 pickups=None, validators=None, solves=None):
         elements = map(Element.make, elements or [])
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
         self.stop = stop
+        assert aiming in ("paraxial", "geometric")
+        self.aiming = aiming
         if object:
             self.object = Conjugate.make(object)
         else:
@@ -66,6 +68,8 @@ class System(list):
             dat["scale"] = float(self.scale)
         if self.wavelengths:
             dat["wavelengths"] = [float(w) for w in self.wavelengths]
+        if self.aiming != "paraxial":
+            dat["scale"] = self.aiming
         if self.object:
             dat["object"] = self.object.dict()
         if self.image:
@@ -190,8 +194,8 @@ class System(list):
 
     def update(self):
         self._pupil_cache.clear()
-        self.solve()
         self.pickup()
+        self.solve()
         if self.wavelengths and self:
             self.object.refractive_index = \
                     self[0].refractive_index(self.wavelengths[0])
@@ -289,6 +293,7 @@ class System(list):
                 n = mat.refractive_index(self.wavelengths[0])
             yield "%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
                     i, e.typeletter, e.distance, roc, rad*2, mat, n, nd, vd)
+        yield ""
 
     def edge_thickness(self, axis=1):
         """list of the edge thicknesses"""
