@@ -44,14 +44,15 @@ class DoubletCase(unittest.TestCase):
         self.s = system_from_yaml(doublet)
 
     def test_poly(self):
-        p = PolyTrace(self.s)
+        p = PolyTrace(self.s, 5)
         nptest.assert_allclose(self.s.object.slope, .001)
         nptest.assert_allclose(self.s.object.chief_slope, .01)
         nptest.assert_allclose(self.s.object.pupil_distance, 100.)
         nptest.assert_allclose(self.s.object.pupil_radius, .1)
         nptest.assert_allclose(self.s.object.radius, 1.)
-        # print("\n".join(p.print_trace("st")))
-        s, t = p.transform()
+        str(p)
+        #print("\n".join(p.print_trace("st")))
+        s, t = p.st()
         # print(s[0])
         # print(p.evaluate([[1.], [0]], [[0, 1], [0, 0]]))
         nptest.assert_allclose(p.stvwo[-1, 0, :20], [
