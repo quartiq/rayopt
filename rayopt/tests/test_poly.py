@@ -32,7 +32,7 @@ description: "test doublet"
 object: {type: finite, slope: .001, pupil_distance: 100, radius: 1}
 elements:
 - {material: vacuum}
-- {material: 1.51872, distance: 99.9, curvature: 1.611356421, radius: .1}
+- {material: 1.51872, distance: 99.9, curvature: 1.611356421}
 - {material: 1.66238, distance: .1, curvature: -2.455396159}
 - {material: vacuum, distance: 0.0661308, curvature: -0.786448792}
 - {distance: 0.93402287}
