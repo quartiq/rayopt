@@ -30,3 +30,52 @@ Examples
 
 Usage examples are at https://github.com/jordens/rayopt-notebooks as IPython
 Notebooks. View at http://nbviewer.ipython.org/github/jordens/rayopt-notebooks/tree/master/
+
+
+Notes
+-----
+
+Distance
+........
+
+The choice of prescription specification is a little different from most other
+lens design and ray tracing programs. RayOpt associates with a surface:
+
+  * `distance` (or directional `offset`, measured in the global, unrotated coordinate
+    system) from the previous surface
+  * orientation (x-y-z Euler `angles` in the rotating frame) with respect to
+    the directional offset
+  * surface shape properties (type of shape, `curvature`, aspheric constants)
+  * the `material` after the surface
+
+Ray data are given at (ray intercepts) or just after (direction cosines,
+paraxial slopes) the respective surface unless state otherwise (e.g. incidence
+angles).
+
+The choice of associating the "distance to" and not the "thickness after"
+with a surface has several advantages: shifts, offsets, tolerances can be implemented
+in a more straight forward manner, ray propagation becomes more natural and
+efficient (transfer, intercept, refraction), ray data at the surfaces' apex planes does
+not need to be tracked. The "thickness after" does not have much meaning in a
+raytrace as it can only be used later when tracing toward the next surface and its
+direction is typically ill defined. Compared to most other programs the
+distance data is the thickness data shifted by one surface towards the object.
+
+Object and Image
+................
+
+Object and image are located at the first (index 0) and last (index -1)
+surface respectively. This naturally allows maintaining their positions,
+material and shape data and supports curved objects and images naturally.
+Further data like object and image space pupils are maintained in the two
+`Conjugate` s of the `System`.
+
+Therefore a minimal system of a single lens consists of fours surfaces: object,
+the two lens surfaces (one of which can be the aperture stop) and the image
+surface. The `offset` data of the first (object) surface does play a role in
+ray tracing but it can be useful as it locates the global coordinate system's
+origin. The `material` of the last (image) surface on the other is used as it can cause
+incident rays to be evanescent at the image surface. This can also be compared
+to other programs where the thickness of the image surface is never relevant or
+the material in object space and the position of the lens has to be tracked
+somewhere else depending on the implementation.
