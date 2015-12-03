@@ -18,63 +18,80 @@
 
 from __future__ import print_function, absolute_import, division
 
+import yaml
 import os
+import time
+import argparse
+import logging
+import subprocess
+from collections import namedtuple
 
 import numpy as np
-import yaml
 
+from .material import Material, air, CoefficientsMaterial, Thermal
+from .utils import sfloat, sint
 
-Glass = namedtuple("Glass", "name typ range coefficients comments")
+logger = logging.getLogger(__name__)
+
+Glass = namedtuple("Glass", "name section data comment")
+Catalog = namedtuple("Catalog", "name sha1")
 
 
 def yml_read(fil):
-    lib = yaml.load(open(fil, "r").read())
-    base, fil = os.path.split(fil)
-    for shelf in lib:
-        for item in shelf["content"]:
-            if not "BOOK" in item:
+    path = os.path.split(fil)[0]
+    sha1 = subprocess.check_output([
+        "git", "-C", path, "describe", "--abbrev=0", "--always"
+    ]).decode().strip()
+    for shelf in yaml.safe_load(open(fil, "r")):
+        cat = Catalog(sha1=sha1, name=shelf["SHELF"])
+        yield cat
+        div = None
+        for book in shelf["content"]:
+            if "DIVIDER" in book:
+                div = book["DIVIDER"]
                 continue
-            for page in item["content"]:
-                dat = open(os.path.join(base, page["path"]), "r")
-                dat = yaml.load(dat.read())
-                yield Glass(name, nd, vd, density, code, comment, status,
-                        tce, "".join(g))
+            for page in book["content"]:
+                if "DIVIDER" in page:
+                    continue
+                fil = os.path.join(path, page["path"])
+                try:
+                    data = yaml.safe_load(open(fil, "r"))
+                    data["BOOK"] = book["BOOK"]
+                    data["PAGE"] = page["PAGE"]
+                    data["name"] = page["name"]
+                    data["div"] = div
+                    data["path"] = page["path"]
+                    yield Glass(name="{}/{}".format(book["BOOK"], page["PAGE"]),
+                                section="{}/{}".format(div, book["name"]),
+                                comment=page["path"], data=yaml.dump(data))
+                except Exception as e:
+                    print("error: {}: {}".format(page, e))
 
+_typ_map = {
+    "formula 1": "sellmeier_offset",
+    "formula 2": "sellmeier_squared_offset",
+    "formula 3": "polynomial",
+    "formula 4": "refractiveindex_info",
+    "formula 5": "cauchy",
+    "formula 6": "gas_offset",
+    "formula 7": "herzberger",
+    "formula 8": "retro",
+    "formula 9": "exotic",
+}
 
-def yml_to_material(dat):
-    for line in dat.splitlines():
-        if not line:
-            continue
-        cmd, args = line[:2], line[3:]
-        if cmd == "NM":
-            args = args.split()
-            typ = typs[int(float(args[1])) - 1]
-            g = CoefficientsMaterial(name=args[0], typ=typ, coefficients=[])
-            g.glasscode = sfloat(args[2])
-        elif cmd == "GC":
-            g.comment = args.strip()
-        elif cmd == "ED":
-            args = list(map(sfloat, args.split()))
-            g.alpham3070, g.alpha20300, g.density = args[0:3]
-        elif cmd == "CD":
-            g.coefficients = np.array([sfloat(_) for _ in args.split()])
-        elif cmd == "TD":
-            s = [sfloat(_) for _ in args.split()]
-            g.thermal = Thermal(s[:3], s[3:5], *s[5:])
-        elif cmd == "OD":
-            g.chemical = list(map(sfloat, args[1:]))
-            g.price = sfloat(args[0])
-        elif cmd == "LD":
-            g.lambda_min = sfloat(args[0])
-            g.lambda_max = sfloat(args[1])
-        elif cmd == "IT":
-            s = list(map(sfloat, args.split()))
-            if not hasattr(g, "transmission"):
-                g.transmission = {}
-            g.transmission[(s[0], tuple(s[2:]))] = s[1]
-        else:
-            print(cmd, args, "not handled")
+def rii_to_material(dat):
+    data = yaml.safe_load(dat)
+    g = CoefficientsMaterial(name="{}/{}".format(data["BOOK"], data["PAGE"]),
+                               coefficients=[])
+    g.comment = data.get("COMMENTS", None)
+    g.references = data.get("REFERENCES", None)
+    for d in data["DATA"]:
+        typ = d["type"]
+        if typ.startswith("formula"):
+            g.typ = _typ_map[typ]
+            g.lambda_min, g.lambda_max = (sfloat(_) for _ in d["range"].split())
+            c = np.array([sfloat(_) for _ in d["coefficients"].split()])
+            g.coefficients = c
+        if typ == "tabulated k":
+            g.tabulated_k = np.array([sfloat(_) for _ in d["data"].split()])
     return g
-
-
-

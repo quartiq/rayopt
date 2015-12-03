@@ -30,7 +30,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import event, create_engine, orm
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Session
 
 from . import zemax, oslo, rii
 from .utils import public
@@ -205,7 +205,21 @@ class Catalog(Base):
         #assert len(self.glasses) == int(num), (len(self.glasses, num)
 
     def load_yml(self, **kwargs):
-        pass
+        session = Session.object_session(self)
+        self.type, self.source = "glass", "rii",
+        self.format, self.name = "rii", "refractiveindex.info"
+        for glass in rii.yml_read(self.file):
+            if isinstance(glass, rii.Catalog):
+                cat = Catalog(source=self.source, type=self.type,
+                              format=self.format, name=glass.name,
+                              sha1=glass.sha1, version=0,
+                              comment=str(self.id), file=self.file,
+                              date=self.date, imported=self.imported)
+                session.add(cat)
+            else:
+                g = Glass(name=glass.name, data=glass.data,
+                          section=glass.section, comment=glass.comment)
+                cat.glasses.append(g)
 
 
 @public
@@ -245,10 +259,11 @@ class Library(object):
         elif mode == "add":
             pass
         cat = Catalog()
-        if not cat.load(fil):
-            return
-        print("adding %s" % fil)
         self.session.add(cat)
+        if not cat.load(fil):
+            self.session.expunge(cat)
+        else:
+            print("added %s" % fil)
         self.session.commit()
 
     def get(self, typ, name, catalog=None, source=None, **kwargs):
@@ -296,13 +311,26 @@ def _test_nd(l):
 
 
 if __name__ == "__main__":
-    import sys
-    l = Library.one()
-    fs = sys.argv[1:]
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("-d", "--db", help="library database url", default=None)
+    p.add_argument("-a", "--all", help="test-parse all entries",
+                   action="store_true")
+    p.add_argument("-g", "--glass", help="test-parse a glass")
+    p.add_argument("-l", "--lens", help="test-parse a lens")
+    p.add_argument("files", nargs="*")
+    o = p.parse_args()
+    l = Library(o.db)
     # fs = ["catalog/oslo_glass", "catalog/zemax_glass",
     # "catalog/oslo_lens", "catalog/zemax_lens"]
-    l.load_all(fs)
-    print(l.get("glass", "BK7"))
-    print(l.get("lens", "AC127-025-A", "thorlabs"))
-    _test_nd(l)
-    _test(l)
+    l.load_all(o.files)
+    #print(l.get("glass", "BK7"))
+    #print(l.get("lens", "AC127-025-A", "thorlabs"))
+    if o.glass:
+        g = l.get("glass", o.glass)
+        print(g)
+    if o.lens:
+        print(l.get("lens", o.lens))
+    if o.all:
+        _test(l)
+    #_test_nd(l)

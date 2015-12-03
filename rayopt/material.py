@@ -269,13 +269,13 @@ class CoefficientsMaterial(Material):
 
     def n_sellmeier_offset(self, w, c):
         w2 = w**2
-        c0, c1 = c[1:-1].reshape(-1, 2).T
-        return np.sqrt(c[0] + (c0*w2/(w2 - c1**2)).sum())
+        c0, c1 = c[1:1 + (c.shape[0] - 1)//2*2].reshape(-1, 2).T
+        return np.sqrt(1. + c[0] + (c0*w2/(w2 - c1**2)).sum())
 
     def n_sellmeier_squared_offset(self, w, c):
         w2 = w**2
-        c0, c1 = c[1:-1].reshape(-1, 2).T
-        return np.sqrt(c[0] + (c0*w2/(w2 - c1)).sum())
+        c0, c1 = c[1:1 + (c.shape[0] - 1)//2*2].reshape(-1, 2).T
+        return np.sqrt(1. + c[0] + (c0*w2/(w2 - c1)).sum())
 
     def n_handbook_of_optics1(self, w, c):
         return np.sqrt(c[0] + (c[1]/(w**2 - c[2])) - (c[3]*w**2))
@@ -298,6 +298,30 @@ class CoefficientsMaterial(Material):
     def n_gas(self, w, c):
         c0, c1 = c.reshape(2, -1)
         return 1. + (c0/(c1 - w**-2)).sum()
+
+    def n_gas_offset(self, w, c):
+        return c[0] + self.n_gas(w, c[1:])
+
+    def n_refractiveindex_info(self, w, c):
+        c0, c1 = c[9:].reshape(-1, 2).T
+        return np.sqrt(c[0] + c[1]*w**c[2]/(w**2 - c[3]**c[4]) +
+                c[5]*w**c[6]/(w**2 - c[7]**c[8]) + (c0*w**c1).sum())
+
+    def n_retro(self, w, c):
+        w2 = w**2
+        a = c[0] + c[1]*w2/(w2 - c[2]) + c[3]*w2
+        return np.sqrt(2 + 1/(a - 1))
+
+    def n_cauchy(self, w, c):
+        c0, c1 = c[1:].reshape(-1, 2).T
+        return c[0] + (c0*w**c1).sum()
+
+    def n_polynomial(self, w, c):
+        return np.sqrt(self.n_cauchy(w, c))
+
+    def n_exotic(self, w, c):
+        return np.sqrt(c[0] + c[1]/(w**2 - c[2]) +
+                       c[3]*(w - c[4])/((w - c[4])**2 + c[5]))
 
     def dict(self):
         dat = super(CoefficientsMaterial, self).dict()
