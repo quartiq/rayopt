@@ -61,7 +61,7 @@ class PolyTrace(Trace):
         self.Simplex = make_simplex(3, self.kmax)
         n = self.length
         self.n = np.empty(n)
-        self.stvwo = np.empty((n, 5, self.Simplex.q))
+        self.stvwof = np.empty((n, 6, self.Simplex.q))
 
     def telecentric(self):
         if not self.system.object.finite:
@@ -87,11 +87,13 @@ class PolyTrace(Trace):
     def propagate(self, start=1, stop=None):
         super(PolyTrace, self).propagate()
         state = self._state
-        self.stvwo[start - 1] = state.s, state.t, state.v, state.w, state.o
+        self.stvwof[start - 1] = (state.s, state.t, state.v, state.w,
+                                  state.o, state.f)
         for j, state in enumerate(self.system.propagate_poly(
                 state, self.l, start, stop)):
             j += start
-            self.stvwo[j] = state.s, state.t, state.v, state.w, state.o
+            self.stvwof[j] = (state.s, state.t, state.v, state.w,
+                              state.o, state.f)
             self.n[j] = state.n
 
     def transform(self, i=-1):
@@ -104,7 +106,7 @@ class PolyTrace(Trace):
             r = -self.system.object.radius
             a, c = c, a
         m = np.array([[r**2, 0, 0], [a**2, c**2, 2*a*c], [r*a, 0, r*c]])
-        st = np.dot([[r, a], [0, c]], self.stvwo[i, :2])
+        st = np.dot([[r, a], [0, c]], self.stvwof[i, :2])
         bst = simplex_transform(self.Simplex.i.ravel(), self.Simplex.j, st, m)
         if telecentric:
             i, j, k = self.Simplex.j.T
@@ -119,7 +121,7 @@ class PolyTrace(Trace):
             else:
                 return self.transform(i)
         else:
-            s, t = self.stvwo[i, :2, :]
+            s, t = self.stvwof[i, :2, :]
             return s.view(self.Simplex), t.view(self.Simplex)
 
     def evaluate(self, xy, ab, i=-1):
@@ -185,10 +187,10 @@ class PolyTrace(Trace):
         yield "maximum order: {:d}".format(self.Simplex.n)
         yield "wavelength: {:g}".format(self.l/1e-9)
 
-    def print_trace(self, components="stvwo", elements=None, cutoff=None,
+    def print_trace(self, components="stvwof", elements=None, cutoff=None,
                     width=12):
         for n in components:
-            a = self.stvwo[:, "stvwo".index(n), :].T
+            a = self.stvwof[:, "stvwof".index(n), :].T
             if elements is None:
                 elements = range(1, a.shape[1])
             if cutoff is None:

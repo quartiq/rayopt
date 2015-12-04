@@ -55,14 +55,14 @@ class DoubletCase(unittest.TestCase):
         s, t = p.st()
         # print(s[0])
         # print(p.evaluate([[1.], [0]], [[0, 1], [0, 0]]))
-        nptest.assert_allclose(p.stvwo[-1, 0, :20], [
+        nptest.assert_allclose(p.stvwof[-1, 0, :20], [
           5.560e-03,   6.672e-02,  -7.896e-01,  -3.607e-02,
           8.647e+00,  -2.132e-01,  -8.588e+00,   4.489e-02,
           1.240e+00,   9.228e-01,   8.649e+01,   1.436e+01,
          -1.081e+02,   3.086e-01,  -9.204e+00,   4.208e+01,
          -9.268e-02,   6.684e-01,  -6.419e-01,  -4.079e+00
         ], atol=0, rtol=1e-3)
-        nptest.assert_allclose(p.stvwo[-1, 1, :20], [
+        nptest.assert_allclose(p.stvwof[-1, 1, :20], [
           1.010e+00,  -1.602e-02,   9.027e-02,  -8.481e-01,
          -2.161e+00,  -3.484e-01,   9.602e-01,   6.039e-02,
          -6.956e-01,   3.486e-01,  -2.187e+01,  -4.773e+00,
