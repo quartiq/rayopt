@@ -179,7 +179,9 @@ class GeometricTrace(Trace):
         r = (r*w).sum()
         return np.sqrt(r)
 
-    def rays_paraxial(self, paraxial):
+    def rays_paraxial(self, paraxial=None):
+        if paraxial is None:
+            paraxial = self.system.paraxial
         y = np.zeros((2, 2))
         y[:, paraxial.axis] = paraxial.y[0]
         u = np.zeros((2, 2))

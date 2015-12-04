@@ -23,7 +23,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 
-from . import ParaxialTrace, GeometricTrace, GaussianTrace
+from . import GeometricTrace, GaussianTrace
 from .utils import tanarcsin
 from .special_sums import polar_sum
 
@@ -51,7 +51,6 @@ class Analysis(object):
     trace_gaussian = False
     print_gaussian = False
     print_system = True
-    print_paraxial = True
     resize_full = False
     refocus_full = True
     print_full = False
@@ -84,15 +83,14 @@ class Analysis(object):
             self.system.update()
         if self.close is not None:
             self.system.close(self.close)
-        self.paraxial = ParaxialTrace(self.system)
         if self.align:
-            self.paraxial.align()
+            self.system.paraxial.align()
         if self.refocus_paraxial:
-            self.paraxial.refocus()
+            self.system.paraxial.refocus()
         if self.update_conjugates:
-            self.paraxial.update_conjugates()
+            self.system.paraxial.update_conjugates()
         if self.resize:
-            self.paraxial.resize()
+            self.system.paraxial.resize()
             self.system.fix_sizes()
         if self.trace_gaussian and self.system.object.finite:
             self.gaussian = GaussianTrace(self.system)
@@ -100,7 +98,7 @@ class Analysis(object):
             self.text.append(str(self.gaussian))
         if self.resize_full:
             t = GeometricTrace(self.system)
-            t.rays_paraxial(self.paraxial)
+            t.rays_paraxial()
             t.resize()
             self.system.fix_sizes()
         if self.refocus_full:
@@ -108,20 +106,17 @@ class Analysis(object):
             t.rays_point((0, 0.), nrays=13, distribution="radau",
                          clip=False, filter=False)
             t.refocus()
-            self.paraxial.propagate()
         if self.print_system:
             self.text.append(str(self.system))
-        if self.print_paraxial:
-            self.text.append(str(self.paraxial))
         t = GeometricTrace(self.system)
-        t.rays_paraxial(self.paraxial)
+        t.rays_paraxial()
         if self.print_full:
             self.text.append(str(t))
         fig, ax = plt.subplots(figsize=(self.figwidth, self.figwidth))
         self.figures.append(fig)
         self.system.plot(ax)
         if self.plot_paraxial:
-            self.paraxial.plot(ax)
+            self.system.paraxial.plot(ax)
         if self.plot_gaussian:
             self.gaussian.plot(ax)
         if self.plot_full:
@@ -272,7 +267,7 @@ class Analysis(object):
 
     def spots(self, ax, heights=[1., .707, 0.],
               wavelengths=None, nrays=150, colors="grbcmyk"):
-        paraxial = self.paraxial
+        paraxial = self.system.paraxial
         if wavelengths is None:
             wavelengths = self.system.wavelengths
         nd = ax.shape[1]
@@ -307,7 +302,7 @@ class Analysis(object):
 
     def opds(self, ax, heights=[0., .707, 1.],
              wavelength=None, nrays=1000, colors="grbcmyk"):
-        paraxial = self.paraxial
+        paraxial = self.system.paraxial
         if wavelength is None:
             wavelength = self.system.wavelengths[0]
         mm = None

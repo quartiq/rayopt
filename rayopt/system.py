@@ -28,6 +28,7 @@ from .conjugates import Conjugate, FiniteConjugate, InfiniteConjugate
 from .material import fraunhofer
 from .utils import public, simple_cache
 from .cachend import PolarCacheND
+from .paraxial_trace import ParaxialTrace
 
 
 @public
@@ -56,6 +57,7 @@ class System(list):
         self.validators = validators or []
         self.solves = solves or []
         self._pupil_cache = {}
+        self.paraxial = ParaxialTrace(self, update=False)
         self.update()
 
     def dict(self):
@@ -205,6 +207,8 @@ class System(list):
             self.object.entrance_radius = self[1].radius
             self.image._entrance_distance = self[-1].distance
             self.image.entrance_radius = self[-2].radius
+        self.paraxial.update()
+        self.validate()
 
     def validate(self, fix=False):
         for validator in self.validators:
@@ -294,6 +298,8 @@ class System(list):
             yield "%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
                     i, e.typeletter, e.distance, roc, rad*2, mat, n, nd, vd)
         yield ""
+        for l in self.paraxial.text():
+            yield l
 
     def edge_thickness(self, axis=1):
         """list of the edge thicknesses"""

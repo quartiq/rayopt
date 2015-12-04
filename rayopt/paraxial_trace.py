@@ -40,10 +40,15 @@ class ParaxialTrace(Trace):
     # sine condition, magnification is equal to optical input ray sine
     # over optical output sine for all rays:
     # m = n0 sin u0/ (nk sin uk)
-    def __init__(self, system, kmax=1, axis=1):
+    def __init__(self, system, kmax=1, axis=1, update=True):
         super(ParaxialTrace, self).__init__(system)
         self.axis = axis
-        self.allocate(kmax)
+        self.kmax = kmax
+        if update:
+            self.update()
+
+    def update(self):
+        self.allocate(self.kmax)
         self.rays()
         self.propagate()
         self.aberrations()
@@ -312,14 +317,16 @@ class ParaxialTrace(Trace):
                 sum=False)
 
     def __str__(self):
-        t = itertools.chain(
-                self.print_params(), ("",),
-                self.print_trace(), ("",),
-                self.print_c3(), ("",),
-                #self.print_h3(), ("",),
-                #self.print_c5(), ("",),
-                )
-        return "\n".join(t)
+        return "\n".join(self.text())
+
+    def text(self):
+        return itertools.chain(
+            self.print_params(), ("",),
+            self.print_trace(), ("",),
+            self.print_c3(), ("",),
+            #self.print_h3(), ("",),
+            #self.print_c5(), ("",),
+        )
 
     def plot(self, ax, principals=False, pupils=False, focals=False,
             nodals=False, **kwargs):
@@ -377,8 +384,6 @@ class ParaxialTrace(Trace):
         n0, n = self.n.take((i - 1, i))
         c = (n*u - n0*u0)/(y*(n0 - n))
         self.system[i].curvature = c
-        self.propagate()
-        self.aberrations()
 
     def _focal_length_solve(self, f, i=None): # TODO: not exact
         if i is None:
@@ -393,13 +398,9 @@ class ParaxialTrace(Trace):
                 + m0[1, 1]*m1[1, 1]*m2[1, 0]
                 )/(m0[1, 1]*m2[0, 0])
         self.system[i].curvature = c/(n0 - n)*n
-        self.propagate()
-        self.aberrations()
 
     def refocus(self):
         self.system[-1].distance -= self.y[-1, 0]/self.u[-1, 0]
-        self.propagate()
-        self.aberrations()
 
     def update_conjugates(self):
         z = self.pupil_distance
@@ -414,7 +415,6 @@ class ParaxialTrace(Trace):
         self.system.image.height = y[1]
         #self.system[0].radius = y[0]
         self.system[-1].radius = y[1]
-        self.system.update()
 
     def update_stop(self, end="image"):
         ai = self.system.stop
