@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf8 -*-
 #
-#   pyrayopt - raytracing for optical imaging systems
+#   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <jordens@phys.ethz.ch>
 #
 #   This program is free software: you can redistribute it and/or modify
@@ -24,13 +24,13 @@ from Cython.Build import cythonize
 import numpy as np
 
 setup(
-    name="pyrayopt",
+    name="rayopt",
     version="0.0+dev",
     description="raytracing and lens design framework",
     long_description=open("README.rst").read(),
     author="Robert Jordens",
     author_email="jordens@gmail.com",
-    url="http://github.com/jordens/pyrayopt",
+    url="http://github.com/jordens/rayopt",
     license="GPLv3+",
     keywords="optics lens raytracing optimization point spread",
     install_requires=[

@@ -1,6 +1,6 @@
 # -*- coding: utf8 -*-
 #
-#   pyrayopt - raytracing for optical imaging systems
+#   rayopt - raytracing for optical imaging systems
 #
 #   Copyright (C) 2011-2013 Robert Jordens <jordens@phys.ethz.ch>
 #

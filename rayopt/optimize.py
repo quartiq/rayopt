@@ -1,6 +1,6 @@
 # -*- coding: utf8 -*-
 #
-#   pyrayopt - raytracing for optical imaging systems
+#   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <jordens@phys.ethz.ch>
 #
 #   This program is free software: you can redistribute it and/or modify
@@ -91,5 +91,5 @@ class MaterialThickness(Constraint):
                           en.shape_func(array([(0, en.radius, 0)])))
                 r.append(self.minimum-min(center, edge))
                 r.append(max(center, edge)-self.maximum)
-                print i, center, edge
+                print(i, center, edge)
         return array(r)
