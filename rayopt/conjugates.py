@@ -102,6 +102,10 @@ class FiniteConjugate(Conjugate):
         super(FiniteConjugate, self).__init__(**kwargs)
         self.radius = radius
 
+    @property
+    def point(self):
+        return not self.radius
+
     def dict(self):
         dat = super(FiniteConjugate, self).dict()
         if self.radius:
@@ -173,6 +177,10 @@ class InfiniteConjugate(Conjugate):
         if angle_deg is not None:
             angle = np.deg2rad(angle_deg)
         self.angle = angle
+
+    @property
+    def point(self):
+        return not self.angle
 
     def dict(self):
         dat = super(InfiniteConjugate, self).dict()

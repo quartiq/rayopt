@@ -145,7 +145,7 @@ class Analysis(object):
             figheight = self.figwidth*len(self.plot_spots)/self.defocus
             fig, ax = plt.subplots(len(self.plot_spots), self.defocus,
                                    figsize=(self.figwidth, figheight),
-                                   sharex=True, sharey=True)
+                                   sharex=True, sharey=True, squeeze=False)
             self.figures.append(fig)
             self.spots(ax[::-1], self.plot_spots)
 
@@ -154,7 +154,8 @@ class Analysis(object):
         if self.plot_opds:
             figheight = self.figwidth*len(self.plot_opds)/4
             fig, ax = plt.subplots(len(self.plot_opds), 4,
-                                   figsize=(self.figwidth, figheight))
+                                   figsize=(self.figwidth, figheight),
+                                   squeeze=False)
             # , sharex=True, sharey=True)
             self.figures.append(fig)
             self.opds(ax[::-1], self.plot_opds)

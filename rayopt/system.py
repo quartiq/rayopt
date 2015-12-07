@@ -44,7 +44,6 @@ class System(list):
         self.scale = scale
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
         self.stop = stop
-        self.fields = fields or [0., 0.7, 1.]
         if object:
             self.object = Conjugate.make(object)
         else:
@@ -57,6 +56,12 @@ class System(list):
             self.image = FiniteConjugate(
                 radius=0., update_radius=True, pupil=RadiusPupil(
                     radius=0., update_distance=True, update_radius=True))
+        if fields is None:
+            if self.object.point:
+                fields = [0.]
+            else:
+                fields = [0., .7, 1.]
+        self.fields = fields
         self.pickups = pickups or []
         self.validators = validators or []
         self.solves = solves or []
