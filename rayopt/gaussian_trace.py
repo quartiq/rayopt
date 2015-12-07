@@ -40,7 +40,6 @@ class GaussianTrace(Trace):
         super(GaussianTrace, self).allocate()
         self.qi = np.empty((self.length, 2, 2), dtype=np.complex_)
         self.n = np.empty(self.length)
-        self.l = 1.
 
     def make_qi(self, l, n, waist, position=(0, 0.), angle=0.):
         z0 = np.pi*n*np.array(waist)**2*self.system.scale/l
@@ -58,17 +57,17 @@ class GaussianTrace(Trace):
         # z0 = pi*n*w0**2/lambda
         if l is None:
             l = self.system.wavelengths[0]
-        n = self.system[0].refractive_index(l)
+        n = self.system.refractive_index(l, 0)
         if qi is None:
             obj = self.system.object
             if obj.finite:
                 qi = self.make_qi(l, n, obj.radius)
             else:
-                qi = self.make_qi(l, n, obj.pupil_radius,
-                                  (-obj.pupil_distance,
-                                   -obj.pupil_distance))
+                qi = self.make_qi(l, n, obj.pupil.radius,
+                                  (-obj.pupil.distance,
+                                   -obj.pupil.distance))
         assert np.allclose(qi.T, qi), qi
-        self.l = l
+        self.wavelength = l
         self.n[0] = n
         self.qi[0] = qi
 
@@ -77,7 +76,7 @@ class GaussianTrace(Trace):
         init = start - 1
         qi, n = self.qi[init], self.n[init]
         for j, (qi, n) in enumerate(self.system.propagate_gaussian(
-            qi, n, self.l, start, stop)):
+            qi, n, self.wavelength, start, stop)):
             j += start
             self.qi[j], self.n[j] = qi, n
 
@@ -126,7 +125,7 @@ class GaussianTrace(Trace):
 
     def spot_radius_at(self, z, normal=False):
         qi, n = self.qin_at(z)
-        c = self.l/self.system.scale/np.pi/n[:, None]
+        c = self.wavelength/self.system.scale/np.pi/n[:, None]
         if normal:
             r, a = self.normal(-qi.imag)
             r = np.sqrt(c/r)
@@ -165,7 +164,7 @@ class GaussianTrace(Trace):
     @property
     def waist_radius(self): # after element
         n = self.n[:, None]
-        r = self.rayleigh_range/np.pi/n*self.l/self.system.scale
+        r = self.rayleigh_range/np.pi/n*self.wavelength/self.system.scale
         return r**.5
 
     @property
@@ -190,7 +189,7 @@ class GaussianTrace(Trace):
 
     @property
     def eigenmodes(self):
-        m = self.system.paraxial_matrix(self.l)
+        m = self.system.paraxial_matrix(self.wavelength)
         # FIXME only know how to do this for simple astigmatic matrices
         # otherwise, solve qi*b*qi + qi*a - d*qi - c = 0
         assert self.is_simple_astigmatic(m)
@@ -202,7 +201,7 @@ class GaussianTrace(Trace):
         return q
 
     def is_proper(self): # Nemes checks
-        m = self.system.paraxial_matrix(self.l)
+        m = self.system.paraxial_matrix(self.wavelength)
         a, b, c, d = m[:2, :2], m[:2, 2:], m[2:, :2], m[2:, 2:]
         for i, (v1, v2) in enumerate([
                 (np.dot(a, d.T) - np.dot(b, c.T), np.eye(2)),
@@ -213,7 +212,7 @@ class GaussianTrace(Trace):
 
     @property
     def m(self):
-        m = self.system.paraxial_matrix(self.l)
+        m = self.system.paraxial_matrix(self.wavelength)
         assert self.is_simple_astigmatic(m)
         a0, a1, d0, d1 = np.diag(m)
         m = np.array([a0 + d0, a1 + d1])/2

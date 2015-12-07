@@ -129,7 +129,7 @@ class PolyTrace(Trace):
         xy, ab = np.atleast_2d(xy, ab)
         xy, ab = np.broadcast_arrays(xy, ab)
         if not self.system.object.finite:
-            xy = xy*self.system.object.pupil_radius
+            xy = xy*self.system.object.pupil.radius
             ab = ab*self.system.object.angle
         #assert xy.shape[1] == 2
         r = (xy**2).sum(1)
