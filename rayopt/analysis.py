@@ -41,16 +41,12 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 
 class Analysis(object):
     figwidth = 12.
-    update = False
-    resize = False
-    align = False
-    close = None
+    update = True
     print = True
-    update_conjugates = True
-    refocus_paraxial = True
     trace_gaussian = False
     print_gaussian = False
     print_system = True
+    print_paraxial = True
     resize_full = False
     refocus_full = True
     print_full = False
@@ -80,21 +76,10 @@ class Analysis(object):
     def run(self):
         if self.update:
             self.system.update()
-        if self.close is not None:
-            self.system.close(self.close)
-        if self.align:
-            self.system.paraxial.align()
-        if self.refocus_paraxial:
-            self.system.paraxial.refocus()
-        if self.update_conjugates:
-            self.system.paraxial.update_conjugates()
-        if self.resize:
-            self.system.paraxial.resize()
-            self.system.fix_sizes()
         if self.trace_gaussian and self.system.object.finite:
             self.gaussian = GaussianTrace(self.system)
-        if self.print_gaussian:
-            self.text.append(str(self.gaussian))
+            if self.print_gaussian:
+                self.text.append(str(self.gaussian))
         if self.resize_full:
             t = GeometricTrace(self.system)
             t.rays_paraxial()
@@ -107,6 +92,8 @@ class Analysis(object):
             t.refocus()
         if self.print_system:
             self.text.append(str(self.system))
+        if self.print_paraxial:
+            self.text.append(str(self.system.paraxial))
         t = GeometricTrace(self.system)
         t.rays_paraxial()
         if self.print_full:
@@ -125,40 +112,34 @@ class Analysis(object):
             t.rays_clipping((0, h))
             t.plot(ax)
 
-        if self.plot_transverse is True:
-            self.plot_transverse = self.system.fields
         if self.plot_transverse:
-            figheight = self.figwidth*len(self.plot_transverse)/5
+            figheight = self.figwidth*len(self.system.fields)/5
             fig = plt.figure(figsize=(self.figwidth, figheight))
             self.figures.append(fig)
-            self.transverse(fig, self.plot_transverse)
+            self.transverse(fig, self.system.fields)
 
         if self.plot_longitudinal:
-            fig, ax = plt.subplots(1, 5,
-                                   figsize=(self.figwidth, self.figwidth/5))
+            fig, ax = plt.subplots(
+                1, 5, figsize=(self.figwidth, self.figwidth/5))
             self.figures.append(fig)
-            self.longitudinal(ax, max(self.plot_transverse))
+            self.longitudinal(ax, max(self.system.fields))
 
-        if self.plot_spots is True:
-            self.plot_spots = self.system.fields
         if self.plot_spots:
-            figheight = self.figwidth*len(self.plot_spots)/self.defocus
-            fig, ax = plt.subplots(len(self.plot_spots), self.defocus,
+            figheight = self.figwidth*len(self.system.fields)/self.defocus
+            fig, ax = plt.subplots(len(self.system.fields), self.defocus,
                                    figsize=(self.figwidth, figheight),
                                    sharex=True, sharey=True, squeeze=False)
             self.figures.append(fig)
-            self.spots(ax[::-1], self.plot_spots)
+            self.spots(ax[::-1], self.system.fields)
 
-        if self.plot_opds is True:
-            self.plot_opds = self.system.fields
         if self.plot_opds:
-            figheight = self.figwidth*len(self.plot_opds)/4
-            fig, ax = plt.subplots(len(self.plot_opds), 4,
+            figheight = self.figwidth*len(self.system.fields)/4
+            fig, ax = plt.subplots(len(self.system.fields), 4,
                                    figsize=(self.figwidth, figheight),
                                    squeeze=False)
             # , sharex=True, sharey=True)
             self.figures.append(fig)
-            self.opds(ax[::-1], self.plot_opds)
+            self.opds(ax[::-1], self.system.fields)
 
         return self.text, self.figures
 

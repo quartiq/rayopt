@@ -49,13 +49,13 @@ class System(list):
         else:
             self.object = InfiniteConjugate(
                 angle=0., pupil=RadiusPupil(
-                    radius=0., update_distance=True, update_radius=True))
+                    radius=1., update_distance=True, update_radius=True))
         if image:
             self.image = Conjugate.make(image)
         else:
             self.image = FiniteConjugate(
                 radius=0., update_radius=True, pupil=RadiusPupil(
-                    radius=0., update_distance=True, update_radius=True))
+                    radius=1., update_distance=True, update_radius=True))
         if fields is None:
             if self.object.point:
                 fields = [0.]
@@ -267,7 +267,7 @@ class System(list):
     def text(self):
         return itertools.chain(
             self.base_text(), ("",),
-            self.paraxial.text(), ("",)
+            # self.paraxial.text(), ("",)
         )
 
     def base_text(self):
