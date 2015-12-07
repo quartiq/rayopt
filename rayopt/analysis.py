@@ -57,7 +57,6 @@ class Analysis(object):
     plot_paraxial = False
     plot_gaussian = False
     plot_full = False
-    plot_heights = [0, .707, 1.]
     plot_rays = 3
     plot_transverse = True
     plot_spots = True
@@ -121,13 +120,13 @@ class Analysis(object):
             self.gaussian.plot(ax)
         if self.plot_full:
             t.plot(ax)
-        for h in min(self.plot_heights), max(self.plot_heights):
+        for h in min(self.system.fields), max(self.system.fields):
             t = GeometricTrace(self.system)
             t.rays_clipping((0, h))
             t.plot(ax)
 
         if self.plot_transverse is True:
-            self.plot_transverse = self.plot_heights
+            self.plot_transverse = self.system.fields
         if self.plot_transverse:
             figheight = self.figwidth*len(self.plot_transverse)/5
             fig = plt.figure(figsize=(self.figwidth, figheight))
@@ -141,7 +140,7 @@ class Analysis(object):
             self.longitudinal(ax, max(self.plot_transverse))
 
         if self.plot_spots is True:
-            self.plot_spots = self.plot_heights
+            self.plot_spots = self.system.fields
         if self.plot_spots:
             figheight = self.figwidth*len(self.plot_spots)/self.defocus
             fig, ax = plt.subplots(len(self.plot_spots), self.defocus,
@@ -151,7 +150,7 @@ class Analysis(object):
             self.spots(ax[::-1], self.plot_spots)
 
         if self.plot_opds is True:
-            self.plot_opds = self.plot_heights
+            self.plot_opds = self.system.fields
         if self.plot_opds:
             figheight = self.figwidth*len(self.plot_opds)/4
             fig, ax = plt.subplots(len(self.plot_opds), 4,
@@ -282,7 +281,7 @@ class Analysis(object):
                      transform=axi.transAxes, horizontalalignment="center")
         for hi, axi in zip(heights, ax):
             for wi, ci in zip(wavelengths, colors):
-                r = paraxial.airy_radius[1]/paraxial.l*wi
+                r = paraxial.airy_radius[1]/paraxial.wavelength*wi
                 t = GeometricTrace(self.system)
                 t.rays_point((0, hi), wi, nrays=nrays,
                              distribution="hexapolar", clip=True)
@@ -330,7 +329,7 @@ class Analysis(object):
             axo.contour(x, y, o, v, cmap=plt.cm.RdBu_r)
             axo.text(.5, -.1, "PTP: %.3g" % og.ptp(),
                      transform=axo.transAxes, horizontalalignment="center")
-            r = paraxial.airy_radius[1]/paraxial.l*wavelength
+            r = paraxial.airy_radius[1]/paraxial.wavelength*wavelength
             axp.add_patch(mpl.patches.Circle(
                 (0, 0), r, edgecolor="green", facecolor="none"))
             x, y, psf = map(np.fft.fftshift, t.psf())

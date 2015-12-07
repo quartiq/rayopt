@@ -53,12 +53,12 @@ class ParaxialTrace(Trace):
         self.propagate()
         self.aberrations()
 
+    @property
+    def wavelength(self):
+        return self.system.wavelengths[0]
+
     def allocate(self, kmax):
         super(ParaxialTrace, self).allocate()
-        l = self.system.wavelengths
-        self.l = l[0]
-        self.lmin = min(l)
-        self.lmax = max(l)
         n = self.length
         if hasattr(self, "c") and self.c.shape[:4] == (n, 2, 2, kmax + 1):
             return
@@ -70,21 +70,17 @@ class ParaxialTrace(Trace):
         self.d = np.empty_like(self.c)
 
     def rays(self):
-        self.n[0] = self.system.refractive_index(self.l, 0)
+        self.n[0] = self.system.refractive_index(self.wavelength, 0)
         y, u = self.y, self.u
-        ai = self.system.stop
-        m = self.system.paraxial_matrix(self.l, stop=ai + 1)
-        a, b, c, d = m[self.axis::2, self.axis::2].flat
-        r = self.system[ai].radius
-        if self.system.object.finite:
-            c = self.system.object.radius
-            y[0], u[0] = (0, -c), (r/b, a*c/b)
+        o = self.system.object
+        if o.finite:
+            y[0], u[0] = (0, -o.radius), (o.pupil.slope, o.slope)
         else:
             if self.system.object.wideangle:
                 c = 1.
             else:
                 c = tanarcsin(self.system.object.angle)
-            y[0], u[0] = (r/a, -b*c/a), (0, c)
+            y[0], u[0] = (o.pupil.radius, -o.slope*o.pupil.distance), (0, c)
 
     def propagate(self, start=1, stop=None):
         super(ParaxialTrace, self).propagate()
@@ -94,7 +90,7 @@ class ParaxialTrace(Trace):
                         self.u[init], self.u[init])).T
         n = self.n[init]
         for j, (yu, n) in enumerate(self.system.propagate_paraxial(
-                yu, n, self.l, start, stop)):
+                yu, n, self.wavelength, start, stop)):
             j += start
             self.y[j], self.u[j] = np.vsplit(yu[:, self.axis::2].T, 2)
             self.n[j] = n
@@ -105,7 +101,8 @@ class ParaxialTrace(Trace):
         self.c[start - 1] = self.v[start - 1] = 0
         for i, el in enumerate(els):
             i += start
-            self.v[i] = el.dispersion(self.lmin, self.lmax)
+            self.v[i] = el.dispersion(min(self.system.wavelengths),
+                                      max(self.system.wavelengths))
             self.c[i] = el.aberration(self.y[i], self.u[i - 1],
                                       self.n[i - 1], self.n[i], kmax)
         self.extrinsic_aberrations()
@@ -250,12 +247,12 @@ class ParaxialTrace(Trace):
     @property
     def airy_radius(self):
         na = self.numerical_aperture
-        return 1.22*self.l/(2*na)/self.system.scale
+        return 1.22*self.wavelength/(2*na)/self.system.scale
 
     @property
     def rayleigh_range(self):
         r = self.airy_radius
-        return np.pi*r**2/self.l*self.system.scale
+        return np.pi*r**2/self.wavelength*self.system.scale
 
     @property
     def magnification(self):
@@ -267,7 +264,7 @@ class ParaxialTrace(Trace):
     def number_of_points(self):
         """number of resolvable independent diffraction points
         (assuming no aberrations)"""
-        return 4*self.lagrange**2/self.l**2
+        return 4*self.lagrange**2/self.wavelength**2
 
     @property
     def petzval_curvature(self):
@@ -278,7 +275,7 @@ class ParaxialTrace(Trace):
 
     @property
     def eigenrays(self):
-        e, v = np.linalg.eig(self.system.paraxial_matrix(self.l))
+        e, v = np.linalg.eig(self.system.paraxial_matrix(self.wavelength))
         return e, v
 
     def print_c3(self):
@@ -391,7 +388,7 @@ class ParaxialTrace(Trace):
         if i is None:
             i = len(self.system) - 2
         seq = (1, i), (i, i + 1), (i + 1, None)
-        m0, m1, m2 = (self.system.paraxial_matrix(self.l, start=a, stop=b)
+        m0, m1, m2 = (self.system.paraxial_matrix(self.wavelength, start=a, stop=b)
             [self.axis::2, self.axis::2] for a, b in seq)
         n0, n = self.n.take((i - 1, i))
         c = -(1/(n0*f)
@@ -405,24 +402,27 @@ class ParaxialTrace(Trace):
         self.system[-1].distance -= self.y[-1, 0]/self.u[-1, 0]
 
     def update_conjugates(self):
-        z = self.pupil_distance
-        z += self.system[1].distance, -self.system[-1].distance
-        a = self.pupil_height
-        y = np.fabs(self.height)
-        self.system.object.update(y[0], z[0], a[0])
-        self.system.image.update(y[1], z[1], a[1])
-        #self.system[0].radius = y[0]
-        #self.system[-1].radius = y[1]
+        ai = self.system.stop
+        r = self.system[ai].radius
+        ma = self.system.paraxial_matrix(self.wavelength, stop=ai + 1)
+        ma = ma[self.axis::2, self.axis::2]
+        a, b = ma[0]
+        self.system.object.update(self.system[0].radius, b/a, r/a)
+        mb = self.system.paraxial_matrix(self.wavelength, start=ai + 1)
+        mb = mb[self.axis::2, self.axis::2]
+        a, b = np.linalg.inv(mb)[0]
+        # m = np.dot(mb, ma)
+        self.system.image.update(self.system[-1].radius, b/a, r/a)
 
     def update_stop(self, end="image"):
         ai = self.system.stop
         if end == "image":
-            m = self.system.paraxial_matrix(self.l, start=ai + 1)
+            m = self.system.paraxial_matrix(self.wavelength, start=ai + 1)
             m = m[self.axis::2, self.axis::2]
             m = np.linalg.inv(m)
             y, u = self.system.image.aim((0, 0), (0, -1))
         elif end == "object":
-            m = self.system.paraxial_matrix(self.l, stop=ai + 1)
+            m = self.system.paraxial_matrix(self.wavelength, stop=ai + 1)
             m = m[self.axis::2, self.axis::2]
             y, u = self.system.object.aim((0, 0), (0, 1))
         u = tanarcsin(u)

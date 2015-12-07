@@ -20,6 +20,7 @@ from __future__ import print_function, absolute_import, division
 
 from .material import *
 from .elements import *
+from .pupils import *
 from .conjugates import *
 from .system import *
 from .raytrace import *

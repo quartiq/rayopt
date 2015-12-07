@@ -35,7 +35,8 @@ from rayopt.utils import tanarcsin, sinarctan
 cooke = """
 description: 'oslo cooke triplet example 50mm f/4 20deg'
 wavelengths: [587.56e-9, 656.27e-9, 486.13e-9]
-object: {angle_deg: 20, pupil: {radius: 6.25}}
+object: {angle_deg: 20, pupil: {radius: 6.25, aim: True}}
+image: {type: finite, pupil: {radius: 0, update_radius: True}}
 elements:
 - {material: air}
 - {roc: 21.25, distance: 5.0, material: schott/SK16, radius: 6.5}
@@ -113,9 +114,9 @@ class DemotripCase(unittest.TestCase):
         #print(str(p))
         nptest.assert_allclose(p.u[0, 0], 0)
         nptest.assert_allclose(p.u[0, 1], tanarcsin(self.s.object.angle))
-        nptest.assert_allclose(p.y[self.s.stop, 0],
-                self.s[self.s.stop].radius)
+        nptest.assert_allclose(p.y[self.s.stop, 0], self.s[self.s.stop].radius, rtol=1e-2)
         nptest.assert_allclose(p.y[self.s.stop, 1], 0, atol=1e-9)
+        nptest.assert_allclose(p.working_f_number[1], -self.s.image.pupil.fno, rtol=1e-2)
         nptest.assert_allclose(p.working_f_number[1], 4, rtol=1e-2)
         nptest.assert_allclose(p.focal_length[1], 50, rtol=1e-3)
         nptest.assert_allclose(p.magnification[0], 0, rtol=1e-3)

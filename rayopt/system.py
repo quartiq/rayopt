@@ -18,7 +18,6 @@
 
 from __future__ import print_function, absolute_import, division
 
-import warnings
 import itertools
 
 import numpy as np
@@ -30,6 +29,7 @@ from .material import fraunhofer
 from .utils import public, simple_cache
 from .cachend import PolarCacheND
 from .paraxial_trace import ParaxialTrace
+from .pupils import RadiusPupil
 
 
 @public
@@ -48,11 +48,15 @@ class System(list):
         if object:
             self.object = Conjugate.make(object)
         else:
-            self.object = InfiniteConjugate(angle=0.)
+            self.object = InfiniteConjugate(
+                angle=0., pupil=RadiusPupil(
+                    radius=0., update_distance=True, update_radius=True))
         if image:
             self.image = Conjugate.make(image)
         else:
-            self.image = FiniteConjugate(radius=0.)
+            self.image = FiniteConjugate(
+                radius=0., update_radius=True, pupil=RadiusPupil(
+                    radius=0., update_distance=True, update_radius=True))
         self.pickups = pickups or []
         self.validators = validators or []
         self.solves = solves or []
@@ -192,8 +196,8 @@ class System(list):
             self.refractive_index(self.wavelengths[0], 0)
         self.image.pupil.refractive_index = \
             self.refractive_index(self.wavelengths[0], -1)
-        self.paraxial.update()
         self.paraxial.update_conjugates()
+        self.paraxial.update()
         self.validate()
 
     def validate(self, fix=False):
@@ -473,11 +477,11 @@ class System(list):
                 b /= 2
             elif fb < 0:
                 a = b
-                b *= 1 - 2*fb
+                b *= 1 - fb
             else:
                 break
         if i == maxiter - 1:
-            raise ValueError("no viable interval found")
+            raise ValueError("no viable interval found", a, b, fb)
         fa = merit(a)
         if abs(fa) <= tol:
             return a
@@ -489,7 +493,8 @@ class System(list):
         return self.object.aim(*args, surface=self[0], **kwargs)
 
     def aim_chief(self, yo, z, p=1., l=None, stop=None, **kwargs):
-        if self.object.finite and self.object.telecentric:
+        assert p
+        if self.object.pupil.telecentric or not self.object.pupil.aim:
             return z
         if l is None:
             l = self.wavelengths[0]
@@ -509,28 +514,32 @@ class System(list):
         return z + a*p
 
     def aim_marginal(self, yo, yp, z, p, l=None, stop=None, **kwargs):
+        assert p
+        if not self.object.pupil.aim:
+            return p
         if l is None:
             l = self.wavelengths[0]
         n = self.refractive_index(l, 0)
         rim = stop == -1
         if rim:
-            stop = len(self) - 2
+            stop = len(self) - 1
         elif stop is None:
-            stop = self.stop
-        r2 = np.square([e.radius for e in self[:stop + 1]])
+            stop = self.stop + 1
+        r2 = np.square([e.radius for e in self[1:stop]])
 
         @simple_cache
         def dist(a):
             y, u = self.aim(yo, yp, z, a*p, filter=False)
             ys = [y]
-            for yunit in self.propagate(y, u, n, l, stop=stop + 1):
+            for yunit in self.propagate(y, u, n, l, stop=stop):
                 ys.append(yunit[0])
-            d = np.square(ys)[:, 0, :2].sum(1)/r2 - 1
+            d = np.square(ys)[1:, 0, :2].sum(1)/r2 - 1
             if rim:
                 return d.max()
             else:
                 return d[-1]
         a = self.solve_brentq(dist, **kwargs)
+        assert a
         return a*p
 
     def _aim_pupil(self, xo, yo, guess, **kwargs):
@@ -555,10 +564,10 @@ class System(list):
             yp[ax] = 2*sig - 1.
             a1 = self.aim_marginal(y, yp, z, a[sig, ax], **kwargs)
             a[sig, ax] = a1
-            if sig == 1: # and guess is None
+            if sig == 1:  # and guess is None
                 a[0, ax] = -a[1, ax]
             if (sig, ax) == (1, 1) and guess is None:
-                a[1, 0] = a[1, 1]
+                a[:, 0] = a[:, 1]
         return np.r_[z, a.flat]
 
     def pupil(self, yo, l=None, stop=None, **kwargs):
