@@ -33,7 +33,7 @@ class TripletYamlCase(unittest.TestCase):
         text = """
 description: oslo cooke triplet example 50mm f/4 20deg
 wavelengths: [546.1e-9, 486.e-9, 656.e-9]
-object: {angle: .364}
+object: {angle_deg: 20, pupil: {radius: 6.25}}
 stop: 4
 elements:
 - {material: air}

@@ -19,6 +19,7 @@
 from __future__ import print_function, absolute_import, division
 
 import warnings
+import itertools
 
 import numpy as np
 from scipy.optimize import newton, brentq
@@ -34,17 +35,16 @@ from .paraxial_trace import ParaxialTrace
 @public
 class System(list):
     def __init__(self, elements=None, description="", scale=1e-3,
-                 wavelengths=None, stop=1, aiming="paraxial",
+                 wavelengths=None, stop=1, fields=None,
                  object=None, image=None,
                  pickups=None, validators=None, solves=None):
-        elements = map(Element.make, elements or [])
+        elements = [Element.make(_) for _ in elements or []]
         super(System, self).__init__(elements)
         self.description = description
         self.scale = scale
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
         self.stop = stop
-        assert aiming in ("paraxial", "geometric")
-        self.aiming = aiming
+        self.fields = fields or [0., 0.7, 1.]
         if object:
             self.object = Conjugate.make(object)
         else:
@@ -58,33 +58,20 @@ class System(list):
         self.solves = solves or []
         self._pupil_cache = {}
         self.paraxial = ParaxialTrace(self, update=False)
-        self.update()
 
     def dict(self):
-        dat = {}
-        if self.description:
-            dat["description"] = self.description
-        if self.stop != 1:
-            dat["stop"] = self.stop
-        if self.scale != 1e-3:
-            dat["scale"] = float(self.scale)
-        if self.wavelengths:
-            dat["wavelengths"] = [float(w) for w in self.wavelengths]
-        if self.aiming != "paraxial":
-            dat["scale"] = self.aiming
-        if self.object:
-            dat["object"] = self.object.dict()
-        if self.image:
-            dat["image"] = self.image.dict()
-        if self.pickups:
-            dat["pickups"] = [dict(p) for p in self.pickups]
-        if self.validators:
-            dat["validators"] = [dict(v) for v in self.validators]
-        if self.solves:
-            dat["solves"] = [dict(s) for s in self.solves]
-        if self:
-            dat["elements"] = [e.dict() for e in self]
-        return dat
+        return {
+            "description": self.description,
+            "stop": self.stop,
+            "scale": float(self.scale),
+            "wavelengths": [float(w) for w in self.wavelengths],
+            "object": self.object.dict(),
+            "image": self.image.dict(),
+            "pickups": [dict(p) for p in self.pickups],
+            "validators": [dict(v) for v in self.validators],
+            "solves": [dict(s) for s in self.solves],
+            "elements": [e.dict() for e in self],
+        }
 
     @property
     def aperture(self):
@@ -93,11 +80,6 @@ class System(list):
     @aperture.setter
     def aperture(self, a):
         self.stop = self.index(a)
-
-    @property
-    def aperture_index(self):
-        warnings.warn("use system.stop", DeprecationWarning)
-        return self.stop
 
     def groups(self):
         """yield lists of element indices that form lens "elements"
@@ -194,20 +176,24 @@ class System(list):
             if "init_current" in solve:
                 solve["init"] = float(x)
 
+    def refractive_index(self, wavelength, index):
+        for element in self[index::-1]:
+            try:
+                return element.refractive_index(wavelength)
+            except AttributeError:
+                pass
+        return 1.
+
     def update(self):
         self._pupil_cache.clear()
         self.pickup()
         self.solve()
-        if self.wavelengths and self:
-            self.object.refractive_index = \
-                    self[0].refractive_index(self.wavelengths[0])
-            self.image.refractive_index = \
-                    self[-2].refractive_index(self.wavelengths[0])
-            self.object._entrance_distance = self[1].distance
-            self.object.entrance_radius = self[1].radius
-            self.image._entrance_distance = self[-1].distance
-            self.image.entrance_radius = self[-2].radius
+        self.object.pupil.refractive_index = \
+            self.refractive_index(self.wavelengths[0], 0)
+        self.image.pupil.refractive_index = \
+            self.refractive_index(self.wavelengths[0], -1)
         self.paraxial.update()
+        self.paraxial.update_conjugates()
         self.validate()
 
     def validate(self, fix=False):
@@ -270,10 +256,17 @@ class System(list):
         return "\n".join(self.text())
 
     def text(self):
+        return itertools.chain(
+            self.base_text(), ("",),
+            self.paraxial.text(), ("",)
+        )
+
+    def base_text(self):
         yield "System: %s" % self.description
         yield "Scale: %s mm" % (self.scale/1e-3)
         yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
                     for w in self.wavelengths)
+        yield "Fields: %s" % ", ".join("%g" % _ for _ in self.fields)
         yield "Object:"
         for line in self.object.text():
             yield " " + line
@@ -294,15 +287,13 @@ class System(list):
             vd = getattr(mat, "vd", np.nan)
             n = nd
             if mat:
-                n = mat.refractive_index(self.wavelengths[0])
+                n = self.refractive_index(self.wavelengths[0], i)
             yield "%2i %1s %10.5g %10.4g %10.5g %17s %7.3f %7.3f %7.2f" % (
                     i, e.typeletter, e.distance, roc, rad*2, mat, n, nd, vd)
-        yield ""
-        for l in self.paraxial.text():
-            yield l
 
     def edge_thickness(self, axis=1):
         """list of the edge thicknesses"""
+        # FIXME: account for differing radius
         t = []
         dz0 = 0.
         for el in self:
@@ -338,9 +329,9 @@ class System(list):
                 if c0 > 0:
                     pending.radius = r
                 pending = None
-                if el.material.solid:
+                if not el.material or el.material.solid:
                     pending = el
-            if el.material.solid:
+            if not el.material or el.material.solid:
                 pending, c0 = el, c
 
     def fix_sizes(self):
@@ -393,7 +384,7 @@ class System(list):
         ax.plot(o[:, 2], o[:, axis], ":", **kwargs)
 
     def paraxial_matrices(self, l, start=1, stop=None):
-        n = self[start - 1].refractive_index(l)
+        n = self.refractive_index(l, start-1)
         for e in self[start:stop]:
             n, m = e.paraxial_matrix(n, l)
             yield n, m
@@ -414,8 +405,12 @@ class System(list):
         self[index].offset -= self.origins[-1]
 
     @property
-    def track(self):
+    def path(self):
         return np.cumsum([el.distance for el in self])
+
+    @property
+    def track(self):
+        return self.origins[:, 2]
 
     def align(self, n):
         n0 = n[0]
@@ -498,7 +493,7 @@ class System(list):
             return z
         if l is None:
             l = self.wavelengths[0]
-        n = self[0].refractive_index(l)
+        n = self.refractive_index(l, 0)
         if stop in (-1, None):
             stop = self.stop
         rad = self[self.stop].radius
@@ -516,7 +511,7 @@ class System(list):
     def aim_marginal(self, yo, yp, z, p, l=None, stop=None, **kwargs):
         if l is None:
             l = self.wavelengths[0]
-        n = self[0].refractive_index(l)
+        n = self.refractive_index(l, 0)
         rim = stop == -1
         if rim:
             stop = len(self) - 2
@@ -541,11 +536,12 @@ class System(list):
     def _aim_pupil(self, xo, yo, guess, **kwargs):
         y = np.array((xo, yo))
         if guess is None:
-            if not self.object.finite and self.object.wideangle:
+            if not self.object.finite and self.object.wideangle and False:
+                # FIXME: wideangle!
                 z = self.object.entrance_distance
             else:
-                z = self.object.pupil_distance
-            a = self.object.pupil_radius
+                z = self.object.pupil.distance
+            a = self.object.pupil.radius
             a = a*np.ones((2, 2))
         else:
             z, a = guess[0], guess[1:].reshape(2, 2)

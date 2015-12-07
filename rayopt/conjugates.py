@@ -21,8 +21,9 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 
 from .utils import (sinarctan, tanarcsin, public, sagittal_meridional,
-        normalize, normalize_z)
+        normalize)
 from .name_mixin import NameMixin
+from .pupils import Pupil, RadiusPupil
 
 # finite/infinite focal/afocal object/image
 # regular/telecentric pupils
@@ -42,65 +43,38 @@ class Conjugate(NameMixin):
     _default_type = "infinite"
     finite = None
 
-    def __init__(self, refractive_index=1.,
-            entrance_distance=0., entrance_radius=0.,
-            pupil_distance=None):
-        self.refractive_index = refractive_index
-        self._entrance_distance = entrance_distance
-        self.entrance_radius = entrance_radius
-        self._pupil_distance = pupil_distance
+    def __init__(self, pupil=None, projection="rectilinear",
+                 update_radius=False):
+        if pupil is None:
+            self.pupil = RadiusPupil(radius=0.)
+        else:
+            self.pupil = Pupil.make(pupil)
+        self.projection = projection
+        self.update_radius = update_radius
+
+    def text(self):
+        if self.projection != "rectilinear":
+            yield "Projection: %s" % self.projection
+        if self.update_radius:
+            yield "Update Radius: %s" % self.update_radius
+        yield "Pupil:"
+        for _ in self.pupil.text():
+            yield "  %s" % _
 
     def dict(self):
         dat = super(Conjugate, self).dict()
-        if self._pupil_distance is not None:
-            dat["pupil_distance"] = float(self._pupil_distance)
+        dat["pupil"] = self.pupil.dict()
+        if self.projection != "rectilinear":
+            dat["projection"] = self.projection
         return dat
 
     @property
-    def entrance_distance(self):
-        return self._entrance_distance
-
-    @entrance_distance.setter
-    def entrance_distance(self, d):
-        if self._pupil_distance is not None:
-            self._pupil_distance += d - self._entrance_distance
-        self._entrance_distance = d
-
-    @property
-    def pupil_distance(self):
-        if self._pupil_distance is not None:
-            return self._pupil_distance
-        else:
-            return self._entrance_distance
-
-    @pupil_distance.setter
-    def pupil_distance(self, p):
-        self._pupil_distance = p
+    def wideangle(self):
+        # FIXME: elaborate this
+        return self.projection != "rectilinear"
 
     def rescale(self, scale):
-        if self._pupil_distance is not None:
-            self._pupil_distance *= scale
-        self._entrance_distance *= scale
-        self.entrance_radius *= scale
-
-    def text(self):
-        yield "Index: %.3g" % self.refractive_index
-        yield "Entrance: %.3g dia at %.3g" % (2*self.entrance_radius,
-                self.entrance_distance)
-        if self._pupil_distance:
-            yield "Pupil: %.3g dia at %.3g" % (2*self.pupil_radius,
-                    self.pupil_distance)
-
-    def map_pupil(self, y, a, filter=True):
-        # a = [[-sag, -mer], [+sag, +mer]]
-        am = np.fabs(a).max()
-        y = np.atleast_2d(y)*am
-        if filter:
-            c = np.sum(a, axis=0)/2
-            d = np.diff(a, axis=0)/2
-            r = ((y - c)**2/d**2).sum(1)
-            y = y[r <= 1]
-        return y
+        self.pupil.rescale(scale)
 
     def aim(self, xy, pq, z=None, a=None):
         """
@@ -124,105 +98,49 @@ class FiniteConjugate(Conjugate):
     _type = "finite"
     finite = True
 
-    def __init__(self, radius=0., na=None, fno=None, slope=None,
-            pupil_radius=None, telecentric=False, **kwargs):
+    def __init__(self, radius=0., **kwargs):
         super(FiniteConjugate, self).__init__(**kwargs)
         self.radius = radius
-        self._na = na
-        self.telecentric = telecentric
-        if fno is not None:
-            self.fno = fno
-        if slope is not None:
-            self.slope = slope
-        if pupil_radius is not None:
-            self.pupil_radius = pupil_radius
 
     def dict(self):
         dat = super(FiniteConjugate, self).dict()
         if self.radius:
             dat["radius"] = float(self.radius)
-        if self._na is not None:
-            dat["na"] = float(self._na)
-        if self.telecentric:
-            dat["telecentric"] = self.telecentric
         return dat
 
     def text(self):
+        yield "Radius: %.3g" % self.radius
         for _ in super(FiniteConjugate, self).text():
             yield _
-        yield "Radius: %.3g" % self.radius
-        if self._na is not None:
-            yield "NA: %.3g" % self.na
-        if self.telecentric:
-            yield "Telecentric: True"
+
+    def update(self, radius, pupil_distance, pupil_radius):
+        self.pupil.update(pupil_distance, pupil_radius)
+        if self.update_radius:
+            self.radius = radius
 
     def rescale(self, scale):
         super(FiniteConjugate, self).rescale(scale)
         self.radius *= scale
 
     @property
-    def na(self):
-        if self._na is not None:
-            return self._na
-        else:
-            return self.refractive_index*sinarctan(
-                    self.entrance_radius/self.entrance_distance)
-
-    @na.setter
-    def na(self, na):
-        self._na = na
-
-    @property
-    def pupil_radius(self):
-        return self.slope*self.pupil_distance
-
-    @pupil_radius.setter
-    def pupil_radius(self, p):
-        self.slope = p/self.pupil_distance
-
-    @property
     def slope(self):
-        return tanarcsin(self.na/self.refractive_index)
+        return self.radius/self.pupil.distance
 
     @slope.setter
-    def slope(self, slope):
-        self.na = self.refractive_index*sinarctan(slope)
-
-    @property
-    def fno(self):
-        return 1/(2*self.na)
-
-    @fno.setter
-    def fno(self, fno):
-        self.na = 1/(2*fno)
-
-    @property
-    def height(self):
-        return self.radius
-
-    @height.setter
-    def height(self, h):
-        self.radius = h
-
-    @property
-    def chief_slope(self):
-        return self.radius/self.pupil_distance
-
-    @chief_slope.setter
-    def chief_slope(self, c):
-        self.radius = abs(self.pupil_distance*c)
+    def slope(self, c):
+        self.radius = self.pupil.distance*c
 
     def aim(self, yo, yp=None, z=None, a=None, surface=None, filter=True):
         if z is None:
-            z = self.pupil_distance
+            z = self.pupil.distance
         yo = np.atleast_2d(yo)
         if yp is not None:
             if a is None:
-                a = self.pupil_radius
+                a = self.pupil.radius
                 a = np.array(((-a, -a), (a, a)))
             a = np.arctan2(a, z)
             yp = np.atleast_2d(yp)
-            yp = self.map_pupil(yp, a, filter)
+            yp = self.pupil.map(yp, a, filter)
             yp = z*np.tan(yp)
             yo, yp = np.broadcast_arrays(yo, yp)
 
@@ -231,7 +149,7 @@ class FiniteConjugate(Conjugate):
         if surface:
             y[..., 2] = -surface.surface_sag(y)
         uz = (0, 0, z)
-        if self.telecentric:
+        if self.pupil.telecentric:
             u = uz
         else:
             u = uz - y
@@ -250,59 +168,37 @@ class InfiniteConjugate(Conjugate):
     _type = "infinite"
     finite = False
 
-    def __init__(self, angle=0., angle_deg=None, pupil_radius=None,
-            projection="rectilinear", wideangle=None, **kwargs):
+    def __init__(self, angle=0., angle_deg=None, **kwargs):
         super(InfiniteConjugate, self).__init__(**kwargs)
         if angle_deg is not None:
             angle = np.deg2rad(angle_deg)
         self.angle = angle
-        if wideangle is None:
-            wideangle = self.angle > np.deg2rad(45)
-        self.wideangle = wideangle
-        self.projection = projection
-        self._pupil_radius = pupil_radius
 
     def dict(self):
         dat = super(InfiniteConjugate, self).dict()
         if self.angle:
             dat["angle"] = float(self.angle)
-        if self._pupil_radius is not None:
-            dat["pupil_radius"] = float(self._pupil_radius)
-        if self.projection != "rectilinear":
-            dat["projection"] = self.projection
-        if self.wideangle:
-            dat["wideangle"] = self.wideangle
         return dat
 
+    def update(self, radius, pupil_distance, pupil_radius):
+        self.pupil.update(pupil_distance, pupil_radius)
+        if self.update_radius:
+            self.angle = np.arctan2(radius, pupil_distance)
+
     def text(self):
+        yield "Semi-Angle: %.3g°" % np.rad2deg(self.angle)
         for _ in super(InfiniteConjugate, self).text():
             yield _
-        yield "Semi-Angle: %.3g" % np.rad2deg(self.angle)
-        if self.projection is not "rectilinear":
-            yield "Projection: %s" % self.projection
-        if self.wideangle:
-            yield "Wideangle: True"
 
     @property
-    def pupil_radius(self):
-        if self._pupil_radius is not None:
-            return self._pupil_radius
-        else:
-            return self.entrance_radius
+    def slope(self):
+        return tanarcsin(self.angle)
 
-    @pupil_radius.setter
-    def pupil_radius(self, p):
-        self._pupil_radius = p
+    @slope.setter
+    def slope(self, c):
+        self.angle = sinarctan(c)
 
-    @property
-    def height(self):
-        return tanarcsin(self.radius)*self.pupil_distance
-
-    @height.setter
-    def height(self, h):
-        self.radius = sinarctan(h/self.pupil_distance)
-
-    def map_object(self, yo, a):
+    def map(self, yo, a):
         p = self.projection
         n = yo.shape[0]
         if p == "rectilinear":
@@ -332,16 +228,16 @@ class InfiniteConjugate(Conjugate):
 
     def aim(self, yo, yp=None, z=None, a=None, surface=None, filter=True):
         if z is None:
-            z = self.pupil_distance
+            z = self.pupil.distance
         yo = np.atleast_2d(yo)
         if yp is not None:
             if a is None:
-                a = self.pupil_radius
+                a = self.pupil.radius
                 a = np.array(((-a, -a), (a, a)))
             yp = np.atleast_2d(yp)
-            yp = self.map_pupil(yp, a, filter)
+            yp = self.pupil.map(yp, a, filter)
             yo, yp = np.broadcast_arrays(yo, yp)
-        u = self.map_object(yo, self.angle)
+        u = self.map(yo, self.angle)
         yz = (0, 0, z)
         y = yz - z*u
         if yp is not None:

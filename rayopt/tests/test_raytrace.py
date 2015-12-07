@@ -35,8 +35,7 @@ from rayopt.utils import tanarcsin, sinarctan
 cooke = """
 description: 'oslo cooke triplet example 50mm f/4 20deg'
 wavelengths: [587.56e-9, 656.27e-9, 486.13e-9]
-object: {angle_deg: 20}
-image: {type: finite, fno: 4.}
+object: {angle_deg: 20, pupil: {radius: 6.25}}
 elements:
 - {material: air}
 - {roc: 21.25, distance: 5.0, material: schott/SK16, radius: 6.5}
@@ -65,7 +64,7 @@ validators:
 class DemotripCase(unittest.TestCase):
     def setUp(self):
         self.s = system_from_yaml(cooke)
-        self.s.validate()
+        self.s.update()
 
     def test_from_text(self):
         self.assertFalse(self.s.object.finite)

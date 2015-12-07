@@ -242,8 +242,7 @@ class Analysis(object):
         if wavelengths is None:
             wavelengths = self.system.wavelengths
         ax = self.pre_setup_fanplot(fig, len(heights))
-        p = (self.system.object.pupil_distance -
-             self.system.object.entrance_distance)
+        p = self.system.object.pupil.distance
         for hi, axi in zip(heights, ax):
             axm, axsm, axss = axi
             axm.text(-.1, .5, "OY=%s" % hi, rotation="vertical",
@@ -256,7 +255,7 @@ class Analysis(object):
                 # plot transverse image plane versus entrance pupil
                 # coordinates
                 y = t.y[-1, :, :2] - t.y[-1, t.ref, :2]
-                py = t.y[1, :, :2] + p*tanarcsin(t.i[1])
+                py = t.y[0, :, :2] + p*tanarcsin(t.u[0])
                 py -= py[t.ref]
                 axm.plot(py[:t.ref, 1], y[:t.ref, 1], "-%s" % ci, label="%s" % wi)
                 axsm.plot(py[t.ref:, 0], y[t.ref:, 1], "-%s" % ci, label="%s" % wi)
@@ -404,9 +403,8 @@ class Analysis(object):
             t = GeometricTrace(self.system)
             t.rays_point((0, 0.), wi, nrays=nrays,
                          distribution="half-meridional", clip=True)
-            p = (self.system.object.pupil_distance -
-                 self.system.object.entrance_distance)
-            py = t.y[1, :, 1] + p*tanarcsin(t.i[1])[:, 1]
+            p = self.system.object.pupil.distance
+            py = t.y[0, :, 1] + p*tanarcsin(t.u[0])[:, 1]
             z = -t.y[-1, :, 1]/tanarcsin(t.i[-1])[:, 1]
             z[t.ref] = np.nan
             axs.plot(py, z, ci+"-", label="%s" % wi)

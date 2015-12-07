@@ -280,15 +280,12 @@ class Interface(Element):
         self.material = material
 
     def get_n_mu(self, n0, l):
-        n = n0
-        mu = 1.
-        if self.material:
-            if self.material.mirror:
-                mu = -1.
-            else:
-                n = self.material.refractive_index(l)
-                mu = n0/n
-        return n, mu
+        if self.material is None:
+            return n0, 1.
+        if self.material.mirror:
+            return n0, -1.
+        n = self.material.refractive_index(l)
+        return n, n0/n
 
     def dict(self):
         dat = super(Interface, self).dict()
@@ -297,7 +294,7 @@ class Interface(Element):
         return dat
 
     def refractive_index(self, wavelength):
-        return abs(self.material.refractive_index(wavelength))
+        return self.material.refractive_index(wavelength)
 
     def paraxial_matrix(self, n0, l):
         n, m = super(Interface, self).paraxial_matrix(n0, l)
@@ -317,9 +314,9 @@ class Interface(Element):
         return y, u, n, t*n0
 
     def dispersion(self, lmin, lmax):
-        if self.material is not None:
-            return self.material.delta_n(lmin, lmax)
-        return 0.
+        if self.material is None:
+            return 0.
+        return self.material.delta_n(lmin, lmax)
 
     def surface_sag(self, p):
         raise NotImplementedError
@@ -617,12 +614,12 @@ try:
             c = self.curvature
             k = self.conic
             r = self.radius
-            n = n0
-            if self.material:
-                if self.material.mirror:
-                    n = -n0
-                else:
-                    n = self.material.refractive_index(l)
+            if self.material is None:
+                n = n0
+            elif self.material.mirror:
+                n = -n0
+            else:
+                n = self.material.refractive_index(l)
             mu = n0/n
             fast_propagate(c, k, r, mu, y0, u0, n0, l, clip, y, u, t)
             return y, u, n, t

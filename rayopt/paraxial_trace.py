@@ -60,6 +60,8 @@ class ParaxialTrace(Trace):
         self.lmin = min(l)
         self.lmax = max(l)
         n = self.length
+        if hasattr(self, "c") and self.c.shape[:4] == (n, 2, 2, kmax + 1):
+            return
         self.n = np.empty(n)
         self.y = np.empty((n, 2))
         self.u = np.empty((n, 2))
@@ -68,7 +70,7 @@ class ParaxialTrace(Trace):
         self.d = np.empty_like(self.c)
 
     def rays(self):
-        self.n[0] = self.system[0].refractive_index(self.l)
+        self.n[0] = self.system.refractive_index(self.l, 0)
         y, u = self.y, self.u
         ai = self.system.stop
         m = self.system.paraxial_matrix(self.l, stop=ai + 1)
@@ -407,14 +409,10 @@ class ParaxialTrace(Trace):
         z += self.system[1].distance, -self.system[-1].distance
         a = self.pupil_height
         y = np.fabs(self.height)
-        self.system.object.pupil_distance = z[0]
-        self.system.image.pupil_distance = -z[1]
-        self.system.object.pupil_radius = a[0]
-        self.system.image.pupil_radius = a[1]
-        #self.system.object.height = y[0]
-        self.system.image.height = y[1]
+        self.system.object.update(y[0], z[0], a[0])
+        self.system.image.update(y[1], z[1], a[1])
         #self.system[0].radius = y[0]
-        self.system[-1].radius = y[1]
+        #self.system[-1].radius = y[1]
 
     def update_stop(self, end="image"):
         ai = self.system.stop

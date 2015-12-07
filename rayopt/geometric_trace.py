@@ -68,7 +68,7 @@ class GeometricTrace(Trace):
             u2 = np.square(self.u[0, :, :2]).sum(-1)
             self.u[0, :, 2] = np.sqrt(1 - u2)
         self.i[0] = self.u[0]
-        self.n[0] = self.system[0].refractive_index(l)
+        self.n[0] = self.system.refractive_index(l, 0)
         self.t[0] = 0
 
     def propagate(self, start=1, stop=None, clip=False):
@@ -248,11 +248,12 @@ class GeometricTrace(Trace):
                 yield _
             yield ""
 
+    def text(self):
+        return itertools.join(self.print_trace())
+
     def __str__(self):
-        t = itertools.chain(
-                self.print_trace(), ("",),
-                )
-        return "\n".join(t)
+        return "\n".join(self.text())
+
 
 # alias
 @public

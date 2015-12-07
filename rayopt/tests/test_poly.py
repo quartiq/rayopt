@@ -29,7 +29,14 @@ from rayopt import system_from_yaml, PolyTrace, GeometricTrace
 
 doublet = """
 description: "test doublet"
-object: {type: finite, slope: .001, pupil_distance: 100, radius: 1}
+object:
+  type: finite
+  radius: 1.0
+  pupil:
+    type: slope
+    slope: .001
+    distance: 100.
+    update_distance: False
 elements:
 - {material: vacuum}
 - {material: 1.51872, distance: 99.9, curvature: 1.611356421}
@@ -45,10 +52,10 @@ class DoubletCase(unittest.TestCase):
 
     def test_poly(self):
         p = PolyTrace(self.s, 5)
-        nptest.assert_allclose(self.s.object.slope, .001)
-        nptest.assert_allclose(self.s.object.chief_slope, .01)
-        nptest.assert_allclose(self.s.object.pupil_distance, 100.)
-        nptest.assert_allclose(self.s.object.pupil_radius, .1)
+        nptest.assert_allclose(self.s.object.pupil.slope, .001)
+        nptest.assert_allclose(self.s.object.slope, .01)
+        nptest.assert_allclose(self.s.object.pupil.distance, 100.)
+        nptest.assert_allclose(self.s.object.pupil.radius, .1)
         nptest.assert_allclose(self.s.object.radius, 1.)
         str(p)
         #print("\n".join(p.print_trace("st")))

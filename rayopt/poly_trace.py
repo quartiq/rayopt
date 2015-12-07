@@ -66,17 +66,17 @@ class PolyTrace(Trace):
     def telecentric(self):
         if not self.system.object.finite:
             return False
-        if self.system.object.telecentric:
+        if self.system.object.pupil.telecentric:
             return True
-        return (abs(self.system.object.slope) >
-                abs(self.system.object.chief_slope))
+        return (abs(self.system.object.pupil.slope) >
+                abs(self.system.object.slope))
 
     def rays(self):
-        self.n[0] = self.system[0].refractive_index(self.l)
+        self.n[0] = self.system.refractive_index(self.l, 0)
         if self.telecentric():
             pos = 0
         else:
-            pos = self.system.object.pupil_distance
+            pos = self.system.object.pupil.distance
         S = self.Simplex
         state = PolyState(f=S().shift(pos),
                           n=self.n[0], r=S(), p=S(), k=S(),
@@ -98,9 +98,9 @@ class PolyTrace(Trace):
 
     def transform(self, i=-1):
         assert self.system.object.finite
-        r = self.system.object.pupil_radius
-        a = self.system.object.slope
-        c = self.system.object.chief_slope
+        r = self.system.object.pupil.radius
+        a = self.system.object.pupil.slope
+        c = self.system.object.slope
         telecentric = abs(a) > abs(c)
         if telecentric:
             r = -self.system.object.radius

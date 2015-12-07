@@ -34,8 +34,7 @@ from .test_raytrace import cooke
 class DemotripCase(unittest.TestCase):
     def setUp(self):
         self.s = system_from_yaml(cooke)
-        p = ParaxialTrace(self.s)
-        p.update_conjugates()
+        self.s.update()
 
     def test_run(self):
         a = Analysis(self.s)
