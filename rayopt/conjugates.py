@@ -78,16 +78,19 @@ class Conjugate(NameMixin):
 
     def aim(self, xy, pq, z=None, a=None):
         """
-        h 2d fractional object coordinate (object knows meaning)
-        yp 2d fractional angular pupil coordinate (since object points
-        emit into solid angles)
+        xy 2d fractional xy object coordinate (object knows meaning)
+        pq 2d fractional sagittal/meridional pupil coordinate
 
-        aiming should be aplanatic (the grid is equal solid angle
-        in object space) and not paraxaial (equal area in entrance
+        aiming should be aplanatic (the grid is by solid angle
+        in object space) and not paraxaxial (equal area in entrance
         beam plane)
 
-        z pupil distance from "surface 0 apex" (also infinite object)
-        a pupil aperture (also for infinite object, then from z=0)
+        z pupil distance from "surface 0 apex" (also for infinite object)
+        a pupil aperture (also for infinite object or telecentric pupils,
+        then from z=0)
+
+        if z, a are not provided they are takes from the (paraxial data) stored
+        in object/pupil
         """
         raise NotImplementedError
 
@@ -150,7 +153,7 @@ class FiniteConjugate(Conjugate):
 
         y = np.zeros((yo.shape[0], 3))
         y[..., :2] = -yo*self.radius
-        if surface:
+        if surface is not None:
             y[..., 2] = -surface.surface_sag(y)
         uz = (0, 0, z)
         if self.pupil.telecentric:
@@ -251,6 +254,6 @@ class InfiniteConjugate(Conjugate):
         if yp is not None:
             s, m = sagittal_meridional(u, yz)
             y += yp[..., 0, None]*s + yp[..., 1, None]*m
-        if surface:
+        if surface is not None:
             y += surface.intercept(y, u)[..., None]*u
         return y, u

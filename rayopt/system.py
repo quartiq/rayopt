@@ -93,6 +93,8 @@ class System(list):
     def groups(self):
         """yield lists of element indices that form lens "elements"
         (singlets, multiplets, mirrors)
+
+        a group is: gas solid+ (mirror solid+)+ gas or a single mirror
         """
         group = []
         for i, el in enumerate(self):
@@ -502,7 +504,7 @@ class System(list):
     def aim(self, *args, **kwargs):
         return self.object.aim(*args, surface=self[0], **kwargs)
 
-    def aim_chief(self, yo, z, p=1., l=None, stop=None, **kwargs):
+    def aim_chief(self, yo, z, p, l=None, stop=None, **kwargs):
         assert p
         if self.object.pupil.telecentric or not self.object.pupil.aim:
             return z
