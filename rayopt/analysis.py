@@ -41,6 +41,7 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
 
 class Analysis(object):
     figwidth = 12.
+    run = True
     update = True
     print = True
     trace_gaussian = False
@@ -60,14 +61,15 @@ class Analysis(object):
     plot_opds = True
     plot_longitudinal = True
 
-    def __init__(self, system, run=True, **kwargs):
+    def __init__(self, system, **kwargs):
         self.system = system
         self.text = []
         self.figures = []
         for k, v in kwargs.items():
-            assert hasattr(self, k)
+            if not hasattr(self, k):
+                raise ValueError("no such option %s" % k)
             setattr(self, k, v)
-        if run:
+        if self.run:
             self.run()
         if self.print:
             for t in self.text:
