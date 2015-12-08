@@ -84,7 +84,7 @@ class Analysis(object):
             t = GeometricTrace(self.system)
             t.rays_paraxial()
             t.resize()
-            self.system.fix_sizes()
+            self.system.resize_convex()
         if self.refocus_full:
             t = GeometricTrace(self.system)
             t.rays_point((0, 0.), nrays=13, distribution="radau",
