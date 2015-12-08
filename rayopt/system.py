@@ -333,7 +333,7 @@ class System(list):
             c = getattr(el, "curvature", 0)
             if pending is not None:
                 r = max(el.radius, pending.radius)
-                if c < 0:
+                if c <= 0:
                     el.radius = r
                 if c0 > 0:
                     pending.radius = r
