@@ -64,7 +64,7 @@ class GeometricTrace(Trace):
         self.y[0, :, :m] = y
         self.y[0, :, m:] = 0
         self.u[0, :, :m] = u
-        if m < 3: # assumes forward rays
+        if m < 3:  # assumes forward rays
             u2 = np.square(self.u[0, :, :2]).sum(-1)
             self.u[0, :, 2] = np.sqrt(1 - u2)
         self.i[0] = self.u[0]
@@ -117,12 +117,12 @@ class GeometricTrace(Trace):
         u = ei.to_normal(ea.from_normal(self.u[after]))
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
         # replace u with direction from y to chief image
-        #u = -y/np.sqrt(np.square(y).sum(1))[:, None]
+        # u = -y/np.sqrt(np.square(y).sum(1))[:, None]
         y[:, 2] += radius
         ti = Spheroid(curvature=1./radius).intercept(y, u)
         t += ti*self.n[after]
         t = -(t - t[chief])/(self.l/self.system.scale)
-        # positive t rays have a shorter path to ref sphere and 
+        # positive t rays have a shorter path to ref sphere and
         # are arriving before chief
         py = y + ti[:, None]*u
         py[:, 2] -= radius
@@ -143,7 +143,7 @@ class GeometricTrace(Trace):
     def psf(self, pad=4, resample=4, **kwargs):
         radius = self.system[-1].distance
         x, y, o = self.opd(resample=resample, radius=radius,
-                **kwargs)
+                           **kwargs)
         good = np.isfinite(o)
         n = np.count_nonzero(good)
         o = np.where(good, np.exp(-2j*np.pi*o), 0)/n**.5
@@ -190,7 +190,7 @@ class GeometricTrace(Trace):
         self.propagate()
 
     def rays(self, yo, yp, wavelength, stop=None, filter=None,
-            clip=False, weight=None, ref=0):
+             clip=False, weight=None, ref=0):
         if filter is None:
             filter = not clip
         z, p = self.system.pupil(yo, l=wavelength, stop=stop)
@@ -199,11 +199,11 @@ class GeometricTrace(Trace):
         self.propagate(clip=clip)
 
     def rays_point(self, yo, wavelength=None, nrays=11,
-            distribution="meridional", filter=None, stop=None,
-            clip=False):
+                   distribution="meridional", filter=None, stop=None,
+                   clip=False):
         ref, yp, weight = pupil_distribution(distribution, nrays)
         self.rays(yo, yp, wavelength, filter=filter, stop=stop,
-                clip=clip, weight=weight, ref=ref)
+                  clip=clip, weight=weight, ref=ref)
 
     def rays_clipping(self, yo, wavelength=None, axis=1):
         z, p = self.system.pupil(yo, l=wavelength, stop=-1)
@@ -215,12 +215,12 @@ class GeometricTrace(Trace):
         yi = np.linspace(0, 1, nrays)[:, None]*np.atleast_2d(yo)
         y = np.empty((3, nrays, 3))
         u = np.empty_like(y)
-        e = np.zeros((3, 2)) # chief, meridional, sagittal
+        e = np.zeros((3, 2))  # chief, meridional, sagittal
         e[(1, 2), (1, 0)] = eps
         z, p = self.system.pupil((0, 0), l=wavelength)
         for i in range(yi.shape[0]):
             z = self.system.aim_chief(yi[i], z, np.fabs(p).max(),
-                    l=wavelength)
+                                      l=wavelength)
             y[:, i], u[:, i] = self.system.aim(yi[i], e, z, p)
         self.rays_given(y.reshape(-1, 3), u.reshape(-1, 3), wavelength)
         self.propagate()
@@ -233,16 +233,18 @@ class GeometricTrace(Trace):
     def plot(self, ax, axis=1, **kwargs):
         kwargs.setdefault("color", "green")
         y = np.array([el.from_normal(yi) + oi for el, yi, oi
-            in zip(self.system, self.y, self.origins)])
+                      in zip(self.system, self.y, self.origins)])
         ax.plot(y[:, :, 2], y[:, :, axis], **kwargs)
 
     def print_trace(self):
         t = np.cumsum(self.t, axis=0) - self.z[:, None]
         for i in range(self.nrays):
             yield "ray %i" % i
-            c = np.concatenate((self.n[:, None], self.z[:, None],
-                t[:, i, None], self.y[:, i, :], self.u[:, i, :]), axis=1)
-            for _ in self.print_coeffs(c, "n/track z/rel path/"
+            c = np.concatenate(
+                (self.n[:, None], self.z[:, None], t[:, i, None],
+                 self.y[:, i, :], self.u[:, i, :]), axis=1)
+            for _ in self.print_coeffs(
+                    c, "n/track z/rel path/"
                     "height x/height y/height z/angle x/angle y/angle z"
                     .split("/"), sum=False):
                 yield _

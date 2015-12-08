@@ -17,17 +17,11 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import (absolute_import, print_function,
-        unicode_literals, division)
+                        unicode_literals, division)
 
-import os
 import unittest
 
-from scipy import constants as ct
-import numpy as np
-from numpy import testing as nptest
-
-
-from rayopt import system_from_yaml, Analysis, ParaxialTrace
+from rayopt import system_from_yaml, Analysis
 from .test_raytrace import cooke
 
 

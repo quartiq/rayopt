@@ -21,7 +21,7 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 
 from .utils import (sinarctan, tanarcsin, public, sagittal_meridional,
-        normalize)
+                    normalize)
 from .name_mixin import NameMixin
 from .pupils import Pupil, RadiusPupil
 
@@ -81,11 +81,11 @@ class Conjugate(NameMixin):
         h 2d fractional object coordinate (object knows meaning)
         yp 2d fractional angular pupil coordinate (since object points
         emit into solid angles)
-        
+
         aiming should be aplanatic (the grid is equal solid angle
         in object space) and not paraxaial (equal area in entrance
         beam plane)
-        
+
         z pupil distance from "surface 0 apex" (also infinite object)
         a pupil aperture (also for infinite object, then from z=0)
         """

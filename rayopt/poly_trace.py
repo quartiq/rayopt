@@ -23,7 +23,7 @@ from collections import namedtuple
 
 import numpy as np
 
-from .utils import sinarctan, tanarcsin, public
+from .utils import public
 from .raytrace import Trace
 from .simplex import make_simplex, simplex_transform
 
@@ -37,8 +37,8 @@ class PolyTrace(Trace):
     aberration coefficients, Applied Optics 19, 3800-3816 (1980),
     http://dx.doi.org/10.1364/AO.19.003800).
 
-    With generalizations to finite and telecentric objects (after F. Bociort, T. B.
-    Andersen, and L.H.J.F. Beckmann, High-order optical aberration
+    With generalizations to finite and telecentric objects (after F. Bociort,
+    T. B. Andersen, and L.H.J.F. Beckmann, High-order optical aberration
     coefficients: extension to finite objects and to telecentricity in object
     space, Applied Optics 47, 5691-5700 (2008),
     http://dx.doi.org/10.1364/AO.47.005691).
@@ -131,7 +131,7 @@ class PolyTrace(Trace):
         if not self.system.object.finite:
             xy = xy*self.system.object.pupil.radius
             ab = ab*self.system.object.angle
-        #assert xy.shape[1] == 2
+        # assert xy.shape[1] == 2
         r = (xy**2).sum(1)
         p = (ab**2).sum(1)
         k = (xy*ab).sum(1)
@@ -167,11 +167,13 @@ class PolyTrace(Trace):
         ("field curvature", "distortion"),
         ("meridional coma", "field curvature"),
         ("spherical aberration", "circular coma"),
-        ("sagittal oblique spherical aberration", "meridional elliptical coma"),
+        ("sagittal oblique spherical aberration",
+         "meridional elliptical coma"),
         ("circular coma", "oblique spherical aberration"),
         ("field curvature", "distortion"),
         ("sagittal elliptical coma", "meridional field curvature"),
-        ("sagittal oblique spherical aberration", "meridional elliptical coma"),
+        ("sagittal oblique spherical aberration",
+         "meridional elliptical coma"),
     ]
 
     def print_names(self):
@@ -198,7 +200,8 @@ class PolyTrace(Trace):
             else:
                 idx = self.Simplex.j.sum(1) < cutoff
             yield "{:s}".format(n.upper())
-            yield "  n  i  j  k " + " ".join("{:12d}".format(i) for i in elements)
+            yield "  n  i  j  k " + " ".join(
+                "{:12d}".format(i) for i in elements)
             for (i, j, k), ai in zip(self.Simplex.j[idx], a[idx][:, elements]):
                 i = "{:3d}{:3d}{:3d}{:3d}".format(self.Simplex.i[i, j, k],
                                                   i, j, k)
@@ -209,7 +212,7 @@ class PolyTrace(Trace):
     def __str__(self):
         return "\n".join(itertools.chain(
             self.print_params(), ("",),
-        #    self.print_trace(), ("",),
+            # self.print_trace(), ("",),
             self.print_seidel(), ("",),
             self.print_names(), ("",),
         ))

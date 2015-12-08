@@ -22,8 +22,8 @@ import numpy as np
 from scipy.optimize import newton
 
 from .utils import public
-from .transformations import (euler_matrix, euler_from_matrix, 
-        rotation_matrix)
+from .transformations import (euler_matrix, euler_from_matrix,
+                              rotation_matrix)
 from .name_mixin import NameMixin
 from .aberration_orders import aberration_intrinsic
 from .material import Material
@@ -106,7 +106,7 @@ class TransformMixin(object):
     def align(self, direction, mu):
         """orient such that direction is excidence"""
         i = self.direction
-        r = mu*i - direction # snell
+        r = mu*i - direction  # snell
         if mu < 1:
             r *= -1
         if np.allclose(r, 0):
@@ -131,7 +131,7 @@ class TransformMixin(object):
             u *= -1
         self._distance = d = distance
         self._direction = u
-        self._offset = o = d*u
+        self._offset = d*u
         self._angles = a = np.array(angles)
         self.straight = np.allclose(u, (0, 0, 1.))
         self.normal = np.allclose(a, 0.)
@@ -143,7 +143,7 @@ class TransformMixin(object):
         if not self.straight:
             rdir = np.cross(u, (0, 0, 1.))
             rang = np.arcsin(np.linalg.norm(rdir))
-            if u[2] < 0: # == np.dot((0, 0, 1), u)
+            if u[2] < 0:  # == np.dot((0, 0, 1), u)
                 rang = np.pi - rang
             if np.allclose(rdir, 0):
                 rdir = 1., 0, 0
@@ -333,13 +333,16 @@ class Interface(Element):
         s = super(Interface, self).intercept(y, u)
         for i in range(y.shape[0]):
             yi, ui = y[None, i], u[None, i]
+
             def func(si):
                 return self.surface_sag(yi + si*ui)[0]
+
             def fprime(si):
                 return np.dot(self.surface_normal(yi + si*ui), ui.T)[0]
+
             try:
                 s[i] = newton(func=func, fprime=fprime, x0=s[i],
-                        tol=1e-7, maxiter=5)
+                              tol=1e-7, maxiter=5)
             except RuntimeError:
                 s[i] = np.nan
         return s
@@ -357,11 +360,11 @@ class Interface(Element):
         a = muf*(u0*r).sum(1)/r2
         # solve g**2 + 2*a*g + b=0
         if mu == -1:
-            u = u0 - 2*a[:, None]*r # reflection
+            u = u0 - 2*a[:, None]*r  # reflection
         else:
             b = (mu**2 - 1)/r2
             g = -a + np.sign(mu)*np.sqrt(np.square(a) - b)
-            u = muf*u0 + g[:, None]*r # refraction
+            u = muf*u0 + g[:, None]*r  # refraction
         return u
 
     def surface_cut(self, axis, points):
@@ -408,7 +411,7 @@ class Interface(Element):
 @Element.register
 class Spheroid(Interface):
     def __init__(self, curvature=0., conic=0., aspherics=None, roc=None,
-            alternate_intersection=False, **kwargs):
+                 alternate_intersection=False, **kwargs):
         super(Spheroid, self).__init__(**kwargs)
         if roc is not None:
             curvature = 1./roc
@@ -472,11 +475,11 @@ class Spheroid(Interface):
 
     def intercept(self, y, u):
         if self.aspherics is not None:
-            return Interface.intercept(self, y, u) # expensive iterative
+            return Interface.intercept(self, y, u)  # expensive iterative
         # replace the newton-raphson with the analytic solution
         c, k = self.curvature, self.conic
         if c == 0:
-            return -y[:, 2]/u[:, 2] # flat
+            return -y[:, 2]/u[:, 2]  # flat
         if not k:
             uy = (u*y).sum(1)
             uu = 1.
@@ -492,7 +495,7 @@ class Spheroid(Interface):
         g = np.sqrt(np.square(d) - e*f)
         if self.alternate_intersection:
             g *= -1
-        #g *= np.sign(u[:, 2])
+        # g *= np.sign(u[:, 2])
         s = -(d + g)/e
         return s
 

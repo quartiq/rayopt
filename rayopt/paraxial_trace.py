@@ -149,14 +149,14 @@ class ParaxialTrace(Trace):
         s = np.array([
             -2*b[:, 0, 1, 2, 0, 0],  # MU1
             -1*b[:, 0, 1, 1, 1, 0],  # MU3
-            -2*b[:, 0, 0, 1, 1, 0] - 2*b[:, 0, 1, 1, 0, 1]  # MU5
-            + 2*b[:, 0, 1, 0, 2, 0],  # MU6
+            -2*b[:, 0, 0, 1, 1, 0] - 2*b[:, 0, 1, 1, 0, 1] +  # MU5
+            2*b[:, 0, 1, 0, 2, 0],  # MU6
             2*b[:, 0, 1, 1, 0, 1],  # MU5
             # -2*b[:, 0, 0, 1, 0, 1]-b[:, 0, 0, 0, 2, 0]
             # -b[:, 0, 1, 0, 1, 1],  # MU7
             # -b[:, 0, 1, 0, 1, 1]-b[:, 0, 0, 0, 2, 0],  # MU8
-            -2*b[:, 0, 0, 1, 0, 1] - 2*b[:, 0, 0, 0, 2, 0]
-            - 2*b[:, 0, 1, 0, 1, 1],  # MU7+MU8
+            -2*b[:, 0, 0, 1, 0, 1] - 2*b[:, 0, 0, 0, 2, 0] -
+            2*b[:, 0, 1, 0, 1, 1],  # MU7+MU8
             -1*b[:, 0, 1, 0, 1, 1],  # MU9
             -b[:, 0, 0, 0, 1, 1]/2,  # (MU10-MU11)/4
             -2*b[:, 0, 1, 0, 0, 2] + b[:, 0, 0, 0, 1, 1]/2,
@@ -177,7 +177,7 @@ class ParaxialTrace(Trace):
     def height(self):
         """object and image ray height"""
         return np.fabs(self.y[(0, -1), 1])
-        #self.lagrange/(self.n[-2]*self.u[-2,0])
+        # self.lagrange/(self.n[-2]*self.u[-2,0])
 
     @property
     def pupil_distance(self):
@@ -191,8 +191,8 @@ class ParaxialTrace(Trace):
 
     @property
     def lagrange(self):
-        return self.n[0]*(self.u[0, 0]*self.y[0, 1]
-                - self.u[0, 1]*self.y[0, 0])
+        return self.n[0]*(self.u[0, 0]*self.y[0, 1] -
+                          self.u[0, 1]*self.y[0, 0])
 
     @property
     def focal_length(self):
@@ -208,8 +208,8 @@ class ParaxialTrace(Trace):
         """front/back focal distance relative to first/last surface
         Malacara1989 p27 2.43 2.44, F-V"""
         c = self.n.take((0, -2))*self.focal_length/self.lagrange
-        fd = (self.y[(1, -2), 1]*self.u[(-2, 0), 0]
-                - self.y[(1, -2), 0]*self.u[(-2, 0), 1])*c
+        fd = (self.y[(1, -2), 1]*self.u[(-2, 0), 0] -
+              self.y[(1, -2), 0]*self.u[(-2, 0), 1])*c
         return fd
 
     @property
@@ -280,16 +280,17 @@ class ParaxialTrace(Trace):
 
     def print_c3(self):
         return self.print_coeffs(self.seidel3,
-                "SA3 CMA3 AST3 PTZ3 DIS3".split())
+                                 "SA3 CMA3 AST3 PTZ3 DIS3".split())
 
-    def print_h3(self): # TODO
-        c3a = self.aberration3*8 # chromatic
-        return self.print_coeffs(c3a[(6, 12), :].T, 
-                "PLC PTC".split())
+    def print_h3(self):  # TODO
+        c3a = self.aberration3*8  # chromatic
+        return self.print_coeffs(c3a[(6, 12), :].T,
+                                 "PLC PTC".split())
 
     def print_c5(self):
-        return self.print_coeffs(self.seidel5,
-                "SA5 CMA5 TOBSA5 SOBSA5 TECMA5 SECMA5 AST5 PTZ5 DIS5".split())
+        return self.print_coeffs(
+            self.seidel5,
+            "SA5 CMA5 TOBSA5 SOBSA5 TECMA5 SECMA5 AST5 PTZ5 DIS5".split())
 
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
@@ -310,10 +311,10 @@ class ParaxialTrace(Trace):
 
     def print_trace(self):
         c = np.c_[self.z, self.y[:, 0], self.u[:, 0],
-                self.y[:, 1], self.u[:, 1]]
-        return self.print_coeffs(c,
-                "track/axial y/axial u/chief y/chief u".split("/"),
-                sum=False)
+                  self.y[:, 1], self.u[:, 1]]
+        return self.print_coeffs(
+            c, "track/axial y/axial u/chief y/chief u".split("/"),
+            sum=False)
 
     def __str__(self):
         return "\n".join(self.text())
@@ -323,12 +324,12 @@ class ParaxialTrace(Trace):
             self.print_params(), ("",),
             self.print_trace(), ("",),
             self.print_c3(), ("",),
-            #self.print_h3(), ("",),
-            #self.print_c5(), ("",),
+            # self.print_h3(), ("",),
+            # self.print_c5(), ("",),
         )
 
     def plot(self, ax, principals=False, pupils=False, focals=False,
-            nodals=False, **kwargs):
+             nodals=False, **kwargs):
         kwargs.setdefault("color", "black")
         # this assumes that the outgoing oa of an element
         # coincides with the incoming of the next, use align()
@@ -344,7 +345,7 @@ class ParaxialTrace(Trace):
                 ]:
             if flag:
                 for i, pi, zi in zip((1, -1), p,
-                        (0, self.system[-1].distance)):
+                                     (0, self.system[-1].distance)):
                     y = self.origins[i] + self.system[i].from_axis(
                             np.array([(h, h, pi-zi), (-h, -h, pi-zi)]))
                     ax.plot(y[:, 2], y[:, self.axis], **kwargs)
@@ -352,7 +353,7 @@ class ParaxialTrace(Trace):
             p = self.pupil_distance
             h = self.pupil_height
             for i, hi, pi, zi in zip((1, -1), h, p,
-                    (0, self.system[-1].distance)):
+                                     (0, self.system[-1].distance)):
                 y = np.empty((4, 3))
                 y[:, 0] = y[:, 1] = -1.5, 1.5, -1, 1
                 y *= hi
@@ -374,28 +375,29 @@ class ParaxialTrace(Trace):
 
     def resize(self):
         for e, y in zip(self.system[1:], self.y[1:]):
-            e.radius = np.fabs(y).sum() # marginal+chief
+            e.radius = np.fabs(y).sum()  # marginal+chief
 
     def focal_length_solve(self, f, i=-2):
-        assert i == -2, "only works for the last surface" # TODO
+        assert i == -2, "only works for the last surface"  # TODO
         y0, y = self.y[(i - 1, i), 0]
         u0, u = self.u[i - 1, 0], -self.y[0, 0]/f
         n0, n = self.n.take((i - 1, i))
         c = (n*u - n0*u0)/(y*(n0 - n))
         self.system[i].curvature = c
 
-    def _focal_length_solve(self, f, i=None): # TODO: not exact
+    def _focal_length_solve(self, f, i=None):  # TODO: not exact
         if i is None:
             i = len(self.system) - 2
         seq = (1, i), (i, i + 1), (i + 1, None)
-        m0, m1, m2 = (self.system.paraxial_matrix(self.wavelength, start=a, stop=b)
+        m0, m1, m2 = (self.system.paraxial_matrix(
+            self.wavelength, start=a, stop=b)
             [self.axis::2, self.axis::2] for a, b in seq)
         n0, n = self.n.take((i - 1, i))
-        c = -(1/(n0*f)
-                + m0[1, 0]*m1[0, 0]*m2[0, 0]
-                + m0[1, 0]*m1[0, 1]*m2[1, 0]
-                + m0[1, 1]*m1[1, 1]*m2[1, 0]
-                )/(m0[1, 1]*m2[0, 0])
+        c = -(1/(n0*f) +
+              m0[1, 0]*m1[0, 0]*m2[0, 0] +
+              m0[1, 0]*m1[0, 1]*m2[1, 0] +
+              m0[1, 1]*m1[1, 1]*m2[1, 0]
+              )/(m0[1, 1]*m2[0, 0])
         self.system[i].curvature = c/(n0 - n)*n
 
     def refocus(self):

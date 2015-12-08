@@ -24,7 +24,7 @@ import unittest
 from numpy import testing as nptest
 
 
-from rayopt import system_from_yaml, PolyTrace, GeometricTrace
+from rayopt import system_from_yaml, PolyTrace
 
 
 doublet = """
@@ -58,7 +58,7 @@ class DoubletCase(unittest.TestCase):
         nptest.assert_allclose(self.s.object.pupil.radius, .1)
         nptest.assert_allclose(self.s.object.radius, 1.)
         str(p)
-        #print("\n".join(p.print_trace("st")))
+        # print("\n".join(p.print_trace("st")))
         s, t = p.st()
         # print(s[0])
         # print(p.evaluate([[1.], [0]], [[0, 1], [0, 0]]))

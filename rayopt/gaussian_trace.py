@@ -76,7 +76,7 @@ class GaussianTrace(Trace):
         init = start - 1
         qi, n = self.qi[init], self.n[init]
         for j, (qi, n) in enumerate(self.system.propagate_gaussian(
-            qi, n, self.wavelength, start, stop)):
+                qi, n, self.wavelength, start, stop)):
             j += start
             self.qi[j], self.n[j] = qi, n
 
@@ -107,7 +107,7 @@ class GaussianTrace(Trace):
         qixx, qixy, qiyy = qi[:, 0, 0], qi[:, 0, 1], qi[:, 1, 1]
         if np.iscomplexobj(qi):
             a = np.arctan(2*qixy/(qixx - qiyy))/2
-            #a = np.where(np.isnan(a), 0, a)
+            # a = np.where(np.isnan(a), 0, a)
         else:
             a = np.arctan2(2*qixy, qixx - qiyy)/2
         a = (a + np.pi/4) % (np.pi/2) - np.pi/4
@@ -117,7 +117,7 @@ class GaussianTrace(Trace):
         a = self.angle(qi)
         ca, sa = np.cos(a), np.sin(a)
         o = np.array([[ca, -sa], [sa, ca]])
-        #qi = np.where(np.isnan(qi), 0, qi)
+        # qi = np.where(np.isnan(qi), 0, qi)
         qi = np.einsum("jki,ikl,lmi->ijm", o, qi, o)
         assert np.allclose(qi[:, 0, 1], 0), qi
         assert np.allclose(qi[:, 1, 0], 0), qi
@@ -144,25 +144,25 @@ class GaussianTrace(Trace):
             return 1/r
 
     @property
-    def curvature_radius(self): # on element
+    def curvature_radius(self):  # on element
         return self.curvature_radius_at(z=None)
 
     @property
-    def spot_radius(self): # on element
+    def spot_radius(self):  # on element
         return self.spot_radius_at(z=None)
 
     @property
-    def waist_position(self): # after element relative to element
+    def waist_position(self):  # after element relative to element
         w = -(1/np.diagonal(self.qi, 0, 1, 2)).real
         return w
 
     @property
-    def rayleigh_range(self): # after element
+    def rayleigh_range(self):  # after element
         z = (1/np.diagonal(self.qi, 0, 1, 2)).imag
         return z
 
     @property
-    def waist_radius(self): # after element
+    def waist_radius(self):  # after element
         n = self.n[:, None]
         r = self.rayleigh_range/np.pi/n*self.wavelength/self.system.scale
         return r**.5
@@ -185,7 +185,7 @@ class GaussianTrace(Trace):
     def is_simple_astigmatic(self, m):
         # does not mix the two axes
         return np.allclose(m[(0, 0, 1, 1, 2, 2, 3, 3),
-            (1, 3, 0, 2, 1, 3, 0, 2)], 0)
+                             (1, 3, 0, 2, 1, 3, 0, 2)], 0)
 
     @property
     def eigenmodes(self):
@@ -197,10 +197,10 @@ class GaussianTrace(Trace):
         for axis in (0, 1):
             a, b, c, d = m[axis::2, axis::2].flat
             q.append(np.roots((c, d - a, -b)))
-        q = np.eye(2)[None, :]/np.array(q).T[:, :, None] # mode, axis
+        q = np.eye(2)[None, :]/np.array(q).T[:, :, None]  # mode, axis
         return q
 
-    def is_proper(self): # Nemes checks
+    def is_proper(self):  # Nemes checks
         m = self.system.paraxial_matrix(self.wavelength)
         a, b, c, d = m[:2, :2], m[:2, 2:], m[2:, :2], m[2:, 2:]
         for i, (v1, v2) in enumerate([
@@ -225,7 +225,7 @@ class GaussianTrace(Trace):
         return m + m1, m - m1
 
     @property
-    def real(self): # 
+    def real(self):
         return (self.m**2).imag == 0
 
     @property
@@ -235,15 +235,15 @@ class GaussianTrace(Trace):
     # TODO: sagittal, meridional, angled, make_complete
 
     def print_trace(self):
-        #c, rc = self.curvature_radius_at(z=None, normal=True)
+        # c, rc = self.curvature_radius_at(z=None, normal=True)
         s, rs = self.spot_radius_at(z=None, normal=True)
         sa, sb = s.T
-        wpx, wpy = self.waist_position.T # assumes simple astig
-        wrx, wry = self.waist_radius.T # assumes simple astig
+        wpx, wpy = self.waist_position.T  # assumes simple astig
+        wrx, wry = self.waist_radius.T  # assumes simple astig
         c = np.c_[self.z, sa, sb, np.rad2deg(rs), wpx, wpy, wrx, wry]
-        return self.print_coeffs(c,
-                "track/spot a/spot b/spot ang/waistx dz/waisty dz/"
-                "waist x/waist y".split("/"), sum=False)
+        return self.print_coeffs(
+            c, "track/spot a/spot b/spot ang/waistx dz/waisty dz/"
+            "waist x/waist y".split("/"), sum=False)
 
     def __str__(self):
         t = itertools.chain(
@@ -268,7 +268,7 @@ class GaussianTrace(Trace):
         m = self.mirrored.take(i)
         wx, wy = self.spot_radius_at(z).T*scale*m
         y = np.array([
-            [wx, wx, z], [wy, wy, z], 
+            [wx, wx, z], [wy, wy, z],
             [-wx, -wx, z], [-wy, -wy, z],
             ]).transpose(2, 0, 1)
         y = self.from_axis(y)
@@ -280,11 +280,11 @@ class GaussianTrace(Trace):
             r = self.rayleigh_range.T
             for i, ci in zip((axis, 0 if axis else 1), ("-", "--")):
                 for j, (el, oi) in enumerate(zip(self.system[1:],
-                        self.origins[1:])):
+                                                 self.origins[1:])):
                     for z, h, cj in [(0, w[i, j], ci),
-                            (r[i, j], 2**.5*w[i, j], ":"),
-                            (-r[i, j], 2**.5*w[i, j], ":"),
-                            ]:
+                                     (r[i, j], 2**.5*w[i, j], ":"),
+                                     (-r[i, j], 2**.5*w[i, j], ":"),
+                                     ]:
                         v = p[i, j] + z - el.distance
                         if v >= -el.distance and v <= 0:
                             y = np.array([[h, h, v], [-h, -h, v]])

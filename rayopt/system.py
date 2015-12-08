@@ -151,23 +151,27 @@ class System(list):
     def solve(self):
         for solve in self.solves:
             if "get" in solve:
-                getter = lambda: self.get_path(solve["get"])
+                def getter():
+                    return self.get_path(solve["get"])
             elif "get_eval" in solve:
                 def getter():
                     loc = dict(self=self, solve=solve)
                     return eval(solve["get_eval"], loc, globals())
             elif "get_func" in solve:
-                getter = lambda: solve["get_func"](self, solve)
+                def getter():
+                    return solve["get_func"](self, solve)
             if "set" in solve:
-                setter = lambda x: self.set_path(solve["set"], x)
+                def setter(x):
+                    self.set_path(solve["set"], x)
             elif "set_exec" in solve:
                 def setter(value):
-                    loc = dict(value=value, self=self, solve=solve)
+                    # loc = dict(value=value, self=self, solve=solve)
                     raise NotImplementedError
                     # http://bugs.python.org/issue21591
-                    #exec(solve["set_exec"], globals(), loc)
+                    # exec(solve["set_exec"], globals(), loc)
             elif "set_func" in solve:
-                setter = lambda x: solve["set_func"](self, solve, x)
+                def setter(x):
+                    solve["set_func"](self, solve, x)
             target = solve.get("target", 0.)
             if "init" in solve:
                 init = solve["init"]
@@ -175,12 +179,14 @@ class System(list):
                 init = self.get_path(solve["set"])
             else:
                 init = 0.
+
             def func(x):
                 setter(x)
                 self.pickup()
                 return getter() - target
+
             x = newton(func, init, tol=solve.get("tol", 1e-8),
-                    maxiter=solve.get("maxiter", 20))
+                       maxiter=solve.get("maxiter", 20))
             func(x)
             if "init_current" in solve:
                 solve["init"] = float(x)
@@ -222,27 +228,30 @@ class System(list):
                     if fix and "get" in validator:
                         self.set_path(validator["get"], v)
                     else:
-                        raise ValueError("%s < %s (%s)" % (value, v, validator))
+                        raise ValueError("%s < %s (%s)" %
+                                         (value, v, validator))
             if "maximum" in validator:
                 v = validator["maximum"]
                 if value > v:
                     if fix and "get" in validator:
                         self.set_path(validator["get"], v)
                     else:
-                        raise ValueError("%s > %s (%s)" % (value, v, validator))
+                        raise ValueError("%s > %s (%s)" %
+                                         (value, v, validator))
             if "equality" in validator:
                 v = validator["equality"]
                 if value != v:
                     if fix and "get" in validator:
                         self.set_path(validator["get"], v)
                     else:
-                        raise ValueError("%s != %s (%s)" % (value, v, validator))
+                        raise ValueError("%s != %s (%s)" %
+                                         (value, v, validator))
 
     def reverse(self):
         # i-1|material_i-1,distance_i|i|material_i,distance_i+1|i+1
         # ->
         # i-1|material_i,distance_i-1|i|material_i+1,distance_i|i+1
-        # 
+        #
         d = [e.distance for e in self] + [0.]
         m = [None] + [getattr(e, "material", None) for e in self]
         for i, e in enumerate(self):
@@ -274,7 +283,7 @@ class System(list):
         yield "System: %s" % self.description
         yield "Scale: %s mm" % (self.scale/1e-3)
         yield "Wavelengths: %s nm" % ", ".join("%.0f" % (w/1e-9)
-                    for w in self.wavelengths)
+                                               for w in self.wavelengths)
         yield "Fields: %s" % ", ".join("%g" % _ for _ in self.fields)
         yield "Object:"
         for line in self.object.text():
@@ -287,7 +296,7 @@ class System(list):
         yield "%2s %1s %10s %10s %10s %17s %7s %7s %7s" % (
                 "#", "T", "Distance", "Rad Curv", "Diameter",
                 "Material", "n", "nd", "Vd")
-        for i,e in enumerate(self):
+        for i, e in enumerate(self):
             curv = getattr(e, "curvature", 0)
             roc = curv == 0 and np.inf or 1./curv
             rad = e.radius
@@ -357,16 +366,16 @@ class System(list):
                 continue
             if pending:
                 px, pz = pending
-                if x[0] < px[0]: # lower right
+                if x[0] < px[0]:  # lower right
                     cl = x[0], pz[0]
-                else: # lower left
+                else:  # lower left
                     cl = px[0], z[0]
-                if x[-1] > px[-1]: # upper right
+                if x[-1] > px[-1]:  # upper right
                     cu = x[-1], pz[-1]
-                else: # upper left
+                else:  # upper left
                     cu = px[-1], z[-1]
                 yield np.c_[(px, pz), cu, (x[::-1], z[::-1]), cl,
-                        (px[0], pz[0])]
+                            (px[0], pz[0])]
             elif not e.material.solid or e.material.mirror:
                 yield x, z
             if e.material.solid or (pending and e.material.mirror):
@@ -429,7 +438,8 @@ class System(list):
     @property
     def mirrored(self):
         return np.cumprod([-1 if getattr(getattr(el, "material", None),
-            "mirror", False) else 1 for el in self])
+                                         "mirror", False) else 1
+                           for el in self])
 
     def propagate_paraxial(self, yu, n, l, start=1, stop=None):
         for e in self[start:stop]:
@@ -559,7 +569,7 @@ class System(list):
         if not np.allclose(y, 0):
             z1 = self.aim_chief(y, z, np.fabs(a).max(), **kwargs)
             if self.object.finite:
-                a *= np.fabs(z1/z) # improve guess
+                a *= np.fabs(z1/z)  # improve guess
             z = z1
         for ax, sig in (1, 1), (1, 0), (0, 1), (0, 0):
             yp = [0, 0]
@@ -578,6 +588,6 @@ class System(list):
             c = self._pupil_cache[k]
         except KeyError:
             c = self._pupil_cache[k] = PolarCacheND(self._aim_pupil,
-                    l=l, stop=stop, **kwargs)
+                                                    l=l, stop=stop, **kwargs)
         q = c(*yo)
         return q[0], q[1:].reshape(2, 2)

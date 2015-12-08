@@ -240,9 +240,12 @@ class Analysis(object):
                 y = t.y[-1, :, :2] - t.y[-1, t.ref, :2]
                 py = t.y[0, :, :2] + p*tanarcsin(t.u[0])
                 py -= py[t.ref]
-                axm.plot(py[:t.ref, 1], y[:t.ref, 1], "-%s" % ci, label="%s" % wi)
-                axsm.plot(py[t.ref:, 0], y[t.ref:, 1], "-%s" % ci, label="%s" % wi)
-                axss.plot(py[t.ref:, 0], y[t.ref:, 0], "-%s" % ci, label="%s" % wi)
+                axm.plot(py[:t.ref, 1], y[:t.ref, 1], "-%s" % ci,
+                         label="%s" % wi)
+                axsm.plot(py[t.ref:, 0], y[t.ref:, 1], "-%s" % ci,
+                          label="%s" % wi)
+                axss.plot(py[t.ref:, 0], y[t.ref:, 0], "-%s" % ci,
+                          label="%s" % wi)
         for axi in ax:
             for axii in axi:
                 self.post_setup_axes(axii)
