@@ -29,11 +29,15 @@ from .gaussian_trace import *
 from .geometric_trace import *
 from .poly_trace import *
 
+from . import library
 from .library import Library
+from . import analysis
 from .analysis import Analysis
 
 from .formats import (system_from_text,
     system_from_yaml, system_to_yaml,
     system_from_json, system_to_json)
+from . import oslo
 from .oslo import len_to_system
+from . import zemax
 from .zemax import zmx_to_system
