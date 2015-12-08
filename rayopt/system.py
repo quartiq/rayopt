@@ -165,10 +165,8 @@ class System(list):
                     self.set_path(solve["set"], x)
             elif "set_exec" in solve:
                 def setter(value):
-                    # loc = dict(value=value, self=self, solve=solve)
-                    raise NotImplementedError
-                    # http://bugs.python.org/issue21591
-                    # exec(solve["set_exec"], globals(), loc)
+                    loc = dict(value=value, self=self, solve=solve)
+                    exec(solve["set_exec"], globals(), loc)
             elif "set_func" in solve:
                 def setter(x):
                     solve["set_func"](self, solve, x)
