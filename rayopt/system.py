@@ -343,9 +343,6 @@ class System(list):
             if not el.material or el.material.solid:
                 pending, c0 = el, c
 
-    def fix_sizes(self):
-        self.resize_convex()
-
     def surfaces_cut(self, axis=1, points=31):
         """yields cut outlines of surfaces. solids are closed"""
         # FIXME: not really a global cut, but a local one

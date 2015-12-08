@@ -100,7 +100,7 @@ class DemotripCase(unittest.TestCase):
         nptest.assert_allclose([el.distance for el in self.s], l)
 
     def test_funcs(self):
-        self.s.fix_sizes()
+        self.s.resize_convex()
         list(self.s.surfaces_cut(axis=1, points=11))
         self.s.paraxial_matrices(self.s.wavelengths[0], start=1, stop=None)
         self.s.paraxial_matrix(self.s.wavelengths[0], start=1, stop=None)
