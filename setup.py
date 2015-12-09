@@ -51,7 +51,7 @@ setup(
     ]),
     include_dirs=[np.get_include()],
     entry_points={},
-    package_data={"rayopt": ["../library.db"]},
+    package_data={"rayopt": ["library.db"]},
     classifiers=[f.strip() for f in """
         Development Status :: 4 - Beta
         Intended Audience :: Science/Research
