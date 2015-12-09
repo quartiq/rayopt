@@ -19,7 +19,7 @@
 
 from __future__ import print_function, absolute_import, division
 
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, find_packages
 from Cython.Build import cythonize
 import numpy as np
 
@@ -30,33 +30,35 @@ setup(
     long_description=open("README.rst").read(),
     author="Robert Jordens",
     author_email="jordens@gmail.com",
-    url="http://github.com/jordens/rayopt",
+    url="https://github.com/jordens/rayopt",
     license="GPLv3+",
-    keywords="optics lens raytracing optimization point spread",
+    keywords=("optics lens design raytracing optimization "
+              "point spread opd aberration"),
     install_requires=[
-            "numpy", "scipy", "matplotlib", "pyyaml", "sqlalchemy", "cython",
+        "numpy",
+        "scipy",
+        "matplotlib",
+        "pyyaml",
+        "sqlalchemy",
+        "cython",
     ],
     extras_require={},
-    #dependency_links=[],
     packages=find_packages(),
-    #namespace_packages=[],
     test_suite="rayopt.tests",
     ext_modules=cythonize([
-        Extension("rayopt._transformations",
-                  sources=["rayopt/_transformations.c"]),
-        Extension("rayopt.simplex_accel",
-                  sources=["rayopt/simplex_accel.pyx"]),
+        "rayopt/_transformations.c",
+        "rayopt/simplex_accel.pyx",
     ]),
     include_dirs=[np.get_include()],
     entry_points={},
-    include_package_data=True,
+    package_data={"rayopt": ["../library.db"]},
     classifiers=[f.strip() for f in """
-            Development Status :: 4 - Beta
-            Intended Audience :: Science/Research
-            License :: OSI Approved :: GNU General Public License (GPL)
-            Operating System :: OS Independent
-            Programming Language :: Python :: 2
-            Programming Language :: Python :: 3
-            Topic :: Scientific/Engineering :: Physics
+        Development Status :: 4 - Beta
+        Intended Audience :: Science/Research
+        License :: OSI Approved :: GNU General Public License (GPL)
+        Operating System :: OS Independent
+        Programming Language :: Python :: 2
+        Programming Language :: Python :: 3
+        Topic :: Scientific/Engineering :: Physics
     """.splitlines() if f.strip()],
 )

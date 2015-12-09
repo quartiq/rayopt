@@ -23,6 +23,11 @@ import os
 import io
 import hashlib
 import time
+import shutil
+import site
+
+from pkg_resources import Requirement, resource_filename
+from distutils.dir_util import mkpath
 
 from sqlalchemy import (Column, Integer, String, Float,
                         ForeignKey, Boolean)
@@ -146,7 +151,7 @@ class Catalog(Base):
         self.date = stat.st_mtime
         self.size = stat.st_size
         sha1 = hashlib.sha1()
-        sha1.update(open(fil, "rb").read())
+        sha1.update(io.open(fil, "rb").read())
         self.sha1 = sha1.hexdigest()
         self.imported = time.time()
         loader(**kwargs)
@@ -158,7 +163,7 @@ class Catalog(Base):
         self.name = catalog
         self.type, self.source, self.format = "lens", "zemax", "zmx"
         self.version = 1001
-        for lens in zemax.zmf_read(open(self.file, "rb")):
+        for lens in zemax.zmf_read(io.open(self.file, "rb")):
             l = Lens(name=lens.name, version=lens.version,
                      elements=lens.elements, shape=lens.shape,
                      aspheric=lens.aspheric, toroidal=lens.toroidal,
@@ -226,10 +231,19 @@ class Catalog(Base):
 class Library(object):
     def __init__(self, db=None):
         if db is None:
-            dir = os.path.split(__file__)[0]
-            db = os.path.join(dir, "library.db")
-            db = "sqlite:///%s" % db
+            db = "sqlite:///%s" % self.find_db()
         self.db_get(db)
+
+    def find_db(self):
+        dir = os.path.join(site.getuserbase(), "rayopt")
+        main = os.path.join(dir, "library.db")
+        for db in "library.db", main:
+            if os.path.exists(db):
+                return db
+        base = resource_filename(Requirement.parse("rayopt"), "library.db")
+        mkpath(dir)
+        shutil.copy(base, main)
+        return main
 
     def db_get(self, db):
         self.engine = create_engine(db)
