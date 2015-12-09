@@ -27,7 +27,6 @@ import shutil
 import site
 
 from pkg_resources import Requirement, resource_filename
-from distutils.dir_util import mkpath
 
 from sqlalchemy import (Column, Integer, String, Float,
                         ForeignKey, Boolean)
@@ -235,13 +234,16 @@ class Library(object):
         self.db_get(db)
 
     def find_db(self):
-        name = "library.db"
+        name = "library.sqlite"
         dir = os.path.join(site.getuserbase(), "rayopt")
         main = os.path.join(dir, name)
         if os.path.exists(main):
                 return main
         base = resource_filename(Requirement.parse("rayopt"), name)
-        mkpath(dir)
+        if not os.path.exists(base):
+            base = os.path.join(os.path.split(__file__)[0], name)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         shutil.copy(base, main)
         return main
 
