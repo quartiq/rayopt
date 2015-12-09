@@ -60,8 +60,8 @@ def yml_read(fil):
                     data["div"] = div
                     data["path"] = page["path"]
                     yield Glass(
-                        name="{}/{}".format(book["BOOK"], page["PAGE"]),
-                        section="{}/{}".format(div, book["name"]),
+                        name="{}|{}".format(book["BOOK"], page["PAGE"]),
+                        section="{}|{}".format(div, book["name"]),
                         comment=page["path"], data=yaml.dump(data))
                 except Exception as e:
                     print("error: {}: {}".format(page, e))
@@ -81,7 +81,7 @@ _typ_map = {
 
 def rii_to_material(dat):
     data = yaml.safe_load(dat)
-    g = CoefficientsMaterial(name="{}/{}".format(data["BOOK"], data["PAGE"]),
+    g = CoefficientsMaterial(name="{}|{}".format(data["BOOK"], data["PAGE"]),
                              coefficients=[])
     g.comment = data.get("COMMENTS", None)
     g.references = data.get("REFERENCES", None)

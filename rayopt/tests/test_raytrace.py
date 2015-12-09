@@ -37,12 +37,12 @@ object: {angle_deg: 20, pupil: {radius: 6.25, aim: True}}
 image: {type: finite, pupil: {radius: 0, update_radius: True}}
 elements:
 - {material: air}
-- {roc: 21.25, distance: 5.0, material: schott/SK16, radius: 6.5}
+- {roc: 21.25, distance: 5.0, material: SCHOTT-SK|N-SK16, radius: 6.5}
 - {roc: -158.65, distance: 2.0, material: air, radius: 6.5}
-- {roc: -20.25, distance: 6.0, material: schott/F4, radius: 5.0}
-- {roc: 19.3, distance: 1.0, material: air, radius: 5.0}
+- {roc: -20.25, distance: 6.0, material: SCHOTT-F|N-F2, radius: 5.0}
+- {roc: 19.6, distance: 1.0, material: air, radius: 5.0}
 - {material: air, radius: 4.75}
-- {roc: 141.25, distance: 6.0, material: schott/SK16, radius: 6.5}
+- {roc: 141.25, distance: 6.0, material: SCHOTT-SK|N-SK16, radius: 6.5}
 - {roc: -17.285, distance: 2.0, material: air, radius: 6.5}
 - {distance: 42.95, radius: 0.364}
 stop: 5
@@ -64,6 +64,7 @@ class DemotripCase(unittest.TestCase):
     def setUp(self):
         self.s = system_from_yaml(cooke)
         self.s.update()
+        self.s.paraxial.refocus()
 
     def test_from_text(self):
         self.assertFalse(self.s.object.finite)
@@ -118,9 +119,9 @@ class DemotripCase(unittest.TestCase):
         nptest.assert_allclose(p.working_f_number[1], -self.s.image.pupil.fno,
                                rtol=1e-2)
         nptest.assert_allclose(p.working_f_number[1], 4, rtol=1e-2)
-        nptest.assert_allclose(p.focal_length[1], 50, rtol=1e-3)
+        nptest.assert_allclose(p.focal_length[1], 50, rtol=5e-3)
         nptest.assert_allclose(p.magnification[0], 0, rtol=1e-3)
-        nptest.assert_allclose(p.numerical_aperture[1], .124, rtol=1e-3)
+        nptest.assert_allclose(p.numerical_aperture[1], .124, rtol=5e-3)
         p.update_conjugates()
         self.s.image.na = .125
         p.update_stop("image")
@@ -193,8 +194,8 @@ class DemotripCase(unittest.TestCase):
         g.rays_point((0, 1.), nrays=13, distribution="radau",
                      filter=False)
         a = g.rms()
-        nptest.assert_allclose(a, .063, rtol=2e-2)
+        nptest.assert_allclose(a, .052, rtol=1e-2)
         g.rays_point((0, 1.), nrays=500, distribution="square",
                      clip=False, filter=True)
         b = g.rms()
-        nptest.assert_allclose(a, b, rtol=2e-2)
+        nptest.assert_allclose(a, b, rtol=5e-2)
