@@ -17,8 +17,8 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
+from __future__ import absolute_import, print_function, division
+# unicode_literals confuse cython
 
 from setuptools import setup, find_packages
 from distutils.extension import Extension
@@ -49,8 +49,10 @@ setup(
     packages=find_packages(),
     test_suite="rayopt.test",
     ext_modules=cythonize([
-        Extension("rayopt._transformations", ["rayopt/_transformations.c"]),
-        Extension("rayopt.simplex_accel", ["rayopt/simplex_accel.pyx"]),
+        Extension("rayopt._transformations",
+                  sources=["rayopt/_transformations.c"]),
+        Extension("rayopt.simplex_accel",
+                  sources=["rayopt/simplex_accel.pyx"]),
     ]),
     include_dirs=[np.get_include()],
     entry_points={},
