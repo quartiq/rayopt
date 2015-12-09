@@ -27,11 +27,13 @@ install:
     source activate py$TRAVIS_PYTHON_VERSION
     conda install -q pip coverage anaconda-client
     pip install coveralls
+  - |
+    conda build --python=$TRAVIS_PYTHON_VERSION --no-test .
+    export PACKAGE=$(conda build --python=$TRAVIS_PYTHON_VERSION --output .)
+    echo $PACKAGE
+  - tar tjvf $PACKAGE
+  - conda install rayopt --use-local
 script:
-  - export PACKAGE=$(conda build --python=$TRAVIS_PYTHON_VERSION --output .)
-  - echo $PACKAGE
-  - conda build --python=$TRAVIS_PYTHON_VERSION --no-test .
-  - conda install $PACKAGE
   - coverage run --source=rayopt setup.py test
 after_success:
   - |
