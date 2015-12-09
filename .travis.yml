@@ -4,6 +4,9 @@ python:
   - "3.4"
   - "3.5"
 sudo: false
+env:
+  global:
+    secure: "aAKlce1nkgQTUnZK8Uq+oGUWyg3CpTSDvlWuEwfTj9IvAf4tKWDK09uLL32SxE7lUPjrQ7ploqdd/Li3QK/hEAJLBzKTF96TTkZsygH/wK466PbsP6s8+cOeXgdDO0qaN2tAYWRowTI4X0qLrY9vos48DwVr6VoQ/unl8CNihSQ="
 install:
   - |
     if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
@@ -23,10 +26,20 @@ install:
   - |
     conda create -q -n py$TRAVIS_PYTHON_VERSION python=$TRAVIS_PYTHON_VERSION
     source activate py$TRAVIS_PYTHON_VERSION
+    conda install -q pip coverage anaconda-client
+    pip install coveralls
   - conda build .
   - conda install rayopt --use-local
 script:
-  - python -m unittest discover rayopt.test
+  - coverage run --source=artiq setup.py test
+after_success:
+  - |
+      if [ "$TRAVIS_BRANCH" == "master" ]; then
+        anaconda -q login --hostname $(hostname) --username $binstar_login --password $binstar_password
+        anaconda -q upload --user $binstar_login --channel dev $(conda build --output .)
+        anaconda -q logout
+      fi
+  - coveralls
 notifications:
   email:
     on_success: never
