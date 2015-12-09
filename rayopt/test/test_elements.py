@@ -135,5 +135,5 @@ class ParaxToRealCase(unittest.TestCase):
         #yr, ur = self.s.from_normal(yr, ur)
         yr, ur = self.sa.to_axis(yr, ur)
         nptest.assert_allclose(nr, np_, rtol=1e-4, atol=1e-9)
-        nptest.assert_allclose(yr[:, :2], yp, rtol=1e-4, atol=1e-9)
-        nptest.assert_allclose(tanarcsin(ur), up, rtol=1e-4, atol=1e-9)
+        nptest.assert_allclose(yr[:, :2], yp, rtol=2e-4, atol=1e-9)
+        nptest.assert_allclose(tanarcsin(ur), up, rtol=2e-4, atol=1e-9)

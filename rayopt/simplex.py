@@ -192,6 +192,5 @@ def make_simplex(d0, n0):
             p = simplex_transform(self.i.ravel(), self.j, self, t)
             return p.view(self.__class__)
 
-
-    Simplex.__name__ = "Simplex{}d{}n".format(d0, n0)
+    Simplex.__name__ = str("Simplex{}d{}n".format(d0, n0))
     return Simplex

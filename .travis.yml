@@ -6,14 +6,13 @@ python:
 sudo: false
 env:
   global:
-    secure: "aAKlce1nkgQTUnZK8Uq+oGUWyg3CpTSDvlWuEwfTj9IvAf4tKWDK09uLL32SxE7lUPjrQ7ploqdd/Li3QK/hEAJLBzKTF96TTkZsygH/wK466PbsP6s8+cOeXgdDO0qaN2tAYWRowTI4X0qLrY9vos48DwVr6VoQ/unl8CNihSQ="
+    secure: "FcUC/7PNgZIaa8bjY2gKhtF6nTkcu0uGiEkbmVwgqxf9VYpC6azn+RyNhfc8/T77ZbQ7RfzcM9GajblPncF+8KSQ7rCiv93hlc7tSmKXrfXDTpittsFReNK+r2mcyCWy+drlK9XGh7zFky2p8+CIqft3EomgvRsEl3/m3XhaSuc="
 install:
   - |
-    if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
-    else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $HOME/miniconda.sh;
+    if [[ "${TRAVIS_PYTHON_VERSION:0:1}" == "3" ]]; then
+      MINICONDA_VER=3
     fi
+    wget -O $HOME/miniconda.sh -q https://repo.continuum.io/miniconda/Miniconda${MINICONDA_VER}-latest-Linux-x86_64.sh
     bash $HOME/miniconda.sh -b -p $HOME/miniconda
     export PATH="$HOME/miniconda/bin:$PATH"
     mkdir -p $HOME/.config/matplotlib
@@ -28,17 +27,19 @@ install:
     source activate py$TRAVIS_PYTHON_VERSION
     conda install -q pip coverage anaconda-client
     pip install coveralls
-  - conda build .
-  - conda install rayopt --use-local
 script:
-  - coverage run --source=artiq setup.py test
+  - export PACKAGE=$(conda build --python=$TRAVIS_PYTHON_VERSION --output .)
+  - echo $PACKAGE
+  - conda build --python=$TRAVIS_PYTHON_VERSION --no-test .
+  - conda install $PACKAGE
+  - coverage run --source=rayopt setup.py test
 after_success:
   - |
-      if [ "$TRAVIS_BRANCH" == "master" ]; then
-        anaconda -q login --hostname $(hostname) --username $binstar_login --password $binstar_password
-        anaconda -q upload --user $binstar_login --channel dev $(conda build --output .)
-        anaconda -q logout
-      fi
+    if [ "$TRAVIS_BRANCH" == "master" ]; then
+      anaconda -q login --hostname $(hostname) --username $ANACONDA_USER --password $ANACONDA_PASSWORD
+      anaconda -q upload --user $ANACONDA_USER --channel ci $PACKAGE
+      anaconda -q logout
+    fi
   - coveralls
 notifications:
   email:

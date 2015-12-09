@@ -118,7 +118,7 @@ class TransformMixin(object):
         if np.allclose(rdir, 0):
             rdir = 1., 0, 0
         rot = rotation_matrix(rang, rdir).T
-        angles = euler_from_matrix(rot, "rxyz")
+        angles = euler_from_matrix(rot, str("rxyz"))
         self.update(self.distance, self.direction, angles)
 
     def update(self, distance, direction, angles):
@@ -151,7 +151,7 @@ class TransformMixin(object):
             self.rot_axis = r1 = rotation_matrix(rang, rdir)[:3, :3]
             r = np.dot(r, r1)
         if not self.normal:
-            r1 = euler_matrix(axes="rxyz", *tuple(a))[:3, :3]
+            r1 = euler_matrix(axes=str("rxyz"), *tuple(a))[:3, :3]
             r = np.dot(r, r1)
         self.rot_normal = r
 

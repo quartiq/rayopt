@@ -1,10 +1,15 @@
 package:
   name: rayopt
-  version: "0.0"
+  version: 0.0.git{{ environ.get("TRAVIS_TAG", "") }}
+  # version: {{ environ.get("GIT_DESCRIBE_TAG", "") }}
+
+about:
+  home: https://github.com/jordens/rayopt
+  license: GPL3
+  license_file: COPYING
 
 source:
   path: .
-  # git_rev: master
   # git_url: https://github.com/jordens/rayopt.git
 
 requirements:
@@ -27,8 +32,9 @@ requirements:
     - sqlalchemy
 
 build:
-  number: 1
-  string: dev
+  # number: {{ environ.get("GIT_DESCRIBE_NUMBER", 0) }}
+  number: {{ environ.get("TRAVIS_BUILD_NUMBER", 0) }}
+  # string: {{ environ.get("GIT_BUILD_STR", "") }}
   script: python setup.py install
 
 test:
@@ -36,8 +42,3 @@ test:
     - rayopt
   commands:
     - python -m unittest discover rayopt.test
-
-about:
-  home: https://github.com/jordens/rayopt
-  license: GPL3
-  license_file: COPYING
