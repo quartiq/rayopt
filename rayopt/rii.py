@@ -20,16 +20,14 @@ from __future__ import print_function, absolute_import, division
 
 import yaml
 import os
-import time
-import argparse
 import logging
 import subprocess
 from collections import namedtuple
 
 import numpy as np
 
-from .material import Material, air, CoefficientsMaterial, Thermal
-from .utils import sfloat, sint
+from .material import CoefficientsMaterial
+from .utils import sfloat
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +59,10 @@ def yml_read(fil):
                     data["name"] = page["name"]
                     data["div"] = div
                     data["path"] = page["path"]
-                    yield Glass(name="{}/{}".format(book["BOOK"], page["PAGE"]),
-                                section="{}/{}".format(div, book["name"]),
-                                comment=page["path"], data=yaml.dump(data))
+                    yield Glass(
+                        name="{}/{}".format(book["BOOK"], page["PAGE"]),
+                        section="{}/{}".format(div, book["name"]),
+                        comment=page["path"], data=yaml.dump(data))
                 except Exception as e:
                     print("error: {}: {}".format(page, e))
 
@@ -79,17 +78,19 @@ _typ_map = {
     "formula 9": "exotic",
 }
 
+
 def rii_to_material(dat):
     data = yaml.safe_load(dat)
     g = CoefficientsMaterial(name="{}/{}".format(data["BOOK"], data["PAGE"]),
-                               coefficients=[])
+                             coefficients=[])
     g.comment = data.get("COMMENTS", None)
     g.references = data.get("REFERENCES", None)
     for d in data["DATA"]:
         typ = d["type"]
         if typ.startswith("formula"):
             g.typ = _typ_map[typ]
-            g.lambda_min, g.lambda_max = (sfloat(_) for _ in d["range"].split())
+            g.lambda_min, g.lambda_max = (
+                sfloat(_) for _ in d["range"].split())
             c = np.array([sfloat(_) for _ in d["coefficients"].split()])
             g.coefficients = c
         if typ == "tabulated k":

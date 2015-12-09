@@ -35,8 +35,8 @@ from . import analysis
 from .analysis import Analysis
 
 from .formats import (system_from_text,
-    system_from_yaml, system_to_yaml,
-    system_from_json, system_to_json)
+                      system_from_yaml, system_to_yaml,
+                      system_from_json, system_to_json)
 from . import oslo
 from .oslo import len_to_system
 from . import zemax
