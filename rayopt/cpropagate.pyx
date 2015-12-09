@@ -21,7 +21,9 @@
 # cython: wraparound=False
 # cython: cdivision=True
 
-from __future__ import division
+from __future__ import (absolute_import, print_function,
+                        unicode_literals, division)
+
 import cython
 import numpy as np
 cimport numpy as np

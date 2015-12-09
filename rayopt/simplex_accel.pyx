@@ -19,7 +19,8 @@
 #cython: boundscheck=False, wraparound=False, cdivision=True,
 #cython: embedsignature=True, initializedcheck=False
 
-from __future__ import print_function, absolute_import, division
+from __future__ import (absolute_import, print_function,
+                        unicode_literals, division)
 
 import cython
 import numpy as np
