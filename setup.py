@@ -44,7 +44,7 @@ setup(
     ],
     extras_require={},
     packages=find_packages(),
-    test_suite="rayopt.tests",
+    test_suite="rayopt.test",
     ext_modules=cythonize([
         "rayopt/_transformations.c",
         "rayopt/simplex_accel.pyx",

@@ -1,6 +1,9 @@
 RayOpt
 ========
 
+.. image:: https://travis-ci.org/jordens/rayopt.svg
+    :target: https://travis-ci.org/jordens/rayopt
+
 Introduction
 ------------
 
