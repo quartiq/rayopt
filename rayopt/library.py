@@ -235,12 +235,12 @@ class Library(object):
         self.db_get(db)
 
     def find_db(self):
+        name = "library.db"
         dir = os.path.join(site.getuserbase(), "rayopt")
-        main = os.path.join(dir, "library.db")
-        for db in "library.db", main:
-            if os.path.exists(db):
-                return db
-        base = resource_filename(Requirement.parse("rayopt"), "library.db")
+        main = os.path.join(dir, name)
+        if os.path.exists(main):
+                return main
+        base = resource_filename(Requirement.parse("rayopt"), name)
         mkpath(dir)
         shutil.copy(base, main)
         return main
