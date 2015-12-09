@@ -198,7 +198,7 @@ class InfiniteConjugate(Conjugate):
             self.angle = np.arctan2(radius, pupil_distance)
 
     def text(self):
-        yield "Semi-Angle: %.3g°" % np.rad2deg(self.angle)
+        yield "Semi-Angle: %.3g deg" % np.rad2deg(self.angle)
         for _ in super(InfiniteConjugate, self).text():
             yield _
 

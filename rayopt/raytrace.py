@@ -60,7 +60,7 @@ class Trace(object):
         for i, a in enumerate(coeff):
             yield fmt % ((i, self.system[i].typeletter) + tuple(a))
         if sum:
-            yield fmt % ((" ∑", "") + tuple(coeff.sum(0)))
+            yield fmt % (("", "") + tuple(coeff.sum(0)))
 
     def align(self):
         self.system.align(self.n)
