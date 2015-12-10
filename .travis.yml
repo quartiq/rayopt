@@ -28,8 +28,8 @@ install:
     conda install -q pip coverage anaconda-client
     pip install coveralls
   - |
-    conda build -q --python=$TRAVIS_PYTHON_VERSION --no-test .
-    export PACKAGE=$(conda build --python=$TRAVIS_PYTHON_VERSION --output .)
+    conda build -q --python=$TRAVIS_PYTHON_VERSION --no-test .conda
+    export PACKAGE=$(conda build --python=$TRAVIS_PYTHON_VERSION --output .conda)
     echo $PACKAGE
   - tar tjvf $PACKAGE
   - conda install -q --use-local rayopt
