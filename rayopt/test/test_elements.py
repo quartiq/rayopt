@@ -123,17 +123,17 @@ class ParaxToRealCase(unittest.TestCase):
         self.sa = Spheroid(direction=de)
 
     def test_real_similar_to_parax(self, n=100, e=1e-3):
-        y0p = np.random.randn(n, 2.)*e
-        u0p = np.random.randn(n, 2.)*e
+        y0p = np.random.randn(n, 2)*e
+        u0p = np.random.randn(n, 2)*e
         y0r = np.hstack((y0p, np.ones((n, 1))*-self.s.distance))
         u0r = np.hstack((sinarctan(u0p), np.zeros((n, 1))))
         u0r[:, 2] = np.sqrt(1 - np.square(u0p).sum(1))
         yup, np_ = self.s.propagate_paraxial(np.hstack((y0p, u0p)), 1., 1.)
         yp, up = np.hsplit(yup, 2)
-        #y0r, u0r = self.s.to_normal(y0r, u0r)
-        yr, ur, nr, tr  = self.s.propagate(y0r, u0r, 1., 1.)
-        #yr, ur = self.s.from_normal(yr, ur)
+        # y0r, u0r = self.s.to_normal(y0r, u0r)
+        yr, ur, nr, tr = self.s.propagate(y0r, u0r, 1., 1.)
+        # yr, ur = self.s.from_normal(yr, ur)
         yr, ur = self.sa.to_axis(yr, ur)
-        nptest.assert_allclose(nr, np_, rtol=1e-4, atol=1e-9)
-        nptest.assert_allclose(yr[:, :2], yp, rtol=2e-4, atol=1e-9)
-        nptest.assert_allclose(tanarcsin(ur), up, rtol=2e-4, atol=1e-9)
+        nptest.assert_allclose(nr, np_, rtol=e**2, atol=3e-8)
+        nptest.assert_allclose(yr[:, :2], yp, rtol=e**2, atol=3e-8)
+        nptest.assert_allclose(tanarcsin(ur), up, rtol=e**2, atol=3e-8)
