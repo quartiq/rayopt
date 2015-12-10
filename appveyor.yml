@@ -1,0 +1,43 @@
+# https://github.com/rmcgibbo/python-appveyor-conda-example
+
+environment:
+  global:
+    WITH_COMPILER: "cmd /E:ON /V:ON /C .\\.appveyor\\run_with_env.cmd"
+    PYPATH: "C:\\Miniconda3"
+    ANACONDA_TOKEN:
+      secure: aGxw9nEg+McADa71cxEuNwcuufgptKexXZJh0HM0Msh5QP1EFa7we5g8gJsbSGCo
+  matrix:
+    - PYTHON_VERSION: "3.5"
+    - PYTHON_VERSION: "2.7"
+    - PYTHON_VERSION: "3.4"
+matrix:
+    fast_finish: true
+
+platform:
+  - x64
+  - x86
+
+install:
+  - IF "%APPVEYOR_REPO_TAG%"=="true" (SET TRAVIS_TAG=%APPVEYOR_REPO_TAG_NAME%) ELSE (SET TRAVIS_TAG=)
+  - "SET TRAVIS_BUILD_NUMBER=%APPVEYOR_BUILD_NUMBER%"
+  - IF "%PLATFORM%"=="x64" (SET PYSUFFIX=-x64) ELSE (SET PYSUFFIX=)
+  - "SET PATH=%PYPATH%%PYSUFFIX%;%PYPATH%%PYSUFFIX%\\Scripts;%PATH%"
+  - "conda config --set always_yes yes --set changeps1 no"
+  - "conda update -q conda"
+  - "conda install -q conda-build anaconda-client"
+  - "conda create -q --yes -n py%PYTHON_VERSION% python=%PYTHON_VERSION%"
+  - "activate py%PYTHON_VERSION%"
+  - "python --version"
+  - "conda info -a"
+
+build: false
+
+test_script:
+  - "ECHO %PYPATH% %PYTHON% %PYTHON_VERSION% %PLATFORM% %PYSUFFIX%"
+  - "%WITH_COMPILER% conda build -q --python=%PYTHON_VERSION% .conda"
+
+artifacts:
+  - path: "%PYPATH%%PYSUFFIX%\\conda-bld\\win-*\\*.tar.bz2"
+
+on_success:
+  - "anaconda -t %ANACONDA_TOKEN% upload --no-progress --channel ci %PYPATH%%PYSUFFIX%\\conda-bld\\win-*\\*.tar.bz2"
