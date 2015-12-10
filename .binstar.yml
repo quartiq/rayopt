@@ -1,0 +1,21 @@
+package: rayopt
+
+platform: 
+  - linux-64
+  - linux-32
+
+engine:
+  - python=2
+  - python=3
+
+install:
+  - conda config --set always_yes yes --set changeps1 no
+  - "mkdir -p ~/.config/matplotlib"
+  - "echo 'backend: agg' > ~/.config/matplotlib/matplotlibrc"
+
+script:
+  - conda build .conda
+
+build_targets:
+  files: conda
+  channels: ci
