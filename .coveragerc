@@ -1,0 +1,2 @@
+[report]
+omit = rayopt/transformations.py

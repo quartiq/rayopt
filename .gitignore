@@ -3,15 +3,5 @@
 /build
 /rayopt/*.so
 /rayopt/simplex_accel.c
-*.~*
-*.zmx
-*.ZMX
-*.ses
-*.SES
-*.seq
-*.SEQ
-*.len
-*.LEN
-*.pyo
-*.pyc
-/catalog
+/.coverage.*
+/.coverage
