@@ -23,7 +23,6 @@ import itertools
 
 import numpy as np
 
-from .aberration_orders import aberration_extrinsic
 from .utils import sinarctan, tanarcsin, public
 from .raytrace import Trace
 
@@ -41,15 +40,14 @@ class ParaxialTrace(Trace):
     # sine condition, magnification is equal to optical input ray sine
     # over optical output sine for all rays:
     # m = n0 sin u0/ (nk sin uk)
-    def __init__(self, system, kmax=1, axis=1, update=True):
+    def __init__(self, system, axis=1, update=True):
         super(ParaxialTrace, self).__init__(system)
         self.axis = axis
-        self.kmax = kmax
         if update:
             self.update()
 
     def update(self):
-        self.allocate(self.kmax)
+        self.allocate()
         self.rays()
         self.propagate()
         self.aberrations()
@@ -58,17 +56,16 @@ class ParaxialTrace(Trace):
     def wavelength(self):
         return self.system.wavelengths[0]
 
-    def allocate(self, kmax):
+    def allocate(self):
         super(ParaxialTrace, self).allocate()
         n = self.length
-        if hasattr(self, "c") and self.c.shape[:4] == (n, 2, 2, kmax + 1):
+        if hasattr(self, "n") and self.n.shape[0] == n:
             return
         self.n = np.empty(n)
         self.y = np.empty((n, 2))
         self.u = np.empty((n, 2))
         self.v = np.empty(n)
-        self.c = np.empty((n, 2, 2, kmax + 1, kmax + 1, kmax + 1))
-        self.d = np.empty_like(self.c)
+        self.c = np.empty((n, 7))
 
     def rays(self):
         self.n[0] = self.system.refractive_index(self.wavelength, 0)
@@ -97,77 +94,19 @@ class ParaxialTrace(Trace):
             self.n[j] = n
 
     def aberrations(self, start=1, stop=None):
-        kmax = self.c.shape[-1] - 1
-        els = self.system[start:stop or self.length]
         self.c[start - 1] = self.v[start - 1] = 0
-        for i, el in enumerate(els):
+        for i, el in enumerate(self.system[start:stop or self.length]):
             i += start
             self.v[i] = el.dispersion(min(self.system.wavelengths),
                                       max(self.system.wavelengths))
-            self.c[i] = el.aberration(self.y[i], self.u[i - 1],
-                                      self.n[i - 1], self.n[i], kmax)
-        self.extrinsic_aberrations()
-
-    def extrinsic_aberrations(self):
-        # FIXME: wrong?
-        self.d[:] = 0
-        a = self.system.stop
-        t, s = 0, 1
-        kmax = self.d.shape[-1] - 1
-        b = np.empty_like(self.d)
-        for k0 in range(1, kmax):
-            for j in range(k0 + 1):
-                for i in range(k0 - j + 1):
-                    k = k0 - j - i
-                    b[:, :, :, k, j, i] = np.cumsum(
-                        self.c[:, :, :, k, j, i] + self.d[:, :, :, k, j, i],
-                        axis=0)/self.lagrange
-                    b[:, s, :, k, j, i] -= b[a, s, :, k, j, i]
-                    b[:, t, :, k, j, i] -= b[0, t, :, k, j, i]
-                    if True:
-                        b[:a, s, :, k, j, i] -= b[a-1, s, :, k, j, i]
-                        b[a+1:, s, :, k, j, i] -= b[a+1, s, :, k, j, i]
-                        b[1:, t, :, k, j, i] -= b[1, t, :, k, j, i]
-            for i in range(self.length):
-                aberration_extrinsic(self.c[i], b[i], self.d[i], k0 + 1)
+            self.c[i] = el.aberration(self.y[i], self.u[i - 1], self.u[i],
+                                      self.n[i - 1], self.n[i],
+                                      self.v[i - 1], self.v[i])
 
     @property
     def seidel3(self):
-        b = self.c
-        s = np.array([
-            -2*b[:, 0, 1, 1, 0, 0],  # SA3
-            -b[:, 0, 1, 0, 1, 0],  # CMA3
-            -b[:, 0, 0, 0, 1, 0],  # AST3
-            b[:, 0, 0, 0, 1, 0] - 2*b[:, 0, 1, 0, 0, 1],  # PTZ3
-            -2*b[:, 0, 0, 0, 0, 1],  # DIS3
-        ])
         # transverse image seidel (like oslo)
-        return s.T*self.height[1]/2/self.lagrange
-
-    @property
-    def seidel5(self):
-        b = self.c + self.d
-        s = np.array([
-            -2*b[:, 0, 1, 2, 0, 0],  # MU1
-            -1*b[:, 0, 1, 1, 1, 0],  # MU3
-            -2*b[:, 0, 0, 1, 1, 0] - 2*b[:, 0, 1, 1, 0, 1] +  # MU5
-            2*b[:, 0, 1, 0, 2, 0],  # MU6
-            2*b[:, 0, 1, 1, 0, 1],  # MU5
-            # -2*b[:, 0, 0, 1, 0, 1]-b[:, 0, 0, 0, 2, 0]
-            # -b[:, 0, 1, 0, 1, 1],  # MU7
-            # -b[:, 0, 1, 0, 1, 1]-b[:, 0, 0, 0, 2, 0],  # MU8
-            -2*b[:, 0, 0, 1, 0, 1] - 2*b[:, 0, 0, 0, 2, 0] -
-            2*b[:, 0, 1, 0, 1, 1],  # MU7+MU8
-            -1*b[:, 0, 1, 0, 1, 1],  # MU9
-            -b[:, 0, 0, 0, 1, 1]/2,  # (MU10-MU11)/4
-            -2*b[:, 0, 1, 0, 0, 2] + b[:, 0, 0, 0, 1, 1]/2,
-            # (5*MU11-MU10)/4
-            # -2*b[:, 0, 0, 0, 1, 1]-2*b[:, 0, 1, 0, 0, 2],  # MU10
-            # -2*b[:, 0, 1, 0, 0, 2],  # MU11
-            -2*b[:, 0, 0, 0, 0, 2],  # MU12
-        ])
-        # transverse image seidel (like oslo)
-        return s.T*self.height[1]/2/self.lagrange
+        return self.c*self.height[1]
 
     @property
     def track(self):
@@ -281,17 +220,7 @@ class ParaxialTrace(Trace):
 
     def print_c3(self):
         return self.print_coeffs(self.seidel3,
-                                 "SA3 CMA3 AST3 PTZ3 DIS3".split())
-
-    def print_h3(self):  # TODO
-        c3a = self.aberration3*8  # chromatic
-        return self.print_coeffs(c3a[(6, 12), :].T,
-                                 "PLC PTC".split())
-
-    def print_c5(self):
-        return self.print_coeffs(
-            self.seidel5,
-            "SA5 CMA5 TOBSA5 SOBSA5 TECMA5 SECMA5 AST5 PTZ5 DIS5".split())
+                                 "SA3 CMA3 AST3 PTZ3 DIS3 TACHC TCHC".split())
 
     def print_params(self):
         yield "lagrange: %.5g" % self.lagrange
@@ -325,8 +254,6 @@ class ParaxialTrace(Trace):
             self.print_params(), ("",),
             self.print_trace(), ("",),
             self.print_c3(), ("",),
-            # self.print_h3(), ("",),
-            # self.print_c5(), ("",),
         )
 
     def plot(self, ax, principals=False, pupils=False, focals=False,

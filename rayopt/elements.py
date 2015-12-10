@@ -26,7 +26,6 @@ from .utils import public
 from .transformations import (euler_matrix, euler_from_matrix,
                               rotation_matrix)
 from .name_mixin import NameMixin
-from .aberration_orders import aberration_intrinsic
 from .material import Material
 
 
@@ -555,16 +554,39 @@ class Spheroid(Interface):
             self.aspherics = [ai/scale**(2*i + 1) for i, ai in
                               enumerate(self.aspherics)]
 
-    def aberration(self, y, u, n0, n, kmax):
-        y, yb = y
-        u, ub = u
-        r = self.curvature
-        f, g = (r*y + u)*n0, (r*yb + ub)*n0
+    def aberration(self, y, u0, u, n0, n, v0, v):
+        c = self.curvature
         if self.material is not None and self.material.mirror:
             n = -n  # FIXME check, cleanup
-        c = np.zeros((2, 2, kmax + 1, kmax + 1, kmax + 1))
-        aberration_intrinsic(r, f, g, y, yb, 1/n0, 1/n, c, kmax)
-        return c
+        mu = n0/n
+        # incidence
+        i = c*y+u0
+        l = n*(u[0]*y[1]-u[1]*y[0])
+        s = .5*n0*(1-mu)*y*(u+i)/l
+        # transverse third-order spherical
+        tsc = s[0]*i[0]**2
+        # sagittal third-order coma
+        cc = s[0]*i[0]*i[1]
+        # tangential third-order com
+        # 3*cc
+        # transverse third-order astigmatism
+        tac = s[0]*i[1]**2
+        # transverse third-order Petzval
+        tpc = (1-mu)*c*l/n0/2
+        # third-order distortion
+        dc = s[1]*i[0]*i[1]+.5*(u[1]**2-u0[1]**2)
+        # paraxial transverse axial, lateral chromatic
+        tachc, tchc = -y[0]*i/l*(v0-mu*v)
+
+        if self.aspherics:
+            # FIXME check
+            k = (4*self.aspherics[0]+(self.conic-1)*c**3/2)*(n-n0)/l
+            k = k[0]
+            tsc += k*y[0]**4
+            cc += k*y[0]**3*y[1]
+            tac += k*y[0]**2*y[1]**2
+            dc += k*y[0]*y[1]**3
+        return tsc, cc, tac, tpc, dc, tachc, tchc
 
     def intercept_poly(self, r, p, k):
         S = r.__class__
