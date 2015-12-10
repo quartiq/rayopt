@@ -7,7 +7,6 @@ environment:
   matrix:
     - PYTHON_VERSION: "3.5"
     - PYTHON_VERSION: "2.7"
-    - PYTHON_VERSION: "3.4"
 matrix:
     fast_finish: true
 
@@ -34,8 +33,9 @@ build_script:
 
 test_script:
   - "conda install -q --use-local rayopt"
-  - "python setup.py test"
 #  - "python -m unittest discover rayopt.test"
+#  - "%WITH_COMPILER% python setup.py test"
+  - "python setup.py test"
 
 artifacts:
   - path: "%PYPATH%%PYSUFFIX%\\conda-bld\\win-*\\*.tar.bz2"
