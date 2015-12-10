@@ -6,7 +6,8 @@ python:
 sudo: false
 env:
   global:
-    secure: "FcUC/7PNgZIaa8bjY2gKhtF6nTkcu0uGiEkbmVwgqxf9VYpC6azn+RyNhfc8/T77ZbQ7RfzcM9GajblPncF+8KSQ7rCiv93hlc7tSmKXrfXDTpittsFReNK+r2mcyCWy+drlK9XGh7zFky2p8+CIqft3EomgvRsEl3/m3XhaSuc="
+    - secure: "iU+A6BAnvvV1nee28Net4MEHfiXeylkB0HOJ6SxjGEP10oLPviiJ7xvOl/JOhjK2/ef1X+iOZminUQHlMq2j8zY3kpThsOTqXPjvM4ytFsp8D52sC2iFq5UcSHwC4NHx6vtA4Gby/2VCr6K8qIvnDVczvvCC9pTl1yyCqa/ONSA="
+    - ANACONDA_USER=jordens
 install:
   - |
     if [[ "${TRAVIS_PYTHON_VERSION:0:1}" == "3" ]]; then
@@ -38,9 +39,7 @@ script:
 after_success:
   - |
     if [ "$TRAVIS_BRANCH" == "master" ]; then
-      anaconda -q login --hostname $(hostname) --username $ANACONDA_USER --password $ANACONDA_PASSWORD
-      anaconda -q upload --user $ANACONDA_USER --channel ci $PACKAGE
-      anaconda -q logout
+      anaconda -t $ANACONDA_TOKEN upload --channel ci $PACKAGE
     fi
   - coveralls
 notifications:
