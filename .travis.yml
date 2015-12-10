@@ -28,7 +28,7 @@ install:
     conda create -q -n py$PYTHON_VERSION python=$PYTHON_VERSION
     source activate py$PYTHON_VERSION
     conda install -q pip coverage anaconda-client
-    pip install coveralls
+    pip install codecov
   - |
     conda build -q --python=$PYTHON_VERSION --no-test .conda
     export PACKAGE=$(conda build --python=$PYTHON_VERSION --output .conda)
@@ -43,7 +43,7 @@ after_success:
       if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
         anaconda -t $ANACONDA_TOKEN upload --no-progress --channel ci $PACKAGE
       fi
-      coveralls
+      codecov
     fi
 notifications:
   email:
