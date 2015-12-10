@@ -19,10 +19,8 @@
 from __future__ import (absolute_import, print_function,
                         unicode_literals, division)
 
-import os
 import unittest
 
-from scipy import constants as ct
 import numpy as np
 from numpy import testing as nptest
 
@@ -36,12 +34,12 @@ class ConjugatesCase(unittest.TestCase):
         c = FiniteConjugate(radius=.1,
                             pupil=dict(type="slope", distance=6., slope=2./6))
         self.assertAlmostEqual(c.pupil.na,
-                sinarctan(c.pupil.radius/c.pupil.distance))
+                               sinarctan(c.pupil.radius/c.pupil.distance))
         self.some_aims(c)
 
     def test_infinite(self):
-        c = InfiniteConjugate(angle=.1,
-            pupil=dict(type="radius", distance=6., radius=2/6.))
+        c = InfiniteConjugate(
+            angle=.1, pupil=dict(type="radius", distance=6., radius=2/6.))
         self.some_aims(c)
 
     def some_aims(self, c):
@@ -51,7 +49,7 @@ class ConjugatesCase(unittest.TestCase):
                 y.extend([(0, i), (i, 0), (0, i), (i, 0)])
                 p.extend([(0, j), (0, j), (j, 0), (0, j)])
         for a, b in zip(y, p):
-            #print(a, b)
+            # print(a, b)
             self.assert_aims(c, a, b)
 
     def assert_aims(self, c, yo, yp):
@@ -61,7 +59,7 @@ class ConjugatesCase(unittest.TestCase):
         p = np.arctan2(yo[0, 0], yo[0, 1])
         r = np.array([[np.cos(p), -np.sin(p)], [np.sin(p), np.cos(p)]])
         y1 = np.dot(yp*c.pupil.radius, r)
-        #print(yo, yp, y, u, y1)
+        # print(yo, yp, y, u, y1)
         self.assert_hits(y, u, c.pupil.distance, y1)
 
     def assert_hits(self, y, u, z, yp):

@@ -19,21 +19,21 @@
 from __future__ import (absolute_import, print_function,
                         unicode_literals, division)
 
-import os
 import unittest
 
 import numpy as np
 from numpy import testing as nptest
 
-from rayopt.cachend import *
+from rayopt.cachend import LinearCacheND
 
 
 class CacheCase(unittest.TestCase):
     def test_make(self):
-        c = LinearCacheND(lambda a: a)
+        LinearCacheND(lambda a: a)
 
     def test_random(self):
         n = 10
+
         def solver(a, b, guess):
             if guess is not None:
                 nptest.assert_allclose((a, b), guess)

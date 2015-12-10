@@ -21,11 +21,8 @@ from __future__ import (absolute_import, print_function,
 
 import unittest
 
-import numpy as np
-from numpy import testing as nptest
-
 from rayopt import (system_from_yaml, system_to_yaml, system_to_json,
-    system_from_json)
+                    system_from_json)
 
 
 class TripletYamlCase(unittest.TestCase):
@@ -46,14 +43,16 @@ elements:
 - {distance: 42.95, radius: .364, material: air}
 """
         self.s = system_from_yaml(text)
-    
+
     def test_load(self):
         assert self.s is not None
 
     def test_dump(self):
         d = system_to_yaml(self.s)
         s = system_from_yaml(d)
+        s
 
     def test_json(self):
         d = system_to_json(self.s)
         s = system_from_json(d)
+        s

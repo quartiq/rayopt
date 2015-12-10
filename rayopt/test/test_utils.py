@@ -19,7 +19,6 @@
 from __future__ import (absolute_import, print_function,
                         unicode_literals, division)
 
-import os
 import unittest
 
 import numpy as np
@@ -71,8 +70,8 @@ class MiscCase(unittest.TestCase):
         self.assertEqual(i, 0)
         self.assertEqual(len(xy), 7)
         r = np.hypot(xy[:, 0], xy[:, 1])
-        phi = np.arctan(xy[:, 1], xy[:, 0])
+        # phi = np.arctan(xy[:, 1], xy[:, 0])
         nptest.assert_allclose(np.unique(r),
-                [0, .596, .919], atol=1e-3)
+                               [0, .596, .919], atol=1e-3)
         nptest.assert_allclose(np.unique(w),
-                [.111, .188/3*2, .256/3*2], atol=1e-3)
+                               [.111, .188/3*2, .256/3*2], atol=1e-3)

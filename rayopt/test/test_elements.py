@@ -19,10 +19,8 @@
 from __future__ import (absolute_import, print_function,
                         unicode_literals, division)
 
-import os
 import unittest
 
-from scipy import constants as ct
 import numpy as np
 from numpy import testing as nptest
 
@@ -34,12 +32,12 @@ from rayopt.utils import sinarctan, tanarcsin
 class TransformCase(unittest.TestCase):
     def setUp(self):
         self.s = Spheroid(distance=2., direction=(1, 3, 4.),
-                angles=(.3, .2, .1))
+                          angles=(.3, .2, .1))
 
     def test_offset(self):
         nptest.assert_allclose(self.s.offset,
-                self.s.distance*self.s.direction)
-    
+                               self.s.distance*self.s.direction)
+
     def test_from_to_axis(self, n=10):
         x = np.random.randn(n, 3)
         x1 = self.s.to_axis(x)
@@ -75,7 +73,7 @@ class ParaxialCase(unittest.TestCase):
         nptest.assert_allclose(self.s.direction, (0, 0, 1))
         nptest.assert_allclose(self.s.distance, 0)
         nptest.assert_allclose(self.s.offset, 0)
-    
+
     def test_rotation(self):
         nptest.assert_allclose(self.s.angles, (0, 0, 0.))
         nptest.assert_allclose(self.s.from_axis([0, 0, 1]), (0, 0, 1))
@@ -118,7 +116,7 @@ class ParaxToRealCase(unittest.TestCase):
         a = np.random.randn(3)*1e-8
         a[1:] = 0
         self.s = Spheroid(curvature=.1, distance=.2, material=mat,
-                direction=d, angles=a)
+                          direction=d, angles=a)
         de = self.s.excidence(1/self.s.material.n)
         self.sa = Spheroid(direction=de)
 
