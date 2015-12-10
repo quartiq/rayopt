@@ -1,5 +1,3 @@
-# https://github.com/rmcgibbo/python-appveyor-conda-example
-
 environment:
   global:
     WITH_COMPILER: "cmd /E:ON /V:ON /C .\\.appveyor\\run_with_env.cmd"
@@ -30,11 +28,14 @@ install:
   - "python --version"
   - "conda info -a"
 
-build: false
+build_script:
+  - "ECHO %PYPATH% %PYTHON% %PYTHON_VERSION% %PLATFORM% %PYSUFFIX%"
+  - "%WITH_COMPILER% conda build -q --python=%PYTHON_VERSION% --no-test .conda"
 
 test_script:
-  - "ECHO %PYPATH% %PYTHON% %PYTHON_VERSION% %PLATFORM% %PYSUFFIX%"
-  - "%WITH_COMPILER% conda build -q --python=%PYTHON_VERSION% .conda"
+  - "conda install -q --use-local rayopt"
+  - "python setup.py test"
+#  - "python -m unittest discover rayopt.test"
 
 artifacts:
   - path: "%PYPATH%%PYSUFFIX%\\conda-bld\\win-*\\*.tar.bz2"
