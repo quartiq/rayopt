@@ -21,7 +21,7 @@ install:
     hash -r
     conda config --set always_yes yes --set changeps1 no
     conda update -q conda
-    conda install conda-build
+    conda install -q conda-build
     conda info -a
   - |
     conda create -q -n py$TRAVIS_PYTHON_VERSION python=$TRAVIS_PYTHON_VERSION
@@ -29,19 +29,21 @@ install:
     conda install -q pip coverage anaconda-client
     pip install coveralls
   - |
-    conda build --python=$TRAVIS_PYTHON_VERSION --no-test .
+    conda build -q --python=$TRAVIS_PYTHON_VERSION --no-test .
     export PACKAGE=$(conda build --python=$TRAVIS_PYTHON_VERSION --output .)
     echo $PACKAGE
   - tar tjvf $PACKAGE
-  - conda install rayopt --use-local
+  - conda install -q --use-local rayopt
 script:
   - coverage run --source=rayopt setup.py test
 after_success:
   - |
     if [ "$TRAVIS_BRANCH" == "master" ]; then
-      anaconda -t $ANACONDA_TOKEN upload --channel ci $PACKAGE
+      if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
+        anaconda -t $ANACONDA_TOKEN upload --channel ci $PACKAGE
+      fi
+      coveralls
     fi
-  - coveralls
 notifications:
   email:
     on_success: never
