@@ -598,34 +598,3 @@ class Spheroid(Interface):
             fr += dfr
             g = (4*r*dfr*dfr).shift(1)**-.5
         return r, f, fr, g
-
-
-try:
-    # the numba version is three times faster for nrays=3 but ten times
-    # slower for nrays=1000... thus
-    raise ImportError
-    from .numba_elements import fast_propagate
-    del Element._types[(Element, "spheroid")]
-
-    @public
-    @Element.register
-    class FastSpheroid(Spheroid):
-        def propagate(self, y0, u0, n0, l, clip=True):
-            m = y0.shape[0]
-            y = np.empty((m, 3))
-            u = np.empty((m, 3))
-            t = np.empty((m,))
-            c = self.curvature
-            k = self.conic
-            r = self.radius
-            if self.material is None:
-                n = n0
-            elif self.material.mirror:
-                n = -n0
-            else:
-                n = self.material.refractive_index(l)
-            mu = n0/n
-            fast_propagate(c, k, r, mu, y0, u0, n0, l, clip, y, u, t)
-            return y, u, n, t
-except ImportError:
-    pass
