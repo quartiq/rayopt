@@ -1,18 +1,20 @@
 language: python
-python:
-  - "2.7"
-  - "3.4"
-  - "3.5"
 sudo: false
+os:
+  - linux
+  - osx
 env:
   global:
     - secure: "iU+A6BAnvvV1nee28Net4MEHfiXeylkB0HOJ6SxjGEP10oLPviiJ7xvOl/JOhjK2/ef1X+iOZminUQHlMq2j8zY3kpThsOTqXPjvM4ytFsp8D52sC2iFq5UcSHwC4NHx6vtA4Gby/2VCr6K8qIvnDVczvvCC9pTl1yyCqa/ONSA="
   matrix:
-    - ARCH=x86_64
-    # - ARCH=x86
+    - ARCH=x86_64 PYTHON_VERSION=3.5
+    - ARCH=x86_64 PYTHON_VERSION=2.7
+    - ARCH=x86_64 PYTHON_VERSION=3.4
+    # - ARCH=x86 PYTHON_VERSION=3.5
 install:
   - |
-    wget -O $HOME/miniconda.sh -q https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-${ARCH}.sh
+    if [ $TRAVIS_OS_NAME == osx ]; then ARCH=MacOSX-$ARCH; else ARCH=Linux-$ARCH; fi
+    wget -O $HOME/miniconda.sh -q https://repo.continuum.io/miniconda/Miniconda3-latest-${ARCH}.sh
     echo yes | bash $HOME/miniconda.sh -b -p $HOME/miniconda
     export PATH="$HOME/miniconda/bin:$PATH"
     mkdir -p $HOME/.config/matplotlib
@@ -23,13 +25,13 @@ install:
     conda install -q conda-build
     conda info -a
   - |
-    conda create -q -n py$TRAVIS_PYTHON_VERSION python=$TRAVIS_PYTHON_VERSION
-    source activate py$TRAVIS_PYTHON_VERSION
+    conda create -q -n py$PYTHON_VERSION python=$PYTHON_VERSION
+    source activate py$PYTHON_VERSION
     conda install -q pip coverage anaconda-client
     pip install coveralls
   - |
-    conda build -q --python=$TRAVIS_PYTHON_VERSION --no-test .conda
-    export PACKAGE=$(conda build --python=$TRAVIS_PYTHON_VERSION --output .conda)
+    conda build -q --python=$PYTHON_VERSION --no-test .conda
+    export PACKAGE=$(conda build --python=$PYTHON_VERSION --output .conda)
     echo $PACKAGE
   - tar tjvf $PACKAGE
   - conda install -q --use-local rayopt
