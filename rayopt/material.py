@@ -115,7 +115,7 @@ class Material(NameMixin):
             return basic[name]
         from .library import Library
         lib = Library.one()
-        return lib.get("glass", name, catalog, source)
+        return lib.get("material", name, catalog, source)
 
     def __str__(self):
         if self.catalog is not None:

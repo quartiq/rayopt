@@ -20,11 +20,9 @@ from __future__ import (absolute_import, print_function,
                         unicode_literals, division)
 
 from struct import Struct
-from collections import namedtuple
 import os
 import codecs
 import io
-import time
 
 import numpy as np
 
@@ -32,32 +30,53 @@ from .utils import sfloat, sint
 from .material import Material, air, CoefficientsMaterial, Thermal
 from .elements import Spheroid
 from .system import System
+from .library_items import Material as LibMaterial, Lens, Catalog
 
 
-Lens = namedtuple("Lens", "name version elements shape "
-        "aspheric grin toroidal length efl enp description")
+def register_parsers():
+    Catalog.parsers["zmf"] = zmf_read
+    Catalog.parsers["agf"] = agf_read
+    Lens.parsers["zmx"] = zmx_to_system
+    LibMaterial.parsers["agf"] = agf_to_material
 
-def zmf_read(f):
+
+def zmf_read(file, session):
+    cat = Catalog()
+    cat.load(file)
+    cat.name = os.path.splitext(os.path.basename(file))[0]
+    cat.type, cat.source, cat.format = "lens", "zemax", "zmx"
+    f = io.open(file, "rb")
     head = Struct("<I")
     lens = Struct("<100sIIIIIIIdd")
     shapes = "?EBPM"
-    version, = head.unpack(f.read(head.size))
-    assert version in (1001, )
+    cat.version, = head.unpack(f.read(head.size))
+    assert cat.version in (1001, )
+    session.add(cat)
     while True:
+        l = Lens()
         li = f.read(lens.size)
         if len(li) != lens.size:
             if len(li) > 0:
                 print(f, "additional data", repr(li))
             break
         li = list(lens.unpack(li))
-        li[0] = li[0].decode("latin1").strip("\0")
-        li[3] = shapes[li[3]]
+        l.name = li[0].decode("latin1").strip("\0")
+        l.shape = shapes[li[3]]
+        l.elements = li[2]
+        l.aspheric = li[4]
+        l.version = li[1]
+        l.grin = li[5]
+        l.toroidal = li[6]
+        l.efl = li[8]
+        l.enp = li[9]
         description = f.read(li[7])
         assert len(description) == li[7]
-        description = zmf_obfuscate(description, li[8], li[9])
+        description = zmf_obfuscate(description, l.efl, l.enp)
         description = description.decode("latin1")
-        assert description.startswith("VERS {:06d}\n".format(li[1]))
-        yield Lens(description=description, *li)
+        assert description.startswith("VERS {:06d}\n".format(l.version))
+        l.data = description
+        cat.lenses.append(l)
+    return cat
 
 
 def zmf_obfuscate(data, a, b):
@@ -71,11 +90,11 @@ def zmf_obfuscate(data, a, b):
     return data.tostring()
 
 
-def zmx_to_system(fil):
+def zmx_to_system(data, item=None):
     s = System()
     next_pos = 0.
     s.append(Spheroid(material=air))
-    for line in fil.splitlines():
+    for line in data.splitlines():
         e = s[-1]
         if not line.strip():
             continue
@@ -104,7 +123,7 @@ def zmx_to_system(fil):
             except KeyError:
                 try:
                     e.material = Material.make((float(args[3]),
-                        float(args[4])))
+                                                float(args[4])))
                 except Exception as e:
                     print("material not found", name, e)
         elif cmd == "DIAM":
@@ -130,23 +149,23 @@ def zmx_to_system(fil):
             while len(e.aspherics) <= i:
                 e.aspherics.append(0.)
             e.aspherics[i] = j
-        elif cmd in ("GCAT", # glass catalog names
-                     "OPDX", # opd
-                     "RAIM", # ray aiming
-                     "CONF", # configurations
-                     "ENPD", "PUPD", # pupil
-                     "EFFL", # focal lengths
-                     "VERS", # version
-                     "MODE", # mode
-                     "NOTE", # note
-                     "TYPE", # surface type
-                     "HIDE", # surface hide
-                     "MIRR", # surface is mirror
-                     "PARM", # aspheric parameters
-                     "SQAP", # square aperture?
-                     "XDAT", "YDAT", # xy toroidal data
-                     "OBNA", # object na
-                     "PKUP", # pickup
+        elif cmd in ("GCAT",  # glass catalog names
+                     "OPDX",  # opd
+                     "RAIM",  # ray aiming
+                     "CONF",  # configurations
+                     "ENPD", "PUPD",  # pupil
+                     "EFFL",  # focal lengths
+                     "VERS",  # version
+                     "MODE",  # mode
+                     "NOTE",  # note
+                     "TYPE",  # surface type
+                     "HIDE",  # surface hide
+                     "MIRR",  # surface is mirror
+                     "PARM",  # aspheric parameters
+                     "SQAP",  # square aperture?
+                     "XDAT", "YDAT",  # xy toroidal data
+                     "OBNA",  # object na
+                     "PKUP",  # pickup
                      "MAZH", "CLAP", "PPAR", "VPAR", "EDGE", "VCON",
                      "UDAD", "USAP", "TOLE", "PFIL", "TCED", "FNUM",
                      "TOL", "MNUM", "MOFF", "FTYP", "SDMA", "GFAC",
@@ -167,18 +186,18 @@ def zmx_to_system(fil):
     return s
 
 
-Glass = namedtuple("Glass", "name nd vd density code comment status "
-        "tce description")
-
-
-def agf_read(fil):
+def agf_read(fil, session):
+    cat = Catalog()
+    cat.load(fil)
+    cat.name = os.path.splitext(os.path.basename(fil))[0]
+    cat.type, cat.source, cat.format = "material", "zemax", "agf"
+    cat.version = 0
+    session.add(cat)
     raw = open(fil, "rb").read(32)
     if raw.startswith(codecs.BOM_UTF16):
         dat = io.open(fil, encoding="utf-16")
     else:
         dat = io.open(fil, encoding="latin1")
-    g = []
-    density, comment, status, tce = None, None, None, None
     for line in dat:
         if not line.strip():
             continue
@@ -186,31 +205,27 @@ def agf_read(fil):
         if cmd == "CC":
             continue
         if cmd == "NM":
-            if g:
-                yield Glass(name, nd, vd, density, code, comment, status,
-                        tce, "".join(g))
-                g = []
-                density, comment, status, tce = None, None, None, None
+            mat = LibMaterial()
+            cat.materials.append(mat)
             args = args.split()
-            name = args[0]
-            nd = sfloat(args[3])
-            vd = sfloat(args[4])
-            code = args[2]
+            mat.name = args[0]
+            mat.nd = sfloat(args[3])
+            mat.vd = sfloat(args[4])
+            mat.code = args[2]
             if len(args) >= 7:
-                status = sint(args[6])
+                mat.status = sint(args[6])
+            mat.data = ""
         elif cmd == "GC":
-            comment = args
+            mat.comment = args
         elif cmd == "ED":
             args = args.split()
-            tce = sfloat(args[0])
-            density = sfloat(args[2])
-        g.append(line)
-    if g:
-        yield Glass(name, nd, vd, density, code, comment, status, tce,
-                "".join(g))
+            mat.tce = sfloat(args[0])
+            mat.density = sfloat(args[2])
+        mat.data += line
+    return cat
 
 
-def agf_to_material(dat):
+def agf_to_material(dat, item=None):
     typs = ("schott sellmeier_squared herzberger sellmeier2 conrady "
             "sellmeier_squared handbook_of_optics1 handbook_of_optics2 "
             "sellmeier_squared_offset extended1 sellmeier5 extended2 hikari"
@@ -251,7 +266,8 @@ def agf_to_material(dat):
 
 
 if __name__ == "__main__":
-    import glob, sys
+    import glob
+    import sys
     fs = sys.argv[1:]
     if not fs:
         p = "glass/Stockcat/"
@@ -260,6 +276,5 @@ if __name__ == "__main__":
     l = Library()
     for f in fs:
         print(f)
-        #c = zmf_to_system(f)
-        #print(c)
-        zmf_to_library(f, l)
+        zmf_read(f, l.session)
+        l.session.rollback()

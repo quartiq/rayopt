@@ -23,27 +23,39 @@ import yaml
 import os
 import logging
 import subprocess
-from collections import namedtuple
 
 import numpy as np
 
 from .material import CoefficientsMaterial
 from .utils import sfloat
+from .library_items import Material, Catalog
+
 
 logger = logging.getLogger(__name__)
 
-Glass = namedtuple("Glass", "name section data comment")
-Catalog = namedtuple("Catalog", "name sha1")
+
+def register_parsers():
+    Catalog.parsers["library.yml"] = yml_read
+    Material.parsers["rii"] = rii_to_material
 
 
-def yml_read(fil):
+def yml_read(fil, session):
+    top = Catalog()
+    data = top.load(fil)
+    top.type, top.source = "material", "rii",
+    top.format, top.name = "rii", "refractiveindex.info"
+    session.add(top)
+
     path = os.path.split(fil)[0]
     sha1 = subprocess.check_output([
         "git", "-C", path, "describe", "--abbrev=0", "--always"
     ]).decode().strip()
-    for shelf in yaml.safe_load(open(fil, "r")):
-        cat = Catalog(sha1=sha1, name=shelf["SHELF"])
-        yield cat
+    for shelf in yaml.safe_load(data):
+        cat = Catalog(sha1=sha1, name=shelf["SHELF"],
+                      source=top.source, type=top.type, format=top.format,
+                      version=top.version, comment=str(top.id), file=top.file,
+                      date=top.date, imported=top.imported)
+        session.add(cat)
         div = None
         for book in shelf["content"]:
             if "DIVIDER" in book:
@@ -60,12 +72,15 @@ def yml_read(fil):
                     data["name"] = page["name"]
                     data["div"] = div
                     data["path"] = page["path"]
-                    yield Glass(
+                    g = Material(
                         name="{}|{}".format(book["BOOK"], page["PAGE"]),
                         section="{}|{}".format(div, book["name"]),
                         comment=page["path"], data=yaml.dump(data))
+                    cat.materials.append(g)
                 except Exception as e:
                     print("error: {}: {}".format(page, e))
+    return top
+
 
 _typ_map = {
     "formula 1": "sellmeier_offset",
@@ -80,7 +95,7 @@ _typ_map = {
 }
 
 
-def rii_to_material(dat):
+def rii_to_material(dat, item=None):
     data = yaml.safe_load(dat)
     g = CoefficientsMaterial(name="{}|{}".format(data["BOOK"], data["PAGE"]),
                              coefficients=[])

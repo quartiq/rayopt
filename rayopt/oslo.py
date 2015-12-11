@@ -19,9 +19,7 @@
 from __future__ import (absolute_import, print_function,
                         unicode_literals, division)
 
-from collections import namedtuple
 import os.path
-import time
 import io
 
 import numpy as np
@@ -30,27 +28,36 @@ from .utils import sfloat, sint
 from .elements import Spheroid
 from .system import System
 from .material import air, Material, CoefficientsMaterial
+from .library_items import Lens, Material as LibMaterial, Catalog
 
 
-Lens = namedtuple("Lens", "name elements efl radius thickness comment "
-        "section description")
+def register_parsers():
+    Catalog.parsers[".dir"] = dir_read
+    Catalog.parsers[".glc"] = glc_read
+    Lens.parsers["len"] = len_to_system
+    Lens.parsers["olc"] = olc_to_system
+    LibMaterial.parsers["glc"] = glc_to_material
 
 
-def olc_read(dir):
-    prefix, ext = os.path.splitext(dir)
-    assert ext.lower() == ".dir"
+def dir_read(file, session):
+    cat = Catalog()
+    prefix = os.path.splitext(file)[0]
+    cat.name = os.path.basename(prefix)
+    cat.type, cat.source, cat.format = "lens", "oslo", "olc"
+    cat.version = 0
+    session.add(cat)
     # offset, length, name, efl, diameter, thickness
-    dir = np.loadtxt(dir, delimiter=",", skiprows=1,
-            dtype="i,i,i,S64,f,f,f", ndmin=1)
-    lens = open("%s.dat" % prefix, "r")
+    dir = np.loadtxt(file, delimiter=",", skiprows=1,
+                     dtype="i,i,i,S64,f,f,f", ndmin=1)
+    lens = io.open("%s.dat" % prefix, "r")
     lens = [lens.read(i) for i in dir["f1"]]
     sections = {}
     sect_lens = []
     if os.access("%s.nam" % prefix, os.R_OK):
         try:
             # abbrev, description
-            name = np.loadtxt("%s.nam" % prefix, delimiter=",", skiprows=1,
-                      dtype="S64,S128", ndmin=1)
+            name = np.loadtxt("%s.nam" % prefix, delimiter=",",
+                              skiprows=1, dtype="S64,S128", ndmin=1)
             for k, n in name:
                 sect_lens.append(len(k))
                 sections[k] = str(n).strip("\" '")
@@ -59,25 +66,27 @@ def olc_read(dir):
     sect_lens = sorted(sect_lens)[::-1]
     for i, (dirline, lensdat) in enumerate(zip(dir, lens)):
         of, le, ele, part, efl, dia, thick = dirline
-        section = None
-        comment = None
+        l = Lens(data=lensdat)
+        cat.lenses.append(l)
+        l.name = part
+        l.elements = int(ele)
+        l.thickness = float(thick)
+        l.efl = float(efl)
+        l.radius = float(dia)/2
         for k in sect_lens:
             try:
-                comment = sections[part[:k]]
-                section = part[:k]
+                l.comment = sections[part[:k]]
+                l.section = part[:k]
                 break
             except KeyError:
                 continue
-        yield Lens(part, int(ele), float(efl), float(dia/2.), float(thick),
-                comment, section, lensdat)
+    return cat
 
 
-
-oslo_glass_map = {
-    }
+oslo_glass_map = {}
 
 
-def olc_to_system(dat, glass_map=oslo_glass_map):
+def olc_to_system(dat, item=None, glass_map=oslo_glass_map):
     sys = System()
     s = Spheroid()
     sys.append(s)
@@ -103,7 +112,7 @@ def olc_to_system(dat, glass_map=oslo_glass_map):
             th = sfloat(args[0]) or 0.
             # used on nxt and last
         elif cmd in "AP CVX APN AY1 AY2 AX1 AX2 ATP AAC".split():
-            pass # cylindrical
+            pass  # cylindrical
         elif cmd == "CC":
             s.conic = sfloat(args[0])
         elif cmd == "ASP":
@@ -120,7 +129,7 @@ def olc_to_system(dat, glass_map=oslo_glass_map):
     return sys
 
 
-def len_to_system(fil):
+def len_to_system(fil, item=None):
     s = System()
     e = Spheroid()
     th = 0.
@@ -160,27 +169,29 @@ def len_to_system(fil):
     return s
 
 
-Glass = namedtuple("Glass", "name nd vd density description")
-
-
-def glc_read(f):
+def glc_read(f, session):
+    cat = Catalog()
     f = io.open(f, "r")
-    line = f.readline().split()
-    ver, num, catalog = line[:3]
-    #if len(line) > 3:
-    #    print line
+    ver, num, cat.name = f.readline().split()[:3]
+    cat.version = float(ver)
+    cat.type, cat.source, cat.format = "material", "oslo", "glc"
+    session.add(cat)
     for l in f:
         line = l.strip().split()
         if not line:
             continue
-        name = line.pop(0)
-        nd = sfloat(line.pop(0))
-        vd = sfloat(line.pop(0))
-        density = sfloat(line.pop(0))
-        yield Glass(name, nd, vd, density, l.strip())
+        g = LibMaterial()
+        g.name = line.pop(0)
+        g.nd = sfloat(line.pop(0))
+        g.vd = sfloat(line.pop(0))
+        g.density = sfloat(line.pop(0))
+        g.data = l.strip()
+        cat.materials.append(g)
+    return cat
+    # assert len(cat.materials) == int(num), (len(cat.materials), num)
 
 
-def glc_to_material(l):
+def glc_to_material(l, item=None):
     line = l.strip().split()
     name = line.pop(0)
     nd = sfloat(line.pop(0))
@@ -197,10 +208,10 @@ def glc_to_material(l):
     except IndexError:
         typ = "unknown"
     mat = CoefficientsMaterial(name=name, coefficients=coeff, typ=typ)
-    #if not np.allclose(nd, mat.nd):
-    #    print(name, nd, mat.nd)
+    # if not np.allclose(nd, mat.nd):
+    #     print(name, nd, mat.nd)
     mat.density = density
-    return mat # weird remaining format
+    return mat  # weird remaining format
     if not line:
         return mat
     a, num = sint(line.pop(0)), sint(line.pop(0))
@@ -209,6 +220,6 @@ def glc_to_material(l):
     a, num = sint(line.pop(0)), sint(line.pop(0))
     assert a == 1, l
     num *= 2
-    transmission = np.array([sfloat(_) for _ in line[:num]]).reshape(-1, 2)
+    # transmission = np.array([sfloat(_) for _ in line[:num]]).reshape(-1, 2)
     del line[:num]
     return mat
