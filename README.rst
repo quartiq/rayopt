@@ -4,6 +4,22 @@ RayOpt
 .. image:: https://travis-ci.org/jordens/rayopt.svg
     :target: https://travis-ci.org/jordens/rayopt
 
+.. image:: https://ci.appveyor.com/api/projects/status/6e97f8o94v7r5bpb/branch/master?svg=true
+    :target: https://ci.appveyor.com/project/jordens/rayopt
+
+.. image:: https://codecov.io/github/jordens/rayopt/coverage.svg?branch=master
+    :target: https://codecov.io/github/jordens/rayopt?branch=master
+
+.. image:: https://anaconda.org/jordens/rayopt/badges/installer/conda.svg
+    :target: https://anaconda.org/jordens/rayopt
+
+.. image:: https://anaconda.org/jordens/rayopt/badges/version.svg
+    :target: https://anaconda.org/jordens/rayopt
+
+.. image:: https://anaconda.org/jordens/rayopt/badges/license.svg
+    :target: https://github.com/jordens/rayopt
+
+
 Introduction
 ------------
 
