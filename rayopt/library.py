@@ -31,12 +31,13 @@ from sqlalchemy import event, create_engine, orm
 
 from .utils import public
 from .library_items import Material, Lens, Catalog, Base
-from . import oslo, zemax, rii
+from . import oslo, zemax, rii, codev
 
 
 oslo.register_parsers()
 zemax.register_parsers()
 rii.register_parsers()
+codev.register_parsers()
 
 
 @event.listens_for(Engine, "connect")
