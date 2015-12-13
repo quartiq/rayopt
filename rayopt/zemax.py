@@ -34,8 +34,8 @@ from .library_items import Material as LibMaterial, Lens, Catalog
 
 
 def register_parsers():
-    Catalog.parsers["zmf"] = zmf_read
-    Catalog.parsers["agf"] = agf_read
+    Catalog.parsers[".zmf"] = zmf_read
+    Catalog.parsers[".agf"] = agf_read
     Lens.parsers["zmx"] = zmx_to_system
     LibMaterial.parsers["agf"] = agf_to_material
 
@@ -230,6 +230,7 @@ def agf_to_material(dat, item=None):
             "sellmeier_squared handbook_of_optics1 handbook_of_optics2 "
             "sellmeier_squared_offset extended1 sellmeier5 extended2 hikari"
             ).split()
+    g = CoefficientsMaterial(coefficients=[])
     for line in dat.splitlines():
         if not line:
             continue
@@ -237,8 +238,9 @@ def agf_to_material(dat, item=None):
         if cmd == "NM":
             args = args.split()
             typ = typs[int(float(args[1])) - 1]
-            g = CoefficientsMaterial(name=args[0], typ=typ, coefficients=[])
             g.glasscode = sfloat(args[2])
+            g.name = args[0]
+            g.typ = typ
         elif cmd == "GC":
             g.comment = args.strip()
         elif cmd == "ED":
