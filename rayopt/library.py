@@ -146,16 +146,15 @@ def _test(l):
 def _test_nd(l):
     from .material import lambda_d
     for g in l.session.query(Material):
-        if hasattr(g, "nd"):
-            try:
-                nd0 = g.parse().refractive_index(lambda_d)
-            except:
-                continue
-            if 1. in (nd0, g.nd) or 0. in (nd0, g.nd):
-                continue
+        if not getattr(g, "nd", None):
+            continue
+        try:
+            m = g.parse()
+            nd0 = m.refractive_index(lambda_d)
             if abs(g.nd - nd0) > .001:
-                print(g.name, g.catalog.source, g.catalog.name,
-                      g.nd, nd0, g.parse().coefficients, g.parse().typ)
+                raise ValueError(g.nd, nd0, m.coefficients, m.typ)
+        except Exception as e:
+            print(g.catalog.source, g.catalog.name, g.name, e)
 
 
 if __name__ == "__main__":
@@ -164,21 +163,19 @@ if __name__ == "__main__":
     p.add_argument("-d", "--db", help="library database url", default=None)
     p.add_argument("-a", "--all", help="test-parse all entries",
                    action="store_true")
-    p.add_argument("-m", "--material", help="test-parse a glass")
+    p.add_argument("-m", "--material", help="test-parse a material")
     p.add_argument("-l", "--lens", help="test-parse a lens")
+    p.add_argument("-n", "--nd", help="test nd of materials",
+                   action="store_true")
     p.add_argument("files", nargs="*")
     o = p.parse_args()
     l = Library(o.db)
-    # fs = ["catalog/oslo_glass", "catalog/zemax_glass",
-    # "catalog/oslo_lens", "catalog/zemax_lens"]
     l.load_all(o.files)
-    # print(l.get("material", "BK7"))
-    # print(l.get("lens", "AC127-025-A", "thorlabs"))
     if o.material:
-        g = l.get("material", o.material)
-        print(g)
+        print(l.get("material", o.material))
     if o.lens:
         print(l.get("lens", o.lens))
     if o.all:
         _test(l)
-    # _test_nd(l)
+    if o.nd:
+        _test_nd(l)
