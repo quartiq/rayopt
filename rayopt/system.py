@@ -322,7 +322,7 @@ class System(list):
                 dz = 0.
             t.append(el.distance - dz + dz0)
             dz0 = dz
-        return t
+        return np.array(t)
 
     @property
     def edge_y(self):
