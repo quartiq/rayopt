@@ -19,80 +19,126 @@
 from __future__ import (absolute_import, print_function,
                         unicode_literals, division)
 
+from functools import lru_cache
 import numpy as np
-
-from traits.api import (HasTraits, Str, Callable, Float, Tuple, Bool)
-
-
-class Demerit(HasTraits):
-    name = Str
-    func = Callable
-    weight = Float(1)
-
-    def __call__(self, system, ptrace, rays):
-        return self.func(system, ptrace, rays)
-
-demerit_rms_position = Demerit(name="rms size",
-    func=lambda system, ptrace, rays:
-    [np.ma.masked_invalid(r.positions[...,(0,1)]).std(axis=0) for r in rays])
-
-demerit_rms_angle = Demerit(name="rms angle",
-    func=lambda system, ptrace, rays:
-    [np.ma.masked_invalid(r.angles[...,(0,1)]).std(axis=0) for r in rays])
-
-demerit_mean_angle = Demerit(name="mean angle",
-    func=lambda system, ptrace, rays:
-    [np.ma.masked_invalid(r.angles[...,(0,1)]).mean(axis=0) for r in rays])
-
-demerit_aberration3 = Demerit(name="primary aberrations",
-    func=lambda system, ptrace, rays:
-    ptrace.aberration3.sum(0)*ptrace.image_height)
+from scipy.optimize import minimize
 
 
-class Parameter(HasTraits):
-    name = Str
-    bounds = Tuple((-np.inf, np.inf))
-    scale = Float
+class Variable:
+    def __init__(self, system, bounds=(-np.inf, np.inf),
+                 scale=None, init=None):
+        self.system = system
+        if scale is None:
+            range = bounds[1] - bounds[0]
+            assert np.isfinite(range)
+            scale = range
+        self.scale = scale
+        self.bounds = bounds
+        if init is None:
+            init = self.get()
+        self.init = init
 
-    def __init__(self, name, bounds=None, scale=1, **k):
-        super(Parameter, self).__init__(name=name,
-                bounds=bounds, scale=scale, **k)
+    def get(self):
+        raise NotImplementedError
 
-    def set_value(self, system, value):
-        #exec "system.%s=%s" % (self.name, value)
-        setattr(system, self.name, value)
-
-    def get_value(self, system):
-        #return eval("system.%s" % self.name)
-        return getattr(system, self.name)
-
-
-class Constraint(HasTraits):
-    equality = Bool(True)
-
-    def __call__(self, system):
-        pass
+    def set(self, value):
+        raise NotImplementedError
 
 
-class MaterialThickness(Constraint):
-    minimum = Float(1e-3)
-    maximum = Float(10e-2)
-    equality = False
-    
-    def __call__(self, system):
-        r = []
-        for i,e in enumerate(system.elements[:-1]):
-            en = system.elements[i+1]
-            if isinstance(e, Aperture):
-                continue
-            if isinstance(en, Aperture):
-                en = system.elements[i+2]
-            if e.material not in (air, vacuum):
-                center = en.origin[2]
-                edge = (center+
-                          e.shape_func(array([(0, e.radius, 0)]))-
-                          en.shape_func(array([(0, en.radius, 0)])))
-                r.append(self.minimum-min(center, edge))
-                r.append(max(center, edge)-self.maximum)
-                print(i, center, edge)
-        return array(r)
+class PathVariable(Variable):
+    def __init__(self, system, path, *args, **kwargs):
+        self.path = path
+        super(PathVariable, self).__init__(system, *args, **kwargs)
+
+    def get(self):
+        return self.system.get_path(self.path)
+
+    def set(self, value):
+        self.system.set_path(self.path, value)
+
+
+class Operand:
+    def __init__(self, system, weight=None, offset=0,
+                 min=None, max=None):
+        self.system = system
+        self.weight = weight
+        self.offset = offset
+        self.min = min
+        self.max = max
+
+    def get(self):
+        raise NotImplementedError
+
+    def get_objective(self):
+        if self.weight:
+            yield lambda v: self.weight*(v - self.offset)
+
+    def get_equality(self):
+        if self.min is not None and self.min == self.max:
+            yield lambda v: v - self.offset
+
+    def get_inequality(self):
+        if self.min is not None:
+            yield lambda v: v - self.offset - self.min
+        if self.max is not None:
+            yield lambda v: self.max - (v - self.offset)
+
+
+class FuncOp(Operand):
+    def __init__(self, system, func, *args, **kwargs):
+        super(FuncOp, self).__init__(system, *args, **kwargs)
+        self.func = func
+
+    def get(self):
+        return np.atleast_1d(self.func(self.system)).ravel()
+
+
+def optimize(variables, operands, **kwargs):
+    assert variables
+    assert operands
+    s = np.array([v.scale for v in variables])
+    x0 = np.array([v.get() for v in variables])/s
+    x1 = np.array([v.init for v in variables])/s
+    bounds = np.array([v.bounds for v in variables])/s[:, None]
+
+    ob, eq, ineq = [], [], []
+    for i, op in enumerate(operands):
+        for obi in op.get_objective():
+            ob.append((i, obi))
+        for eqi in op.get_equality():
+            eq.append((i, eqi))
+        for ineqi in op.get_inequality():
+            ineq.append((i, ineqi))
+    assert ob
+
+    def up(x):
+        for xi, vi in zip(x*s, variables):
+            vi.set(xi)
+
+    @lru_cache(maxsize=len(variables) + 1)
+    def ex(*x):
+        up(x)
+        return [op.get() for op in operands]
+
+    def fun(x):
+        v = ex(*x)
+        o = np.concatenate([obi(v[i]) for i, obi in ob])
+        return np.square(o).sum()
+
+    def feq(x):
+        v = ex(*x)
+        return np.concatenate([eqi(v[i]) for i, eqi in eq])
+
+    def fineq(x):
+        v = ex(*x)
+        return np.concatenate([ineqi(v[i]) for i, ineqi in ineq])
+
+    cons = []
+    if eq:
+        cons.append({"type": "eq", "fun": feq})
+    if ineq:
+        cons.append({"type": "ineq", "fun": fineq})
+
+    r = minimize(fun, x1, bounds=bounds, constraints=cons, **kwargs)
+    up(x0)
+    return r, lambda: up(r.x)

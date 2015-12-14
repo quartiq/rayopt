@@ -28,6 +28,7 @@ from .paraxial_trace import *
 from .gaussian_trace import *
 from .geometric_trace import *
 from .poly_trace import *
+from .optimize import *
 
 from . import library
 from .library import Library
