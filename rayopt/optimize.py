@@ -93,7 +93,8 @@ class FuncOp(Operand):
         return np.atleast_1d(self.func(self.system)).ravel()
 
 
-def optimize(variables, operands, **kwargs):
+def optimize(variables, operands, callback=None, tol=1e-4, options={},
+             trace=False, **kwargs):
     assert variables
     assert operands
     s = np.array([v.scale for v in variables])
@@ -139,6 +140,25 @@ def optimize(variables, operands, **kwargs):
     if ineq:
         cons.append({"type": "ineq", "fun": fineq})
 
-    r = minimize(fun, x1, bounds=bounds, constraints=cons, **kwargs)
-    up(x0)
-    return r, lambda: up(r.x)
+    xi, vi, fi = [], [], []
+
+    def cb(x):
+        if trace:
+            v = ex(*x)
+            xi.append(x*s)
+            vi.append(v)
+            fi.append([obi(v[i]) for i, obi in ob])
+        if callback:
+            return callback(x)
+
+    opts = dict(maxiter=100, eps=1e-5)
+    opts.update(options)
+    r = minimize(fun, x1, bounds=bounds, constraints=cons, callback=cb,
+                 tol=tol, options=opts, **kwargs)
+    r.accept = lambda: up(r.x)
+    r.reject = lambda: up(x0)
+    r.trace_x = np.array(xi)
+    r.trace_v = vi
+    r.trace_f = [(i, np.array([fj[j] for fj in fi]))
+                 for j, (i, obi) in enumerate(ob)]
+    return r
