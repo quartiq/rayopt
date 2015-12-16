@@ -345,7 +345,7 @@ class Analysis(object):
             for i, ci in enumerate(("-", "--")):
                 ot = np.fft.ifft(np.fft.ifftshift(psf.sum(i))*psf.size**.5)
                 of = np.fft.fftfreq(ot.size, dx)
-                ot, of = ot[:ot.size/2], of[:of.size/2]
+                ot, of = ot[:ot.size//2], of[:of.size//2]
                 axm.plot(of, np.absolute(ot), "k"+ci)
                 # axm.plot(of, ot.real, "k"+ci)
             axm.set_xlim(0, 1/r)
@@ -371,6 +371,7 @@ class Analysis(object):
                 ]:
             self.setup_axes(axi, xl, yl, tl, yzero=False, xzero=False)
         h = np.linspace(0, height*self.system.image.radius, nrays)
+        h[0] = np.nan
         for i, (wi, ci) in enumerate(zip(wavelengths, colors)):
             t = GeometricTrace(self.system)
             t.rays_line((0, height), wi, nrays=nrays)
@@ -392,8 +393,9 @@ class Analysis(object):
                          distribution="half-meridional", clip=True)
             p = self.system.object.pupil.distance
             py = t.y[0, :, 1] + p*tanarcsin(t.u[0])[:, 1]
-            z = -t.y[-1, :, 1]/tanarcsin(t.i[-1])[:, 1]
-            z[t.ref] = np.nan
+            u = tanarcsin(t.i[-1])[:, 1]
+            u[t.ref] = np.nan
+            z = -t.y[-1, :, 1]/u
             axs.plot(py, z, ci+"-", label="%s" % wi)
         wl, wu = min(wavelengths), max(wavelengths)
         ww = np.linspace(wl - (wu - wl)/4, wu + (wu - wl)/4, nrays)

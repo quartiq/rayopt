@@ -49,7 +49,7 @@ class GeometricTrace(Trace):
         self.l = 1.
         self.t = np.empty((self.length, nrays))
 
-    def rays_given(self, y, u, l=None, w=None, ref=None):
+    def rays_given(self, y, u, l=None, w=None, ref=0):
         y, u = np.atleast_2d(y, u)
         y, u = np.broadcast_arrays(y, u)
         n, m = y.shape
@@ -102,42 +102,47 @@ class GeometricTrace(Trace):
         self.propagate()
 
     def opd(self, radius=None, after=-2, image=-1, resample=4):
-        chief = self.ref
-        t = self.t[:after + 1].sum(0)
+        t = (self.t[:after + 1] - self.t[:after + 1, (self.ref,)]).sum(0)
         if not self.system.object.finite:
             # input reference sphere is a tilted plane
             # u0 * (y0 - y - t*u) == 0
-            tj = np.dot(self.u[0, chief], (self.y[0, chief] - self.y[0]).T)
+            tj = np.dot(self.u[0, self.ref],
+                        (self.y[0, self.ref] - self.y[0]).T)
             t -= tj*self.n[0]
         if radius is None:
-            radius = self.z[image] - self.z[after]
-        # center sphere on chief image
+            if self.system.image.pupil.telecentric:
+                radius = self.z[image] - self.z[after]
+            else:
+                radius = -self.system.image.pupil.distance
+        # center sphere on self.ref image
         ea, ei = self.system[after], self.system[image]
-        y = ea.from_normal(self.y[after]) + self.origins[after]
-        y = ei.to_normal(y - self.origins[image]) - self.y[image, chief]
+        y = ea.from_normal(self.y[after])
+        y = y + (self.origins[after] - self.origins[image])
+        y = ei.to_normal(y) - self.y[image, self.ref]
         u = ei.to_normal(ea.from_normal(self.u[after]))
         # http://www.sinopt.com/software1/usrguide54/evaluate/raytrace.htm
-        # replace u with direction from y to chief image
+        # replace u with direction from y to ref image
         # u = -y/np.sqrt(np.square(y).sum(1))[:, None]
         y[:, 2] += radius
         ti = Spheroid(curvature=1./radius).intercept(y, u)
-        t += ti*self.n[after]
-        t = -(t - t[chief])/(self.l/self.system.scale)
+        t += (ti - ti[self.ref])*self.n[after]
+        t = -t/(self.l/self.system.scale)
         # positive t rays have a shorter path to ref sphere and
-        # are arriving before chief
+        # are arriving before self.ref
         py = y + ti[:, None]*u
         py[:, 2] -= radius
-        py -= py[chief]
+        py -= py[self.ref]
         x, y, z = py.T
         if resample:
             pyt = np.vstack((x, y, t))
             x, y, t = pyt[:, np.all(np.isfinite(pyt), axis=0)]
             if not t.size:
                 raise ValueError("no rays made it through")
-            n = resample*self.y.shape[1]**.5
+            n = int(resample*self.y.shape[1]**.5)
             h = np.fabs((x, y)).max()
             xs, ys = np.mgrid[-1:1:1j*n, -1:1:1j*n]*h
-            ts = griddata((x, y), t, (xs, ys))
+            ts = griddata((x, y), t, (xs, ys), method="linear",
+                          fill_value=np.nan)
             x, y, t = xs, ys, ts
         return x, y, t
 
@@ -161,7 +166,7 @@ class GeometricTrace(Trace):
             raise NotImplementedError
             n = self.y.shape[1]**.5
             radius/2*np.pi*self.l/self.system.scale
-            r = 3*x.max()
+            r = int(3*x.max())
             p, q = np.mgrid[-1:1:1j*n, -1:1:1j*n]*r
             np.einsum("->", o, x, y)
         return p, q, psf

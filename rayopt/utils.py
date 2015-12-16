@@ -161,17 +161,17 @@ def pupil_distribution(distribution, nrays):
         xy = np.c_[np.zeros(n + 1), np.linspace(-1, 1, n + 1)]
     elif d == "sagittal":
         n -= n % 2
-        ref = n/2
+        ref = n//2
         xy = np.c_[np.linspace(-1, 1, n + 1), np.zeros(n + 1)]
     elif d == "cross":
         n -= n % 4
-        ref = n/4
+        ref = n//4
         xy = np.concatenate([
-            np.c_[np.zeros(n/2 + 1), np.linspace(-1, 1, n/2 + 1)],
-            np.c_[np.linspace(-1, 1, n/2 + 1), np.zeros(n/2 + 1)],
+            np.c_[np.zeros(n//2 + 1), np.linspace(-1, 1, n//2 + 1)],
+            np.c_[np.linspace(-1, 1, n//2 + 1), np.zeros(n//2 + 1)],
             ])
     elif d == "tee":
-        n = (n - 2)/3
+        n = (n - 2)//3
         ref = 2*n + 1
         xy = np.concatenate([
             np.c_[np.zeros(2*n + 1), np.linspace(-1, 1, 2*n + 1)],
