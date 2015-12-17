@@ -26,17 +26,17 @@ from scipy.special import orthogonal
 
 
 def public(f):
-  """Use a decorator to avoid retyping function/class names.
+    """Use a decorator to avoid retyping function/class names.
 
-  * Based on an idea by Duncan Booth:
-  http://groups.google.com/group/comp.lang.python/msg/11cbb03e09611b8a
-  * Improved via a suggestion by Dave Angel:
-  http://groups.google.com/group/comp.lang.python/msg/3d400fb22d8a42e1
-  """
-  all = sys.modules[f.__module__].__dict__.setdefault('__all__', [])
-  if f.__name__ not in all:  # Prevent duplicates if run from an IDE.
-      all.append(f.__name__)
-  return f
+    * Based on an idea by Duncan Booth:
+    http://groups.google.com/group/comp.lang.python/msg/11cbb03e09611b8a
+    * Improved via a suggestion by Dave Angel:
+    http://groups.google.com/group/comp.lang.python/msg/3d400fb22d8a42e1
+    """
+    all = sys.modules[f.__module__].__dict__.setdefault('__all__', [])
+    if f.__name__ not in all:  # Prevent duplicates if run from an IDE.
+        all.append(f.__name__)
+    return f
 
 public(public)  # Emulate decorating ourself
 
@@ -44,6 +44,7 @@ public(public)  # Emulate decorating ourself
 @public
 def simple_cache(f):
     cache = {}
+
     def wrapper(*args):
         try:
             return cache[args]
@@ -192,7 +193,7 @@ def pupil_distribution(distribution, nrays):
         xy = np.mgrid[-1:1:1j*n, -1:1:1j*n]
         xy[0] += (np.arange(n) % 2.)*(2./n)
         xy = xy.reshape(2, -1)
-        xy = xy[:, (xy**2).sum(0)<=1].T
+        xy = xy[:, (xy**2).sum(0) <= 1].T
         xy = np.concatenate([[[0, 0]], xy])
     elif d == "hexapolar":
         n = int(np.sqrt(n/3.-1/12.)-1/2.)
@@ -246,9 +247,10 @@ def interval_to_circle(x, w, p=None, a=-1., b=1.):
     r = ((x - a)/(b - a))**.5
     if p is None:
         p = len(x)
-    if type(p) is type(1):
+    p = np.asarray(p)
+    if p.ndim == 0:
         p = np.pi*((np.arange(p) + .5)/p - .5)
-    m = len(p)
+    m = p.shape[0]
     if r[0] == 0.:
         rs = np.r_[r[0], np.repeat(r[1:], m)]
         ws = np.r_[w[0], np.repeat(w[1:]/m, m)]/2
