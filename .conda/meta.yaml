@@ -18,6 +18,11 @@ requirements:
     - setuptools
     - cython
     - numpy
+    - scipy
+    - pyyaml
+    - matplotlib
+    - sqlalchemy
+    - fastcache
   run:
     - python
     - cython
