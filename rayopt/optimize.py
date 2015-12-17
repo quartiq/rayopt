@@ -19,7 +19,7 @@
 from __future__ import (absolute_import, print_function,
                         unicode_literals, division)
 
-from functools import lru_cache
+from fastcache import clru_cache
 import numpy as np
 from scipy.optimize import minimize
 
@@ -116,7 +116,7 @@ def optimize(variables, operands, callback=None, tol=1e-4, options={},
         for xi, vi in zip(x*s, variables):
             vi.set(xi)
 
-    @lru_cache(maxsize=len(variables) + 1)
+    @clru_cache(maxsize=len(variables) + 1)
     def ex(*x):
         up(x)
         return [op.get() for op in operands]

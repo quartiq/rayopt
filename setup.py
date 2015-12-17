@@ -44,6 +44,7 @@ setup(
         "pyyaml",
         "sqlalchemy",
         "cython",
+        "fastcache",
     ],
     extras_require={},
     packages=find_packages(),

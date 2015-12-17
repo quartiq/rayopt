@@ -16,12 +16,8 @@ requirements:
   build:
     - python
     - setuptools
-    - numpy
     - cython
-    - scipy
-    - pyyaml
-    - matplotlib
-    - sqlalchemy
+    - numpy
   run:
     - python
     - cython
@@ -30,6 +26,7 @@ requirements:
     - pyyaml
     - matplotlib
     - sqlalchemy
+    - fastcache
 
 build:
   # number: {{ environ.get("GIT_DESCRIBE_NUMBER", 0) }}
