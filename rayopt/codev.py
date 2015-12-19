@@ -68,3 +68,47 @@ def codevxml_to_material(data, item=None):
         float(_.text) for _ in data.iterfind(
             "./DispersionCoefficients/Coefficient")])
     return mat
+
+
+def main():
+    import argparse
+    import zipfile
+    import tempfile
+    import shutil
+    import os
+    from .library import Library
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("location", nargs="?",
+                        default="https://optics.synopsys.com/"
+                        "support/cvdownloads/glasscatalogs_xml.zip")
+    parser.add_argument("-f", "--file", action="store_true")
+    parser.add_argument("-d", "--db", help="library database url",
+                        default=None)
+    parser.add_argument("-x", "--replace", action="store_true")
+    opts = parser.parse_args()
+    lib = Library(opts.db)
+
+    if opts.file:
+        f = opts.location
+    else:
+        import requests
+        from six import BytesIO
+        f = BytesIO(requests.get(opts.location).content)
+    try:
+        dir = tempfile.mkdtemp()
+        with zipfile.ZipFile(f, "r") as file:
+            for cat in file.namelist():
+                if opts.replace:
+                    p = os.path.splitext(os.path.basename(cat))[0]
+                    for i in lib.session.query(Catalog).filter(
+                        Catalog.source == "codev").filter(
+                            Catalog.name == p):
+                        lib.session.delete(i)
+                lib.load(file.extract(cat, dir))
+    finally:
+        shutil.rmtree(dir)
+
+
+if __name__ == "__main__":
+    main()

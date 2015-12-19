@@ -45,6 +45,8 @@ setup(
         "sqlalchemy",
         "cython",
         "fastcache",
+        "requests",
+        "six",
     ],
     extras_require={},
     packages=find_packages(),

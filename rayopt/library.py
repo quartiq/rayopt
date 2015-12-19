@@ -95,18 +95,18 @@ class Library(object):
                     pass
 
     def load(self, fil, mode="refresh"):
-        res = self.session.query(Catalog).filter(Catalog.file == fil).first()
-        if not res:
-            pass
-        elif mode == "refresh":
-            stat = os.stat(fil)
-            if stat.st_mtime <= res.date or stat.st_size == res.size:
-                return
-            self.sesstion.delete(res)
-        elif mode == "reload":
-            self.sesstion.delete(res)
-        elif mode == "add":
-            pass
+        if mode in ("refresh", "reload"):
+            res = self.session.query(Catalog).filter(
+                Catalog.file == fil).first()
+            if not res:
+                pass
+            elif mode == "refresh":
+                stat = os.stat(fil)
+                if stat.st_mtime <= res.date or stat.st_size == res.size:
+                    return
+                self.session.delete(res)
+            elif mode == "reload":
+                self.session.delete(res)
 
         try:
             if Catalog.parse(fil, self.session):

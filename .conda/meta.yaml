@@ -23,6 +23,8 @@ requirements:
     - matplotlib
     - sqlalchemy
     - fastcache
+    - requests
+    - six
   run:
     - python
     - cython
@@ -32,6 +34,8 @@ requirements:
     - matplotlib
     - sqlalchemy
     - fastcache
+    - requests
+    - six
 
 build:
   # number: {{ environ.get("GIT_DESCRIBE_NUMBER", 0) }}
