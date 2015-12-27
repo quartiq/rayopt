@@ -22,8 +22,8 @@ from __future__ import (absolute_import, print_function,
 import warnings
 
 import numpy as np
+from fastcache import clru_cache
 
-from .utils import simple_cache
 from .name_mixin import NameMixin
 from .utils import public
 
@@ -137,7 +137,7 @@ class Material(NameMixin):
             dat["thermal"] = self.thermal.dict()
         return dat
 
-    @simple_cache
+    @clru_cache(maxsize=1024)
     def refractive_index(self, wavelength):
         return 1.
 
@@ -201,7 +201,7 @@ class AbbeMaterial(Material):
             name = "-"
         return cls(name=name, n=n, v=v)
 
-    @simple_cache
+    @clru_cache(maxsize=1024)
     def refractive_index(self, wavelength):
         return (self.n + (wavelength - self.lambda_ref) /
                 (self.lambda_long - self.lambda_short) *
@@ -229,7 +229,7 @@ class CoefficientsMaterial(Material):
         self.typ = typ
         self.coefficients = np.atleast_1d(coefficients)
 
-    @simple_cache
+    @clru_cache(maxsize=1024)
     def refractive_index(self, wavelength):
         n = getattr(self, "n_%s" % self.typ)
         n = n(wavelength/1e-6, self.coefficients)

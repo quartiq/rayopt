@@ -42,21 +42,6 @@ public(public)  # Emulate decorating ourself
 
 
 @public
-def simple_cache(f):
-    cache = {}
-
-    def wrapper(*args):
-        try:
-            return cache[args]
-        except KeyError:
-            cache[args] = v = f(*args)
-            return v
-    wrapper.cache = cache
-    wrapper.orig = f
-    return wrapper
-
-
-@public
 def tanarcsin(u, v=None):
     u = np.asanyarray(u)
     if u.ndim == 2 and u.shape[1] == 3:
