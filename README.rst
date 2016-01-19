@@ -13,12 +13,6 @@ RayOpt
 .. image:: https://anaconda.org/jordens/rayopt/badges/installer/conda.svg
     :target: https://anaconda.org/jordens/rayopt
 
-.. image:: https://anaconda.org/jordens/rayopt/badges/version.svg
-    :target: https://anaconda.org/jordens/rayopt
-
-.. image:: https://anaconda.org/jordens/rayopt/badges/license.svg
-    :target: https://github.com/jordens/rayopt
-
 
 Introduction
 ------------
