@@ -327,6 +327,7 @@ class Analysis(object):
             dx = x[1, 0] - x[0, 0]
             psfl = np.log10(psf)
             levels = psfl.max() - 1 - np.arange(4)
+            levels = levels[::-1]
             axp.contour(x, y, psfl, levels, cmap=plt.cm.Reds, alpha=.2)
             levels = np.linspace(0, psf.max(), 21)
             axp.contour(x, y, psf, levels, cmap=plt.cm.Greys)
