@@ -13,6 +13,9 @@ RayOpt
 .. image:: https://anaconda.org/jordens/rayopt/badges/installer/conda.svg
     :target: https://anaconda.org/jordens/rayopt
 
+.. image:: https://img.shields.io/pypi/l/rayopt.svg
+    :target: https://pypi.python.org/pypi/rayopt
+
 
 Introduction
 ------------
