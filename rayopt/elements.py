@@ -503,7 +503,7 @@ class Spheroid(Interface):
         # [y', u'] = M * [y, u]
         c = self.curvature
         if self.aspherics is not None:
-            c = c + 2*self.aspherics[0]
+            c += 2*self.aspherics[0]
         d = self.distance
         md = np.eye(4)
         md[0, 2] = md[1, 3] = d
@@ -556,36 +556,36 @@ class Spheroid(Interface):
 
     def aberration(self, y, u0, u, n0, n, v0, v):
         c = self.curvature
+        k = self.conic*c**3/8
+        if self.aspherics:
+            a2, a4 = self.aspherics[:2]
+            k += a4 - a2/4*(4*a2**2 + 6*c*a2 + 3*c**2)
+            c += 2*a2
         if self.material is not None and self.material.mirror:
             n = -n  # FIXME check, cleanup
         mu = n0/n
         # incidence
-        i = c*y+u0
-        l = n*(u[0]*y[1]-u[1]*y[0])
-        s = .5*n0*(1-mu)*y*(u+i)/l
+        i = c*y + u0
+        l = n*(u[0]*y[1] - u[1]*y[0])
+        s = .5*n0*(1 - mu)*y*(u + i)/l
+        w = 4*k*(n - n0)/l
+        #print(self, c, k, w, l, y)
+        #print(s[0]*i[0]**2, w*y[0]**4)
         # transverse third-order spherical
-        tsc = s[0]*i[0]**2
+        tsc = s[0]*i[0]**2 + w*y[0]**4
         # sagittal third-order coma
-        cc = s[0]*i[0]*i[1]
+        cc = s[0]*i[0]*i[1] + w*y[0]**3*y[1]
         # tangential third-order com
         # 3*cc
         # transverse third-order astigmatism
-        tac = s[0]*i[1]**2
+        tac = s[0]*i[1]**2 + w*y[0]**2*y[1]**2
         # transverse third-order Petzval
         tpc = (1-mu)*c*l/n0/2
         # third-order distortion
-        dc = s[1]*i[0]*i[1]+.5*(u[1]**2-u0[1]**2)
+        dc = s[1]*i[0]*i[1]+.5*(u[1]**2-u0[1]**2) + w*y[0]*y[1]**3
         # paraxial transverse axial, lateral chromatic
         tachc, tchc = -y[0]*i/l*(v0-mu*v)
 
-        if self.aspherics:
-            # FIXME check
-            k = (4*self.aspherics[0]+(self.conic-1)*c**3/2)*(n-n0)/l
-            k = k[0]
-            tsc += k*y[0]**4
-            cc += k*y[0]**3*y[1]
-            tac += k*y[0]**2*y[1]**2
-            dc += k*y[0]*y[1]**3
         return tsc, cc, tac, tpc, dc, tachc, tchc
 
     def intercept_poly(self, r, p, k):
