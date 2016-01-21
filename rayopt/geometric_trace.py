@@ -257,7 +257,7 @@ class GeometricTrace(Trace):
             yield ""
 
     def text(self):
-        return itertools.join(self.print_trace())
+        return itertools.chain(self.print_trace())
 
     def __str__(self):
         return "\n".join(self.text())
