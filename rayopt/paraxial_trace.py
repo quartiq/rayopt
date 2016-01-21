@@ -328,8 +328,8 @@ class ParaxialTrace(Trace):
               )/(m0[1, 1]*m2[0, 0])
         self.system[i].curvature = c/(n0 - n)*n
 
-    def refocus(self):
-        self.system[-1].distance -= self.y[-1, 0]/self.u[-1, 0]
+    def refocus(self, idx=-1):
+        self.system[idx].distance -= self.y[idx, 0]/self.u[idx - 1, 0]
 
     def update_conjugates(self):
         ai = self.system.stop

@@ -23,11 +23,12 @@ import itertools
 
 import numpy as np
 from scipy.optimize import newton, brentq
+from fastcache import clru_cache
 
 from .elements import Element
 from .conjugates import Conjugate, FiniteConjugate, InfiniteConjugate
 from .material import fraunhofer
-from .utils import public, simple_cache
+from .utils import public
 from .cachend import PolarCacheND
 from .paraxial_trace import ParaxialTrace
 from .pupils import RadiusPupil
@@ -517,7 +518,7 @@ class System(list):
         rad = self[self.stop].radius
         assert rad
 
-        @simple_cache
+        @clru_cache(maxsize=1024)
         def dist(a):
             y, u = self.aim(yo, None, z + a*p, filter=False)
             for yunit in self.propagate(y, u, n, l, stop=stop + 1):
@@ -540,7 +541,7 @@ class System(list):
             stop = self.stop + 1
         r2 = np.square([e.radius for e in self[1:stop]])
 
-        @simple_cache
+        @clru_cache(maxsize=1024)
         def dist(a):
             y, u = self.aim(yo, yp, z, a*p, filter=False)
             ys = [y]
