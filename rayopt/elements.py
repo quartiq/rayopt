@@ -211,10 +211,11 @@ class Element(NameMixin, TransformMixin):
 
     def propagate_paraxial(self, yu0, n0, l):
         n, m = self.paraxial_matrix(n0, l)
-        yu = np.dot(yu0, m.T)
+        yu = np.dot(m, yu0)
         return yu, n
 
     def propagate_gaussian(self, q0i, n0, l):
+        # takes the inverse q
         n, m = self.paraxial_matrix(n0, l)
         a, b, c, d = m[:2, :2], m[:2, 2:], m[2:, :2], m[2:, 2:]
         qi = np.dot(c + np.dot(d, q0i), np.linalg.inv(a + np.dot(b, q0i)))
@@ -222,8 +223,9 @@ class Element(NameMixin, TransformMixin):
 
     def paraxial_matrix(self, n0, l):
         m = np.eye(4)
+        # 4x4 block matrix, M = [[A, B], [C, D]], A is 2x2 tan sag
         d = self.distance
-        m[0, 2] = m[1, 3] = d
+        m[0, 2] = m[1, 3] = d/n0
         return n0, m
 
     def propagate(self, y0, u0, n0, l, clip=True):
@@ -284,7 +286,7 @@ class Interface(Element):
             return n0, 1.
         if self.material.mirror:
             return n0, -1.
-        n = self.material.refractive_index(l)
+        n = self.refractive_index(l)
         return n, n0/n
 
     def dict(self):
@@ -299,7 +301,9 @@ class Interface(Element):
     def paraxial_matrix(self, n0, l):
         n, m = super(Interface, self).paraxial_matrix(n0, l)
         if self.material is not None:
-            n = self.refractive_index(l)
+            n = self.refractive_index(l)*np.sign(n0)
+            if self.material.mirror:
+                n = -n
         return n, m
 
     def propagate(self, y0, u0, n0, l, clip=True):
@@ -501,27 +505,22 @@ class Spheroid(Interface):
 
     def paraxial_matrix(self, n0, l):
         # [y', u'] = M * [y, u]
+        n, md = super(Spheroid, self).paraxial_matrix(n0, l)
         c = self.curvature
         if self.aspherics is not None:
             c += 2*self.aspherics[0]
-        d = self.distance
-        md = np.eye(4)
-        md[0, 2] = md[1, 3] = d
-
         # FIXME angles is incomplete:
         # rotate to meridional/sagittal then compute total incidence
         # angle, matrix, then rotate back
         theta = self.angles[0] if self.angles is not None else 0.
         costheta = np.cos(theta)
-        n = n0
         m = np.eye(4)
         if self.material is not None:
             if self.material.mirror:
-                m[2, 0] = 2*c*costheta
-                m[3, 1] = 2*c/costheta
-                m = -m
+                m[2, 0] = -2*c*costheta*np.sign(n0)
+                m[3, 1] = -2*c/costheta*np.sign(n0)
+                m[2, 2] = m[3, 3] = -1
             else:
-                n = self.refractive_index(l)
                 mu = n/n0
                 p = np.sqrt(mu**2 + costheta**2 - 1)
                 m[1, 1] = p/(mu*costheta)
@@ -561,16 +560,14 @@ class Spheroid(Interface):
             a2, a4 = self.aspherics[:2]
             k += a4 - a2/4*(4*a2**2 + 6*c*a2 + 3*c**2)
             c += 2*a2
-        if self.material is not None and self.material.mirror:
-            n = -n  # FIXME check, cleanup
         mu = n0/n
         # incidence
-        i = c*y + u0
-        l = n*(u[0]*y[1] - u[1]*y[0])
-        s = .5*n0*(1 - mu)*y*(u + i)/l
-        w = 4*k*(n - n0)/l
-        #print(self, c, k, w, l, y)
-        #print(s[0]*i[0]**2, w*y[0]**4)
+        i = c*y + u0/n0
+        l = u[0]*y[1] - u[1]*y[0]
+        s = .5*y*n0*(mu - 1)/l*(i + u/n*np.sign(mu))
+        w = 4*k*n*(mu - 1)/l
+        # print("self c k i w l y", self, c, k, i, w, l, y)
+        # print(s[0]*i[0]**2, w*y[0]**4)
         # transverse third-order spherical
         tsc = s[0]*i[0]**2 + w*y[0]**4
         # sagittal third-order coma
@@ -580,11 +577,12 @@ class Spheroid(Interface):
         # transverse third-order astigmatism
         tac = s[0]*i[1]**2 + w*y[0]**2*y[1]**2
         # transverse third-order Petzval
-        tpc = (1-mu)*c*l/n0/2
+        tpc = -(1 - mu)/n0*c*l/2
         # third-order distortion
-        dc = s[1]*i[0]*i[1]+.5*(u[1]**2-u0[1]**2) + w*y[0]*y[1]**3
+        dc = s[1]*i[0]*i[1] + .5*(u[1]**2/n**2 - u0[1]**2/n0**2) + \
+            w*y[0]*y[1]**3
         # paraxial transverse axial, lateral chromatic
-        tachc, tchc = -y[0]*i/l*(v0-mu*v)
+        tachc, tchc = -y[0]*i/l*(v0 - mu*v)
 
         return tsc, cc, tac, tpc, dc, tachc, tchc
 

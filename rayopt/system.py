@@ -410,7 +410,7 @@ class System(list):
         m = np.eye(4)
         for n, mi in self.paraxial_matrices(l, start, stop):
             m = np.dot(mi, m)
-        return m
+        return n, m
 
     @property
     def origins(self):
