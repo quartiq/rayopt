@@ -225,7 +225,7 @@ class Element(NameMixin, TransformMixin):
         m = np.eye(4)
         # 4x4 block matrix, M = [[A, B], [C, D]], A is 2x2 tan sag
         d = self.distance
-        m[0, 2] = m[1, 3] = d/n0
+        m[0, 2] = m[1, 3] = d/np.fabs(n0)
         return n0, m
 
     def propagate(self, y0, u0, n0, l, clip=True):
@@ -301,9 +301,7 @@ class Interface(Element):
     def paraxial_matrix(self, n0, l):
         n, m = super(Interface, self).paraxial_matrix(n0, l)
         if self.material is not None:
-            n = self.refractive_index(l)*np.sign(n0)
-            if self.material.mirror:
-                n = -n
+            n = self.refractive_index(l)
         return n, m
 
     def propagate(self, y0, u0, n0, l, clip=True):
@@ -504,33 +502,36 @@ class Spheroid(Interface):
         return s
 
     def paraxial_matrix(self, n0, l):
+        # Reflection and Refraction of Gaussian Light Beams at
+        # Tilted Ellipsoidal Surfaces
+        # G. A. Massey and A. E. Siegman
+        # Applied Optics IP, vol. 8, Issue 5, p.975
+        #
         # [y', u'] = M * [y, u]
         n, md = super(Spheroid, self).paraxial_matrix(n0, l)
         c = self.curvature
         if self.aspherics is not None:
             c += 2*self.aspherics[0]
-        # FIXME angles is incomplete:
-        # rotate to meridional/sagittal then compute total incidence
-        # angle, matrix, then rotate back
         theta = self.angles[0] if self.angles is not None else 0.
         costheta = np.cos(theta)
         m = np.eye(4)
         if self.material is not None:
             if self.material.mirror:
-                m[2, 0] = -2*c*costheta*np.sign(n0)
-                m[3, 1] = -2*c/costheta*np.sign(n0)
-                m[2, 2] = m[3, 3] = -1
+                m[2, 0] = 2*c*costheta
+                m[3, 1] = 2*c/costheta
             else:
                 mu = n/n0
                 p = np.sqrt(mu**2 + costheta**2 - 1)
                 m[1, 1] = p/(mu*costheta)
-                m[2, 0] = c*(costheta - p)/mu
-                m[3, 1] = c*(costheta - p)/(costheta*p)
-                m[2, 2] = 1./mu
-                m[3, 3] = costheta/p
+                m[2, 0] = n0*c*(costheta - p)
+                m[3, 1] = mu*m[2, 0]/(costheta*p)
+                m[3, 3] = mu*costheta/p
         m = np.dot(m, md)
 
         if self.angles is not None:
+            # FIXME angles is incomplete:
+            # rotate to meridional/sagittal then compute total incidence
+            # angle, matrix, then rotate back
             phi = self.angles[2]
             cphi, sphi = np.cos(phi), np.sin(phi)
             r1 = np.array([[cphi, -sphi], [sphi, -cphi]])
@@ -561,13 +562,13 @@ class Spheroid(Interface):
             k += a4 - a2/4*(4*a2**2 + 6*c*a2 + 3*c**2)
             c += 2*a2
         mu = n0/n
+        if self.material and self.material.mirror:
+            mu *= -1
         # incidence
         i = c*y + u0/n0
         l = u[0]*y[1] - u[1]*y[0]
-        s = .5*y*n0*(mu - 1)/l*(i + u/n*np.sign(mu))
+        s = .5*y*n0*(1 - mu)/l*(i + np.sign(mu)*u/n)
         w = 4*k*n*(mu - 1)/l
-        # print("self c k i w l y", self, c, k, i, w, l, y)
-        # print(s[0]*i[0]**2, w*y[0]**4)
         # transverse third-order spherical
         tsc = s[0]*i[0]**2 + w*y[0]**4
         # sagittal third-order coma
@@ -577,7 +578,7 @@ class Spheroid(Interface):
         # transverse third-order astigmatism
         tac = s[0]*i[1]**2 + w*y[0]**2*y[1]**2
         # transverse third-order Petzval
-        tpc = -(1 - mu)/n0*c*l/2
+        tpc = -(mu - 1)/n0*c*l/2
         # third-order distortion
         dc = s[1]*i[0]*i[1] + .5*(u[1]**2/n**2 - u0[1]**2/n0**2) + \
             w*y[0]*y[1]**3

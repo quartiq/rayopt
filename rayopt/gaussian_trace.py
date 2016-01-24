@@ -43,8 +43,8 @@ class GaussianTrace(Trace):
         self.n = np.empty(self.length)
 
     def make_qi(self, l, n, waist, position=(0, 0.), angle=0.):
-        z0 = np.pi*n*np.array(waist)**2*self.system.scale/l
-        z = np.array(position)
+        z0 = np.pi*np.array(waist)**2*self.system.scale/l
+        z = np.array(position)/n
         qi = 1/(z + 1j*z0)
         qq = np.eye(2)*qi
         ca, sa = np.cos(angle), np.sin(angle)
@@ -88,10 +88,11 @@ class GaussianTrace(Trace):
             # qi[i] is valid after element i
             # element indices for z[i-1] <= z < z[i]
             # returns the qi right after element i if z == z[i]
-            i = np.searchsorted(self.z, z) - 1
+            i = np.searchsorted(self.path, z) - 1
             i = np.where(i < 0, 0, i)
-            dz = z - self.z.take(i)
             qi = self.qi[i, :]
+            ni = self.n[i, ]
+            dz = (z - self.path[i, ])/ni
             # have to do full freespace propagation here
             # simple astigmatic have just q = q0 + dz
             qixx, qixy, qiyy = qi[:, 0, 0], qi[:, 0, 1], qi[:, 1, 1]
@@ -101,8 +102,7 @@ class GaussianTrace(Trace):
             qi1[:, 0, 0] = n*(qixx*(1 + dz*qiyy) - dz*qixy2)
             qi1[:, 1, 0] = qi1[:, 0, 1] = n*qixy
             qi1[:, 1, 1] = n*(qiyy*(1 + dz*qixx) - dz*qixy2)
-            n = self.n.take(i)
-            return qi1, n
+            return qi1, ni
 
     def angle(self, qi):
         qixx, qixy, qiyy = qi[:, 0, 0], qi[:, 0, 1], qi[:, 1, 1]
@@ -124,42 +124,42 @@ class GaussianTrace(Trace):
         assert np.allclose(qi[:, 1, 0], 0), qi
         return np.diagonal(qi, 0, 1, 2), a
 
-    def spot_radius_at(self, z, normal=False):
+    def spot_radius_at(self, z=None, normal=False):
         qi, n = self.qin_at(z)
-        c = self.wavelength/self.system.scale/np.pi/n[:, None]
+        c = self.wavelength/(self.system.scale*np.pi)
         if normal:
             r, a = self.normal(-qi.imag)
-            r = np.sqrt(c/r)
-            return r, a
+            return np.sqrt(c/r), a
         else:
             r = np.diagonal(-qi.imag, 0, 1, 2)
             return np.sqrt(c/r)
 
-    def curvature_radius_at(self, z, normal=False):
+    def curvature_radius_at(self, z=None, normal=False):
         qi, n = self.qin_at(z)
+        c = n[:, None]
         if normal:
             r, a = self.normal(qi.real)
-            return 1/r, a
+            return c/r, a
         else:
             r = np.diagonal(qi.real, 0, 1, 2)
-            return 1/r
+            return c/r
 
     @property
     def curvature_radius(self):  # on element
-        return self.curvature_radius_at(z=None)
+        return self.curvature_radius_at()
 
     @property
     def spot_radius(self):  # on element
-        return self.spot_radius_at(z=None)
+        return self.spot_radius_at()
 
     @property
     def waist_position(self):  # after element relative to element
-        w = -(1/np.diagonal(self.qi, 0, 1, 2)).real
+        w = -(1/np.diagonal(self.qi, 0, 1, 2)).real*self.n[:, None]
         return w
 
     @property
     def rayleigh_range(self):  # after element
-        z = (1/np.diagonal(self.qi, 0, 1, 2)).imag
+        z = (1/np.diagonal(self.qi, 0, 1, 2)).imag*self.n[:, None]
         return z
 
     @property
@@ -190,7 +190,7 @@ class GaussianTrace(Trace):
 
     @property
     def eigenmodes(self):
-        m = self.system.paraxial_matrix(self.wavelength)
+        n, m = self.system.paraxial_matrix(self.wavelength)
         # FIXME only know how to do this for simple astigmatic matrices
         # otherwise, solve qi*b*qi + qi*a - d*qi - c = 0
         assert self.is_simple_astigmatic(m)
@@ -202,7 +202,7 @@ class GaussianTrace(Trace):
         return q
 
     def is_proper(self):  # Nemes checks
-        m = self.system.paraxial_matrix(self.wavelength)
+        n, m = self.system.paraxial_matrix(self.wavelength)
         a, b, c, d = m[:2, :2], m[:2, 2:], m[2:, :2], m[2:, 2:]
         for i, (v1, v2) in enumerate([
                 (np.dot(a, d.T) - np.dot(b, c.T), np.eye(2)),
@@ -213,7 +213,7 @@ class GaussianTrace(Trace):
 
     @property
     def m(self):
-        m = self.system.paraxial_matrix(self.wavelength)
+        n, m = self.system.paraxial_matrix(self.wavelength)
         assert self.is_simple_astigmatic(m)
         a0, a1, d0, d1 = np.diag(m)
         m = np.array([a0 + d0, a1 + d1])/2
@@ -241,9 +241,9 @@ class GaussianTrace(Trace):
         sa, sb = s.T
         wpx, wpy = self.waist_position.T  # assumes simple astig
         wrx, wry = self.waist_radius.T  # assumes simple astig
-        c = np.c_[self.z, sa, sb, np.rad2deg(rs), wpx, wpy, wrx, wry]
+        c = np.c_[self.path, sa, sb, np.rad2deg(rs), wpx, wpy, wrx, wry]
         return self.print_coeffs(
-            c, "track/spot a/spot b/spot ang/waistx dz/waisty dz/"
+            c, "path/spot a/spot b/spot ang/waistx dz/waisty dz/"
             "waist x/waist y".split("/"), sum=False)
 
     def __str__(self):
@@ -264,9 +264,9 @@ class GaussianTrace(Trace):
 
     def plot(self, ax, axis=1, npoints=5001, waist=True, scale=10, **kwargs):
         kwargs.setdefault("color", "black")
-        z = np.linspace(self.z[0], self.z[-1], npoints)
-        i = np.searchsorted(self.z, z) - 1
-        m = self.mirrored.take(i)
+        z = np.linspace(self.path[0], self.path[-1], npoints)
+        i = np.searchsorted(self.path, z) - 1
+        m = self.mirrored[i, ]
         wx, wy = self.spot_radius_at(z).T*scale*m
         y = np.array([
             [wx, wx, z], [wy, wy, z],

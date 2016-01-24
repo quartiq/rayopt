@@ -332,10 +332,12 @@ class ParaxialTrace(Trace):
         na, ma = self.system.paraxial_matrix(self.wavelength, stop=ai + 1)
         ma = ma[self.axis::2, self.axis::2]
         a, b = ma[0]
+        b *= self.system[0].refractive_index(self.wavelength)
         self.system.object.update(self.system[0].radius, b/a, r/a)
         nb, mb = self.system.paraxial_matrix(self.wavelength, start=ai + 1)
         mb = mb[self.axis::2, self.axis::2]
         a, b = np.linalg.inv(mb)[0]
+        b *= nb
         # m = np.dot(mb, ma)
         self.system.image.update(self.system[-1].radius, b/a, r/a)
 

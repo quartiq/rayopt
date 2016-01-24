@@ -45,9 +45,16 @@ elements:
 class ParabolicCase(unittest.TestCase):
     def setUp(self):
         self.s = ro.system_from_yaml(parabolic)
+        self.s.update()
 
     def test_zero_spherical(self):
+        nptest.assert_allclose(self.s.paraxial.transverse3[1, 0], 0)
+
+    def test_hyperbolic(self):
+        self.s[1].conic = 0
         self.s.update()
-        print(self.s)
-        print(self.s.paraxial)
-        print(self.s.paraxial.transverse3)
+        sph = self.s.paraxial.transverse3[1, 0]
+        self.s[1].conic = -2
+        self.s.update()
+        hyp = self.s.paraxial.transverse3[1, 0]
+        nptest.assert_allclose(sph, -hyp)
