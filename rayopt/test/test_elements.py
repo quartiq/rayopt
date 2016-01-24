@@ -85,14 +85,14 @@ class ParaxialCase(unittest.TestCase):
         y, u = np.hsplit(yu, 2)
         mu = 1/self.s0.material.n
         nptest.assert_allclose(y, y0)
-        nptest.assert_allclose(u/mu, u0)
+        nptest.assert_allclose(u, u0)
 
     def test_snell_paraxial_mirror(self):
         y0, u0 = (1, 2), (.2, .1)
         yu, n = self.sm0.propagate_paraxial(np.hstack((y0, u0)), 1., 1.)
         y, u = np.hsplit(yu, 2)
-        nptest.assert_allclose(-y, y0)
-        nptest.assert_allclose(-u, u0)
+        nptest.assert_allclose(y, y0)
+        nptest.assert_allclose(u, u0)
 
     def test_align(self):
         d = 0, -.1, 1
@@ -105,8 +105,8 @@ class ParaxialCase(unittest.TestCase):
         yu, n = self.s0.propagate_paraxial(np.hstack((y0, u0)), 1., 1.)
         y, u = np.hsplit(yu, 2)
         nptest.assert_allclose(y[0], y0[0])
-        nptest.assert_allclose(u[0]/mu, u0[0])
-        nptest.assert_allclose(u[1]/mu, d[0])
+        nptest.assert_allclose(u[0], u0[0])
+        nptest.assert_allclose(u[1], d[0])
 
 
 class ParaxToRealCase(unittest.TestCase):
@@ -126,12 +126,12 @@ class ParaxToRealCase(unittest.TestCase):
         y0r = np.hstack((y0p, np.ones((n, 1))*-self.s.distance))
         u0r = np.hstack((sinarctan(u0p), np.zeros((n, 1))))
         u0r[:, 2] = np.sqrt(1 - np.square(u0p).sum(1))
-        yup, np_ = self.s.propagate_paraxial(np.hstack((y0p, u0p)), 1., 1.)
-        yp, up = np.hsplit(yup, 2)
+        yup, np_ = self.s.propagate_paraxial(np.hstack((y0p, u0p)).T, 1., 1.)
+        yp, up = np.hsplit(yup.T, 2)
         # y0r, u0r = self.s.to_normal(y0r, u0r)
         yr, ur, nr, tr = self.s.propagate(y0r, u0r, 1., 1.)
         # yr, ur = self.s.from_normal(yr, ur)
         yr, ur = self.sa.to_axis(yr, ur)
         nptest.assert_allclose(nr, np_, rtol=e**2, atol=3e-8)
         nptest.assert_allclose(yr[:, :2], yp, rtol=e**2, atol=3e-8)
-        nptest.assert_allclose(tanarcsin(ur), up, rtol=e**2, atol=3e-8)
+        nptest.assert_allclose(tanarcsin(ur), up/np_, rtol=e**2, atol=3e-8)

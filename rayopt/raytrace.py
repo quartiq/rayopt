@@ -33,20 +33,21 @@ class Trace(object):
         self.length = len(self.system)
 
     def propagate(self):
-        self.z = self.system.track
+        self.path = self.system.path
+        self.track = self.system.track
         self.origins = self.system.origins
         self.mirrored = self.system.mirrored
 
     def from_axis(self, y, i=None, ref=0):
         y = np.atleast_3d(y) # zi, rayi, xyz
         if i is None:
-            i = np.searchsorted(y[:, ref, 2], self.z)
+            i = np.searchsorted(y[:, ref, 2], self.path)
         ys = []
         for j, yi in enumerate(np.vsplit(y, i)):
             if yi.ndim <= 1:
                 continue
             j = min(self.length - 1, j)
-            zi, ei, oi = self.z[j], self.system[j], self.origins[j]
+            zi, ei, oi = self.path[j], self.system[j], self.origins[j]
             yj = yi.reshape(-1, 3)
             yj = oi + ei.from_axis(yj - (0, 0, zi))
             ys.append(yj.reshape(yi.shape))
