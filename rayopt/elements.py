@@ -511,7 +511,7 @@ class Spheroid(Interface):
         n, md = super(Spheroid, self).paraxial_matrix(n0, l)
         c = self.curvature
         if self.aspherics is not None:
-            c += 2*self.aspherics[0]
+            c = c + 2*self.aspherics[0]
         theta = self.angles[0] if self.angles is not None else 0.
         costheta = np.cos(theta)
         m = np.eye(4)
@@ -560,15 +560,15 @@ class Spheroid(Interface):
         if self.aspherics:
             a2, a4 = self.aspherics[:2]
             k += a4 - a2/4*(4*a2**2 + 6*c*a2 + 3*c**2)
-            c += 2*a2
-        mu = n0/n
+            c = c + 2*a2
         if self.material and self.material.mirror:
-            mu *= -1
+            n = -n
+        mu = n0/n
         # incidence
         i = c*y + u0/n0
         l = u[0]*y[1] - u[1]*y[0]
-        s = .5*y*n0*(1 - mu)/l*(i + np.sign(mu)*u/n)
-        w = 4*k*n*(mu - 1)/l
+        s = .5*y*n0*(1 - mu)/l*(i + u/n)
+        w = 4*k*n*(1 - mu)/l
         # transverse third-order spherical
         tsc = s[0]*i[0]**2 + w*y[0]**4
         # sagittal third-order coma
