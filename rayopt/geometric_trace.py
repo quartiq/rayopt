@@ -111,7 +111,7 @@ class GeometricTrace(Trace):
             t -= tj*self.n[0]
         if radius is None:
             if self.system.image.pupil.telecentric:
-                radius = self.z[image] - self.z[after]
+                radius = self.track[image] - self.track[after]
             else:
                 radius = -self.system.image.pupil.distance
         # center sphere on self.ref image
@@ -243,11 +243,11 @@ class GeometricTrace(Trace):
         ax.plot(y[:, :, 2], y[:, :, axis], **kwargs)
 
     def print_trace(self):
-        t = np.cumsum(self.t, axis=0) - self.z[:, None]
+        t = np.cumsum(self.t, axis=0) - self.path[:, None]
         for i in range(self.nrays):
             yield "ray %i" % i
             c = np.concatenate(
-                (self.n[:, None], self.z[:, None], t[:, i, None],
+                (self.n[:, None], self.path[:, None], t[:, i, None],
                  self.y[:, i, :], self.u[:, i, :]), axis=1)
             for _ in self.print_coeffs(
                     c, "n/track z/rel path/"
