@@ -332,7 +332,7 @@ class ParaxialTrace(Trace):
         na, ma = self.system.paraxial_matrix(self.wavelength, stop=ai + 1)
         ma = ma[self.axis::2, self.axis::2]
         a, b = ma[0]
-        b *= self.system[0].refractive_index(self.wavelength)
+        b *= self.system.refractive_index(self.wavelength, 0)
         self.system.object.update(self.system[0].radius, b/a, r/a)
         nb, mb = self.system.paraxial_matrix(self.wavelength, start=ai + 1)
         mb = mb[self.axis::2, self.axis::2]
