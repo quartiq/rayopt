@@ -225,7 +225,7 @@ class Element(NameMixin, TransformMixin):
         m = np.eye(4)
         # 4x4 block matrix, M = [[A, B], [C, D]], A is 2x2 tan sag
         d = self.distance
-        m[0, 2] = m[1, 3] = d/np.fabs(n0)
+        m[0, 2] = m[1, 3] = d/n0
         return n0, m
 
     def propagate(self, y0, u0, n0, l, clip=True):
@@ -525,7 +525,7 @@ class Spheroid(Interface):
                 m[1, 1] = p/(mu*costheta)
                 m[2, 0] = n0*c*(costheta - p)
                 m[3, 1] = mu*m[2, 0]/(costheta*p)
-                m[3, 3] = mu*costheta/p
+                m[3, 3] = 1/m[1, 1]
         m = np.dot(m, md)
 
         if self.angles is not None:
