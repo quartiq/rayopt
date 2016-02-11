@@ -68,13 +68,13 @@ The choice of prescription specification is a little different from most other
 lens design and ray tracing programs. RayOpt associates with an element
 (surface):
 
-  * `distance` (or directional `offset`, measured in the global, unrotated coordinate
-    system) of the element's apex relative to the previous element's apex.
-  * orientation (x-y-z Euler `angles` in the rotating frame) with respect to
-    the directional offset
-  * element properties (type of element, `curvature`, aspheric and conic coefficients,
-    focal length of an ideal element)
-  * optionally, the `material` after the element (behind the surface)
+* `distance` (or directional `offset`, measured in the global, unrotated coordinate
+  system) of the element's apex relative to the previous element's apex.
+* orientation (x-y-z Euler `angles` in the rotating frame) with respect to
+  the directional offset
+* element properties (type of element, `curvature`, aspheric and conic coefficients,
+  focal length of an ideal element)
+* optionally, the `material` after the element (behind the surface)
 
 Ray data are given at (ray intercepts) or just after (direction cosines,
 paraxial slopes) the respective element unless stated otherwise (e.g. incidence
