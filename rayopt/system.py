@@ -529,12 +529,12 @@ class System(list):
 
     def aim_marginal(self, yo, yp, z, p, l=None, stop=None, **kwargs):
         assert p
-        if not self.object.pupil.aim:
+        rim = stop == -1
+        if not self.object.pupil.aim and not rim:
             return p
         if l is None:
             l = self.wavelengths[0]
         n = self.refractive_index(l, 0)
-        rim = stop == -1
         if rim:
             stop = len(self) - 1
         elif stop is None:
