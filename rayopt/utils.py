@@ -197,6 +197,8 @@ def pupil_distribution(distribution, nrays):
         x, w = gl_roots(n)
         r, p, weight = interval_to_circle(x, w)
         xy = np.c_[r*np.cos(p), r*np.sin(p)]
+    else:
+        raise ValueError("unknown ray distribution", d)
     return ref, xy, weight
 
 
