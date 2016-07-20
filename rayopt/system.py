@@ -407,6 +407,7 @@ class System(list):
             yield n, m
 
     def paraxial_matrix(self, l, start=1, stop=None):
+        n = 1.
         m = np.eye(4)
         for n, mi in self.paraxial_matrices(l, start, stop):
             m = np.dot(mi, m)
