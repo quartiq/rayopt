@@ -263,7 +263,7 @@ class GaussianTrace(Trace):
         self.propagate()
 
     def plot(self, ax, axis=1, npoints=5001, waist=True, scale=10, **kwargs):
-        kwargs.setdefault("color", "black")
+        kwargs.setdefault("color", "red")
         z = np.linspace(self.path[0], self.path[-1], npoints)
         i = np.searchsorted(self.path, z) - 1
         m = self.mirrored[i, ]
