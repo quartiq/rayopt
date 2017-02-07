@@ -79,10 +79,6 @@ class Analysis(object):
     def run(self):
         if self.update:
             self.system.update()
-        if self.trace_gaussian and self.system.object.finite:
-            self.gaussian = GaussianTrace(self.system)
-            if self.print_gaussian:
-                self.text.append(str(self.gaussian))
         if self.resize_full:
             t = GeometricTrace(self.system)
             t.rays_paraxial()
@@ -97,6 +93,9 @@ class Analysis(object):
             self.text.append(str(self.system))
         if self.print_paraxial:
             self.text.append(str(self.system.paraxial))
+        g = GaussianTrace(self.system)
+        if self.print_gaussian:
+            self.text.append(str(g))
         t = GeometricTrace(self.system)
         t.rays_paraxial()
         if self.print_full:
@@ -107,7 +106,7 @@ class Analysis(object):
         if self.plot_paraxial:
             self.system.paraxial.plot(ax)
         if self.plot_gaussian:
-            self.gaussian.plot(ax)
+            g.plot(ax)
         if self.plot_full:
             t.plot(ax)
         for h in min(self.system.fields), max(self.system.fields):
