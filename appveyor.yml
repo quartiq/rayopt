@@ -37,8 +37,8 @@ test_script:
 #  - "%WITH_COMPILER% python setup.py test"
   - "python setup.py test"
 
-artifacts:
-  - path: "%PYPATH%%PYSUFFIX%\\conda-bld\\win-*\\*.tar.bz2"
+#artifacts:
+#  - path: "%PYPATH%%PYSUFFIX%\\conda-bld\\win-*\\*.tar.bz2"
 
 on_success:
   - "anaconda -t %ANACONDA_TOKEN% upload --no-progress --channel ci %PYPATH%%PYSUFFIX%\\conda-bld\\win-*\\*.tar.bz2"
