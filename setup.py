@@ -61,9 +61,9 @@ setup(
     entry_points={},
     package_data={"rayopt": ["library.sqlite"]},
     classifiers=[f.strip() for f in """
-        Development Status :: 4 - Beta
+        Development Status :: 5 - Production/Stable
         Intended Audience :: Science/Research
-        License :: OSI Approved :: GNU Lesser General Public License (LGPL)
+        License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)
         Operating System :: OS Independent
         Programming Language :: Python :: 2
         Programming Language :: Python :: 3
