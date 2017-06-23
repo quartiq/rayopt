@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
-#   Copyright (C) 2014 Robert Jordens <jordens@phys.ethz.ch>
+#   Copyright (C) 2014 Robert Jordens <robert@joerdens.org>
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU Lesser General Public License as published by

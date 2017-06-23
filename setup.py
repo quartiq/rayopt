@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
-#   Copyright (C) 2012 Robert Jordens <jordens@phys.ethz.ch>
+#   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU Lesser General Public License as published by
@@ -32,7 +32,7 @@ setup(
     description="raytracing and lens design framework",
     long_description=open("README.rst").read(),
     author="Robert Jordens",
-    author_email="jordens@gmail.com",
+    author_email="robert@joerdens.org",
     url="https://github.com/jordens/rayopt",
     license="LGPLv3+",
     keywords=("optics lens design raytracing optimization "

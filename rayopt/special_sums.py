@@ -2,7 +2,7 @@
 #   special_sums - algorithms to sum 2D arrays along angled parallels,
 #   radially or azimuthally
 #
-#   Copyright (C) 2012 Robert Jordens <jordens@phys.ethz.ch>
+#   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
 #
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU Lesser General Public License as published by
