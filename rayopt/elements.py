@@ -149,6 +149,8 @@ class TransformMixin(object):
                 rdir = 1., 0, 0
             self.rot_axis = r1 = rotation_matrix(rang, rdir)[:3, :3]
             r = np.dot(r, r1)
+        else:
+            self.rot_axis = None
         if not self.normal:
             r1 = euler_matrix(axes=str("rxyz"), *tuple(a))[:3, :3]
             r = np.dot(r, r1)
