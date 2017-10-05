@@ -59,7 +59,10 @@ setup(
     ]),
     include_dirs=[np.get_include()],
     entry_points={},
-    package_data={"rayopt": ["library.sqlite"]},
+    package_data={
+        "rayopt": ["library.sqlite"],
+        "" : ["*.pyx","*.pxd"],
+    },
     classifiers=[f.strip() for f in """
         Development Status :: 5 - Production/Stable
         Intended Audience :: Science/Research
