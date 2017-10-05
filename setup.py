@@ -28,7 +28,7 @@ import numpy as np
 
 setup(
     name="rayopt",
-    version="0.2",
+    version="0.2+git",
     description="raytracing and lens design framework",
     long_description=open("README.rst").read(),
     author="Robert Jordens",
