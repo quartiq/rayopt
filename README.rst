@@ -107,3 +107,31 @@ incident rays to be evanescent at the image surface. This can also be compared
 to other programs where the thickness of the image surface is never relevant or
 the material in object space and the position of the lens has to be tracked
 somewhere else depending on the implementation.
+
+Literature
+----------
+
+* Warren J. Smith: Modern Optical Engineering, McGraw-Hill 2000: concise
+  and methods derivation from paraxial all the way to arbitrary ray tracing,
+  with terminology explained and examples given
+* Michael Bass (ed): Mandbook of Optics I and II, OSA/McGraw-Hill 1995:
+  physical foundations, broad on optics, comprehensive on theory, some info on
+  numerics, some example designs
+* Daniel Malacara: Handbook of Optical Design, Marcel Dekker Inc. 1994:
+  Introduction, Aberations, Examples, more info on terminology, especially in
+  ray tracing programs and codes
+* Daniel Malacara: Geometrical and Instrumental Optics, Academic Press Inc. 1988:
+  less info about algorithms and numerical methds, more examples and use cases,
+  speciality lens designs
+* Robert R. Shannon: The Art and Science of Optical Design, Cambridge
+  University Press 1997: many examples with Oslo and Zemax, not very thorough
+  on numerical methods and foundations, good for material comparison with own
+  codes.
+* Michael J. Kidger: Intermediate Optical Design, SPIE Press 2004:
+  info on optimization techniques and algorithms, higher order aberrations,
+  lots of example designs
+* Milton Laikin: Lens Design, CRC Press 2007: little bit of basic theory, lots
+  of basic and paradigmatic example designs
+* Oslo Optics `manual <https://www.lambdares.com/wp-content/uploads/support/oslo/oslo_edu/oslo-user-guide.pdf>`_ and `reference <https://www.lambdares.com/wp-content/uploads/support/oslo/oslo_edu/oslo-optics-reference.pdf>`_
+* Zemax
+  `manual <https://neurophysics.ucsd.edu/Manuals/Zemax/ZemaxManual.pdf>`_
