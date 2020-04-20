@@ -74,10 +74,10 @@ class ParaxialTrace(Trace):
             y[0] = 0, -o.radius
             u[0] = n0*o.pupil.slope, n0*o.slope
         else:
-            if self.system.object.wideangle:
+            if o.wideangle:
                 c = 1.
             else:
-                c = tanarcsin(self.system.object.angle)
+                c = np.tan(o.angle)
             y[0] = o.pupil.radius, -o.slope*o.pupil.distance
             u[0] = 0, n0*c
 
@@ -329,11 +329,13 @@ class ParaxialTrace(Trace):
     def update_conjugates(self):
         ai = self.system.stop
         r = self.system[ai].radius
+
         na, ma = self.system.paraxial_matrix(self.wavelength, stop=ai + 1)
         ma = ma[self.axis::2, self.axis::2]
         a, b = ma[0]
         b *= self.system.refractive_index(self.wavelength, 0)
         self.system.object.update(self.system[0].radius, b/a, r/a)
+
         nb, mb = self.system.paraxial_matrix(self.wavelength, start=ai + 1)
         mb = mb[self.axis::2, self.axis::2]
         a, b = np.linalg.inv(mb)[0]

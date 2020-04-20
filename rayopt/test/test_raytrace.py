@@ -109,11 +109,11 @@ class DemotripCase(unittest.TestCase):
         self.s.align(np.ones_like(self.s.track))
 
     def test_paraxial(self):
-        p = ParaxialTrace(self.s)
+        p = self.s.paraxial
         # print(str(p))
         nptest.assert_allclose(p.u[0, 0], 0)
         nptest.assert_allclose(p.u[0, 1],
-                               p.n[0]*tanarcsin(self.s.object.angle))
+                               p.n[0]*np.tan(self.s.object.angle))
         nptest.assert_allclose(p.y[self.s.stop, 0], self.s[self.s.stop].radius,
                                rtol=1e-2)
         nptest.assert_allclose(p.y[self.s.stop, 1], 0, atol=1e-9)

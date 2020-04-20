@@ -204,11 +204,11 @@ class InfiniteConjugate(Conjugate):
 
     @property
     def slope(self):
-        return tanarcsin(self.angle)
+        return np.tan(self.angle)
 
     @slope.setter
     def slope(self, c):
-        self.angle = sinarctan(c)
+        self.angle = np.arctan(c)
 
     def map(self, yo, a):
         p = self.projection
