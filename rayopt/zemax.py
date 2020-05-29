@@ -201,6 +201,11 @@ def agf_read(fil, session):
     for line in dat:
         if not line.strip():
             continue
+
+        # Skip internal comments
+        if line.startswith('!'):
+            continue
+
         cmd, args = line.split(" ", 1)
         if cmd == "CC":
             continue
