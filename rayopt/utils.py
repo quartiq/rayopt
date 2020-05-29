@@ -183,7 +183,7 @@ def pupil_distribution(distribution, nrays):
     elif d == "hexapolar":
         n = int(np.sqrt(n/3.-1/12.)-1/2.)
         l = [np.zeros((2, 1))]
-        for i in np.arange(1, n + 1.):
+        for i in range(1, n + 1):
             a = np.linspace(0, 2*np.pi, 6*i, endpoint=False)
             l.append([np.sin(a)*i/n, np.cos(a)*i/n])
         xy = np.concatenate(l, axis=1).T
