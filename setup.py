@@ -51,12 +51,11 @@ setup(
     extras_require={},
     packages=find_packages(),
     test_suite="rayopt.test",
-    ext_modules=cythonize([
-        Extension("rayopt._transformations",
-                  sources=["rayopt/_transformations.c"]),
-        Extension("rayopt.simplex_accel",
-                  sources=["rayopt/simplex_accel.pyx"]),
-    ]),
+    ext_modules=cythonize([Extension("rayopt._transformations",
+                                     sources=["rayopt/_transformations.c"]),
+                           Extension("rayopt.simplex_accel",
+                                     sources=["rayopt/simplex_accel.pyx"])],
+                          language_level='3'),
     include_dirs=[np.get_include()],
     entry_points={},
     package_data={

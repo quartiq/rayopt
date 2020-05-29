@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2015 Robert Jordens <robert@joerdens.org>
@@ -18,9 +17,6 @@
 
 #cython: boundscheck=False, wraparound=False, cdivision=True,
 #cython: embedsignature=True, initializedcheck=False
-
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import cython
 import numpy as np
