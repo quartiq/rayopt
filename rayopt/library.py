@@ -23,6 +23,7 @@ import os
 import shutil
 import site
 import warnings
+import logging
 
 from pkg_resources import Requirement, resource_filename
 
@@ -33,6 +34,7 @@ from .utils import public
 from .library_items import Material, Lens, Catalog, Base
 from . import oslo, zemax, rii, codev
 
+logger = logging.getLogger(__name__)
 
 oslo.register_parsers()
 zemax.register_parsers()
@@ -89,10 +91,14 @@ class Library(object):
     def load_all(self, paths, **kwargs):
         for path in paths:
             for i in os.listdir(path):
+                file_path = os.path.join(path, i)
                 try:
-                    self.load(os.path.join(path, i), **kwargs)
+                    self.load(file_path, **kwargs)
                 except KeyError:
                     pass
+                except Exception as e:
+                    logger.exception("Could not load %s.", file_path)
+                    continue
 
     def load(self, fil, mode="refresh"):
         if mode in ("refresh", "reload"):
