@@ -5,7 +5,7 @@ package:
 
 about:
   home: https://github.com/jordens/rayopt
-  license: GPL3
+  license: LGPLv3+
   license_file: COPYING
 
 source:
