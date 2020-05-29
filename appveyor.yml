@@ -5,8 +5,8 @@ environment:
     ANACONDA_TOKEN:
       secure: aGxw9nEg+McADa71cxEuNwcuufgptKexXZJh0HM0Msh5QP1EFa7we5g8gJsbSGCo
   matrix:
-    - PYTHON_VERSION: "3.5"
-    - PYTHON_VERSION: "2.7"
+    - PYTHON_VERSION: "3.7"
+    - PYTHON_VERSION: "3.8"
 matrix:
     fast_finish: true
 
