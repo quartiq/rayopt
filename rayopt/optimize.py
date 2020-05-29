@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 from fastcache import clru_cache
 import numpy as np
@@ -48,7 +45,7 @@ class Variable:
 class PathVariable(Variable):
     def __init__(self, system, path, *args, **kwargs):
         self.path = path
-        super(PathVariable, self).__init__(system, *args, **kwargs)
+        super().__init__(system, *args, **kwargs)
 
     def get(self):
         return self.system.get_path(self.path)
@@ -86,7 +83,7 @@ class Operand:
 
 class FuncOp(Operand):
     def __init__(self, system, func, *args, **kwargs):
-        super(FuncOp, self).__init__(system, *args, **kwargs)
+        super().__init__(system, *args, **kwargs)
         self.func = func
 
     def get(self):

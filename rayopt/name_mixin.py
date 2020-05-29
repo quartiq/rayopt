@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2014 Robert Jordens <robert@joerdens.org>
@@ -16,13 +15,11 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 __all__ = ["NameMixin"]
 
 
-class NameMixin(object):
+class NameMixin:
     _types = {}
     _default_type = None
     _nickname = None
@@ -71,4 +68,4 @@ class NameMixin(object):
         self._nickname = name
 
     def __str__(self):
-        return "<%s/%s>" % (self.typeletter, self.nickname)
+        return f"<{self.typeletter}/{self.nickname}>"

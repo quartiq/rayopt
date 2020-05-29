@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import itertools
 
@@ -32,13 +29,13 @@ class GaussianTrace(Trace):
     # qi[i] is valid after the ith element perpendicular to/along
     # the excidence direction (assumes aligned()
     def __init__(self, system):
-        super(GaussianTrace, self).__init__(system)
+        super().__init__(system)
         self.allocate()
         self.rays()
         self.propagate()
 
     def allocate(self):
-        super(GaussianTrace, self).allocate()
+        super().allocate()
         self.qi = np.empty((self.length, 2, 2), dtype=np.complex_)
         self.n = np.empty(self.length)
 
@@ -73,7 +70,7 @@ class GaussianTrace(Trace):
         self.qi[0] = qi
 
     def propagate(self, start=1, stop=None):
-        super(GaussianTrace, self).propagate()
+        super().propagate()
         init = start - 1
         qi, n = self.qi[init], self.n[init]
         for j, (qi, n) in enumerate(self.system.propagate_gaussian(

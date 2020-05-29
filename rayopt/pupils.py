@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2014 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import numpy as np
 
@@ -50,7 +47,7 @@ class Pupil(NameMixin):
             self.radius = radius
 
     def dict(self):
-        dat = super(Pupil, self).dict()
+        dat = super().dict()
         dat["distance"] = float(self.distance)
         if not self.update_distance:
             dat["update_distance"] = self.update_distance
@@ -117,17 +114,16 @@ class NaPupil(Pupil):
     na = None
 
     def __init__(self, na, **kwargs):
-        super(NaPupil, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.na = na
 
     def dict(self):
-        dat = super(NaPupil, self).dict()
+        dat = super().dict()
         dat["na"] = float(self.na)
         return dat
 
     def text(self):
-        for i in super(NaPupil, self).text():
-            yield i
+        yield from super().text()
         yield "NA: %g" % self.na
 
     @property
@@ -150,17 +146,16 @@ class SlopePupil(Pupil):
     slope = None
 
     def __init__(self, slope, **kwargs):
-        super(SlopePupil, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.slope = slope
 
     def dict(self):
-        dat = super(SlopePupil, self).dict()
+        dat = super().dict()
         dat["slope"] = float(self.slope)
         return dat
 
     def text(self):
-        for i in super(SlopePupil, self).text():
-            yield i
+        yield from super().text()
         yield "Slope: %g" % self.slope
 
     @property
@@ -179,21 +174,20 @@ class RadiusPupil(Pupil):
     radius = None
 
     def __init__(self, radius, **kwargs):
-        super(RadiusPupil, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.radius = radius
 
     def dict(self):
-        dat = super(RadiusPupil, self).dict()
+        dat = super().dict()
         dat["radius"] = float(self.radius)
         return dat
 
     def text(self):
-        for i in super(RadiusPupil, self).text():
-            yield i
+        yield from super().text()
         yield "Radius: %g" % self.radius
 
     def rescale(self, scale):
-        super(RadiusPupil, self).rescale(scale)
+        super().rescale(scale)
         self.radius *= scale
 
 
@@ -204,17 +198,16 @@ class FnoPupil(Pupil):
     fno = None
 
     def __init__(self, fno, **kwargs):
-        super(FnoPupil, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.fno = fno
 
     def dict(self):
-        dat = super(FnoPupil, self).dict()
+        dat = super().dict()
         dat["fno"] = float(self.fno)
         return dat
 
     def text(self):
-        for i in super(FnoPupil, self).text():
-            yield i
+        yield from super().text()
         yield "F-Number: %g" % self.fno
 
     @property

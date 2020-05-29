@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2013 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import numpy as np
 import matplotlib as mpl
@@ -37,10 +34,10 @@ class CenteredFormatter(mpl.ticker.ScalarFormatter):
     def __call__(self, value, pos=None):
         if value == self.center:
             return ""
-        return super(CenteredFormatter, self).__call__(value, pos)
+        return super().__call__(value, pos)
 
 
-class Analysis(object):
+class Analysis:
     figwidth = 12.
     run = True
     update = True

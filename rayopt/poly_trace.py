@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2015 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import itertools
 from collections import namedtuple
@@ -48,7 +45,7 @@ class PolyTrace(Trace):
     simplex_accel.pyx).
     """
     def __init__(self, system, kmax=3, wavelength=0):
-        super(PolyTrace, self).__init__(system)
+        super().__init__(system)
         self.kmax = kmax
         self.l = self.system.wavelengths[wavelength]
         self.allocate()
@@ -58,7 +55,7 @@ class PolyTrace(Trace):
             self.bst = self.transform()
 
     def allocate(self):
-        super(PolyTrace, self).allocate()
+        super().allocate()
         self.Simplex = make_simplex(3, self.kmax)
         n = self.length
         self.n = np.empty(n)
@@ -86,7 +83,7 @@ class PolyTrace(Trace):
         self._state = state
 
     def propagate(self, start=1, stop=None):
-        super(PolyTrace, self).propagate()
+        super().propagate()
         state = self._state
         self.stvwof[start - 1] = (state.s, state.t, state.v, state.w,
                                   state.o, state.f)
@@ -160,7 +157,7 @@ class PolyTrace(Trace):
 
     def print_seidel(self):
         for n, v in self.seidel(*self.st()):
-            yield "{:3s}: {:12.5e}".format(n, v)
+            yield f"{n:3s}: {v:12.5e}"
 
     names = [
         # s/bs, t/bt [1:10]
@@ -187,7 +184,7 @@ class PolyTrace(Trace):
                 self.Simplex.i[i, j, k], i, j, k, nt, t)
 
     def print_params(self):
-        yield "maximum order: {:d}".format(self.Simplex.n)
+        yield f"maximum order: {self.Simplex.n:d}"
         yield "wavelength: {:g}".format(self.l/1e-9)
 
     def print_trace(self, components="stvwof", elements=None, cutoff=None,
@@ -200,14 +197,14 @@ class PolyTrace(Trace):
                 idx = slice(None)
             else:
                 idx = self.Simplex.j.sum(1) < cutoff
-            yield "{:s}".format(n.upper())
+            yield f"{n.upper():s}"
             yield "  n  i  j  k " + " ".join(
-                "{:12d}".format(i) for i in elements)
+                f"{i:12d}" for i in elements)
             for (i, j, k), ai in zip(self.Simplex.j[idx], a[idx][:, elements]):
                 i = "{:3d}{:3d}{:3d}{:3d}".format(self.Simplex.i[i, j, k],
                                                   i, j, k)
-                ai = " ".join("{:12.5e}".format(j) for j in ai)
-                yield "{:s} {:s}".format(i, ai)
+                ai = " ".join(f"{j:12.5e}" for j in ai)
+                yield f"{i:s} {ai:s}"
             yield ""
 
     def __str__(self):

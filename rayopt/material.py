@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import warnings
 
@@ -54,7 +51,7 @@ lambda_C = fraunhofer["C"]
 
 
 
-class Thermal(object):
+class Thermal:
     def __init__(self, d, e, tref=20., lref=lambda_d):
         self.d = d
         self.e = e
@@ -119,7 +116,7 @@ class Material(NameMixin):
 
     def __str__(self):
         if self.catalog is not None:
-            return "%s/%s" % (self.catalog, self.name)
+            return f"{self.catalog}/{self.name}"
         else:
             return self.name
 
@@ -163,14 +160,14 @@ class Material(NameMixin):
 @public
 class ModelMaterial(Material):
     def __init__(self, n=1., **kwargs):
-        super(ModelMaterial, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.n = n
 
     def refractive_index(self, wavelength):
         return self.n
 
     def dict(self):
-        dat = super(ModelMaterial, self).dict()
+        dat = super().dict()
         dat["n"] = self.n
         return dat
 
@@ -179,7 +176,7 @@ class ModelMaterial(Material):
 class AbbeMaterial(Material):
     def __init__(self, n=1., v=np.inf, lambda_ref=lambda_d,
                  lambda_long=lambda_C, lambda_short=lambda_F, **kwargs):
-        super(AbbeMaterial, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.n = n
         self.v = v
         self.lambda_ref = lambda_ref
@@ -208,7 +205,7 @@ class AbbeMaterial(Material):
                 (1 - self.n)/self.v)
 
     def dict(self):
-        dat = super(AbbeMaterial, self).dict()
+        dat = super().dict()
         dat["n"] = self.n
         dat["v"] = self.v
         if self.lambda_ref != lambda_d:
@@ -223,9 +220,9 @@ class AbbeMaterial(Material):
 @public
 class CoefficientsMaterial(Material):
     def __init__(self, coefficients, typ="sellmeier", **kwargs):
-        super(CoefficientsMaterial, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         if not hasattr(self, "n_%s" % typ):
-            warnings.warn("unknown dispersion %s (%s)" % (typ, self.name))
+            warnings.warn(f"unknown dispersion {typ} ({self.name})")
         self.typ = typ
         self.coefficients = np.atleast_1d(coefficients)
 
@@ -325,7 +322,7 @@ class CoefficientsMaterial(Material):
                        c[3]*(w - c[4])/((w - c[4])**2 + c[5]))
 
     def dict(self):
-        dat = super(CoefficientsMaterial, self).dict()
+        dat = super().dict()
         dat["typ"] = self.typ
         dat["coefficients"] = list(self.coefficients)
         return dat
@@ -337,10 +334,10 @@ mirror = Material(name="mirror", catalog="basic", solid=False, mirror=True)
 air = CoefficientsMaterial(
     name="air", catalog="basic", typ="gas", solid=False,
     coefficients=[.05792105, .00167917, 238.0185, 57.362])
-basic = dict((m.name, m) for m in (vacuum, air, mirror))
+basic = {m.name: m for m in (vacuum, air, mirror)}
 
 
-class DefaultGlass(object):
+class DefaultGlass:
     def __getitem__(self, key):
         return self.get(key)
 
