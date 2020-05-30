@@ -36,17 +36,40 @@ Python versions are available through `Anaconda
 
 The distribution already contains all materials from http://refractiveindex.info/.
 
+More materials
+--------------
+
 More materials and lenses catalogs can be obtained from the freely available
 versions of Oslo and Zemax, copied to `catalog/` and then parsed using
-`rayopt/library.py` (see there for details on where the files are expected)::
+`rayopt/library.py`.
 
-  get and install http://www.lambdares.com/images/OSLO/OSLO662_EDU_Installer.exe
-  get and install http://downloads.radiantsourcemodels.com/Downloads/Zemax_2015-03-03_x32.exe
-  $ python -m rayopt.library \
-    Users/Public/Documents/OSLO66\ EDU/bin/lmo \
-    Users/Public/Documents/OSLO66\ EDU/bin/glc \
+Zemax
+.....
+
+More materials and lenses catalogs can be obtained from the freely available
+versions of Oslo and Zemax, copied to `catalog/` and then parsed using
+`rayopt/library.py` (see there for details on where the files are expected)
+
+Get `Zemax optics studio <https://my.zemax.com/en-US/OpticStudio-downloads/>`_.
+You can either install the software or unpack it with
+`innoextract <https://constexpr.org/innoextract/>`_. Depending on your chosen
+method the paths have to be adapted: ::
+
+    $ python -m rayopt.library \
     Users/$USER/My\ Documents/Zemax/Glasscat \
     Users/$USER/My\ Documents/Zemax/Stockcat
+
+
+OSLO
+.....
+
+For OSLO, download and install OSLO.::
+
+    get and install http://www.lambdares.com/images/OSLO/OSLO662_EDU_Installer.exe
+    $ python -m rayopt.library \
+    Users/Public/Documents/OSLO66\ EDU/bin/lmo \
+    Users/Public/Documents/OSLO66\ EDU/bin/glc
+
 
 Examples
 --------
