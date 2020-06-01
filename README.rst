@@ -1,8 +1,8 @@
 RayOpt
 ========
 
-.. image:: https://travis-ci.org/jordens/rayopt.svg
-    :target: https://travis-ci.org/jordens/rayopt
+.. image:: https://travis-ci.org/quartiq/rayopt.svg
+    :target: https://travis-ci.org/quartiq/rayopt
 
 .. image:: https://ci.appveyor.com/api/projects/status/6e97f8o94v7r5bpb/branch/master?svg=true
     :target: https://ci.appveyor.com/project/jordens/rayopt
