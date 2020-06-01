@@ -7,10 +7,9 @@ env:
   global:
     - secure: "iU+A6BAnvvV1nee28Net4MEHfiXeylkB0HOJ6SxjGEP10oLPviiJ7xvOl/JOhjK2/ef1X+iOZminUQHlMq2j8zY3kpThsOTqXPjvM4ytFsp8D52sC2iFq5UcSHwC4NHx6vtA4Gby/2VCr6K8qIvnDVczvvCC9pTl1yyCqa/ONSA="
   matrix:
-    - ARCH=x86_64 PYTHON_VERSION=3.5
-    - ARCH=x86_64 PYTHON_VERSION=2.7
-    - ARCH=x86_64 PYTHON_VERSION=3.4
-    # - ARCH=x86 PYTHON_VERSION=3.5
+    - ARCH=x86_64 PYTHON_VERSION=3.7
+    - ARCH=x86_64 PYTHON_VERSION=3.8
+
 install:
   - |
     if [ $TRAVIS_OS_NAME == osx ]; then ARCH=MacOSX-$ARCH; else ARCH=Linux-$ARCH; fi

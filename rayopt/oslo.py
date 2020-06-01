@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2013 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import os.path
 import io
@@ -49,7 +46,7 @@ def dir_read(file, session):
     # offset, length, name, efl, diameter, thickness
     dir = np.loadtxt(file, delimiter=",", skiprows=1,
                      dtype="i,i,i,S64,f,f,f", ndmin=1)
-    lens = io.open("%s.dat" % prefix, "r")
+    lens = open("%s.dat" % prefix)
     lens = [lens.read(i) for i in dir["f1"]]
     sections = {}
     sect_lens = []
@@ -171,7 +168,7 @@ def len_to_system(fil, item=None):
 
 def glc_read(f, session):
     cat = Catalog()
-    f = io.open(f, "r")
+    f = open(f)
     ver, num, cat.name = f.readline().split()[:3]
     cat.version = float(ver)
     cat.type, cat.source, cat.format = "material", "oslo", "glc"

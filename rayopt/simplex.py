@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2015 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import numpy as np
 
@@ -111,7 +108,7 @@ def simplex_idx(d, m):
 
 def make_simplex(d0, n0):
     class Simplex(np.ndarray):
-        """
+        r"""
         Truncated multinomial over R^d of maximal order n.
 
         The coefficients cover the n-scaled (d+1)-simplex (cube corner in
@@ -192,5 +189,5 @@ def make_simplex(d0, n0):
             p = simplex_transform(self.i.ravel(), self.j, self, t)
             return p.view(self.__class__)
 
-    Simplex.__name__ = str("Simplex{}d{}n".format(d0, n0))
+    Simplex.__name__ = f"Simplex{d0}d{n0}n"
     return Simplex

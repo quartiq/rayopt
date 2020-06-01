@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import itertools
 
@@ -38,7 +35,7 @@ class GeometricTrace(Trace):
     all in i-surface normal coordinates relative to vertex
     """
     def allocate(self, nrays):
-        super(GeometricTrace, self).allocate()
+        super().allocate()
         self.nrays = nrays
         self.n = np.empty(self.length)
         self.y = np.empty((self.length, nrays, 3))
@@ -73,7 +70,7 @@ class GeometricTrace(Trace):
         self.t[0] = 0
 
     def propagate(self, start=1, stop=None, clip=False):
-        super(GeometricTrace, self).propagate()
+        super().propagate()
         init = start - 1
         y, u, n, l = self.y[init], self.u[init], self.n[init], self.l
         y, u = self.system[init].from_normal(y, u)
@@ -249,11 +246,10 @@ class GeometricTrace(Trace):
             c = np.concatenate(
                 (self.n[:, None], self.path[:, None], t[:, i, None],
                  self.y[:, i, :], self.u[:, i, :]), axis=1)
-            for _ in self.print_coeffs(
+            yield from self.print_coeffs(
                     c, "n/track z/rel path/"
                     "height x/height y/height z/angle x/angle y/angle z"
-                    .split("/"), sum=False):
-                yield _
+                    .split("/"), sum=False)
             yield ""
 
     def text(self):

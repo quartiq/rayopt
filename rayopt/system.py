@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import itertools
 
@@ -41,7 +38,7 @@ class System(list):
                  object=None, image=None,
                  pickups=None, validators=None, solves=None):
         elements = [Element.make(_) for _ in elements or []]
-        super(System, self).__init__(elements)
+        super().__init__(elements)
         self.description = description
         self.scale = scale
         self.wavelengths = wavelengths or [fraunhofer[i] for i in "dCF"]
@@ -295,7 +292,7 @@ class System(list):
             yield " " + line
         yield "Stop: %i" % self.stop
         yield "Elements:"
-        yield "%2s %1s %10s %10s %10s %17s %7s %7s %7s" % (
+        yield "{:>2} {:>1} {:>10} {:>10} {:>10} {:>17} {:>7} {:>7} {:>7}".format(
                 "#", "T", "Distance", "Rad Curv", "Diameter",
                 "Material", "n", "nd", "Vd")
         for i, e in enumerate(self):

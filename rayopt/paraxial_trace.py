@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import itertools
 
@@ -41,7 +38,7 @@ class ParaxialTrace(Trace):
     # over optical output sine for all rays:
     # m = n0 sin u0/ (nk sin uk)
     def __init__(self, system, axis=1, update=True):
-        super(ParaxialTrace, self).__init__(system)
+        super().__init__(system)
         self.axis = axis
         if update:
             self.update()
@@ -57,7 +54,7 @@ class ParaxialTrace(Trace):
         return self.system.wavelengths[0]
 
     def allocate(self):
-        super(ParaxialTrace, self).allocate()
+        super().allocate()
         n = self.length
         if hasattr(self, "n") and self.n.shape[0] == n:
             return
@@ -82,7 +79,7 @@ class ParaxialTrace(Trace):
             u[0] = 0, n0*c
 
     def propagate(self, start=1, stop=None):
-        super(ParaxialTrace, self).propagate()
+        super().propagate()
         init = start - 1
         # FIXME not really round for gen astig...
         yu = np.vstack((self.y[init], self.y[init],

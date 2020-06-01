@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import numpy as np
 from scipy.optimize import newton
@@ -30,7 +27,7 @@ from .material import Material
 
 
 @public
-class TransformMixin(object):
+class TransformMixin:
     def __init__(self, distance=0., direction=(0, 0, 1.), angles=(0, 0, 0),
                  offset=None):
         self.update(distance, direction, angles)
@@ -117,7 +114,7 @@ class TransformMixin(object):
         if np.allclose(rdir, 0):
             rdir = 1., 0, 0
         rot = rotation_matrix(rang, rdir).T
-        angles = euler_from_matrix(rot, str("rxyz"))
+        angles = euler_from_matrix(rot, "rxyz")
         self.update(self.distance, self.direction, angles)
 
     def update(self, distance, direction, angles):
@@ -152,7 +149,7 @@ class TransformMixin(object):
         else:
             self.rot_axis = None
         if not self.normal:
-            r1 = euler_matrix(axes=str("rxyz"), *tuple(a))[:3, :3]
+            r1 = euler_matrix(axes="rxyz", *tuple(a))[:3, :3]
             r = np.dot(r, r1)
         self.rot_normal = r
 
@@ -183,7 +180,7 @@ class Element(NameMixin, TransformMixin):
     _default_type = "spheroid"
 
     def __init__(self, radius=np.inf, diameter=None, **kwargs):
-        super(Element, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         if diameter is not None:
             radius = diameter/2
         self.radius = radius
@@ -278,7 +275,7 @@ class Element(NameMixin, TransformMixin):
 @public
 class Interface(Element):
     def __init__(self, material=None, **kwargs):
-        super(Interface, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         if material:
             material = Material.make(material)
         self.material = material
@@ -292,7 +289,7 @@ class Interface(Element):
         return n, n0/n
 
     def dict(self):
-        dat = super(Interface, self).dict()
+        dat = super().dict()
         if self.material is not None:
             dat["material"] = str(self.material)
         return dat
@@ -301,7 +298,7 @@ class Interface(Element):
         return self.material.refractive_index(wavelength)
 
     def paraxial_matrix(self, n0, l):
-        n, m = super(Interface, self).paraxial_matrix(n0, l)
+        n, m = super().paraxial_matrix(n0, l)
         if self.material is not None:
             n = self.refractive_index(l)
         return n, m
@@ -334,7 +331,7 @@ class Interface(Element):
         return self.surface_sag(r)
 
     def intercept(self, y, u):
-        s = super(Interface, self).intercept(y, u)
+        s = super().intercept(y, u)
         for i in range(y.shape[0]):
             yi, ui = y[None, i], u[None, i]
 
@@ -373,7 +370,7 @@ class Interface(Element):
 
     def surface_cut(self, axis, points):
         if self.material is None:
-            return super(Interface, self).surface_cut(axis, points)
+            return super().surface_cut(axis, points)
         rad = self.radius
         xyz = np.zeros((points, 3))
         xyz[:, axis] = np.linspace(-rad, rad, points)
@@ -416,7 +413,7 @@ class Interface(Element):
 class Spheroid(Interface):
     def __init__(self, curvature=0., conic=0., aspherics=None, roc=None,
                  alternate_intersection=False, **kwargs):
-        super(Spheroid, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         if roc is not None:
             curvature = 1./roc
         self.alternate_intersection = alternate_intersection
@@ -429,7 +426,7 @@ class Spheroid(Interface):
             assert self.radius**2 <= 1/((1 + self.conic)*self.curvature**2)
 
     def dict(self):
-        dat = super(Spheroid, self).dict()
+        dat = super().dict()
         if self.curvature:
             dat["curvature"] = float(self.curvature)
         if self.conic:
@@ -510,7 +507,7 @@ class Spheroid(Interface):
         # Applied Optics IP, vol. 8, Issue 5, p.975
         #
         # [y', u'] = M * [y, u]
-        n, md = super(Spheroid, self).paraxial_matrix(n0, l)
+        n, md = super().paraxial_matrix(n0, l)
         c = self.curvature
         if self.aspherics is not None:
             c = c + 2*self.aspherics[0]
@@ -544,13 +541,13 @@ class Spheroid(Interface):
         return n, m
 
     def reverse(self):
-        super(Spheroid, self).reverse()
+        super().reverse()
         self.curvature *= -1
         if self.aspherics is not None:
             self.aspherics = [-ai for ai in self.aspherics]
 
     def rescale(self, scale):
-        super(Spheroid, self).rescale(scale)
+        super().rescale(scale)
         self.curvature /= scale
         if self.aspherics is not None:
             self.aspherics = [ai/scale**(2*i + 1) for i, ai in

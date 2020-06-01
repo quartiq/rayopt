@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2015 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import yaml
 import os
@@ -66,7 +63,7 @@ def yml_read(fil, session):
                     continue
                 fil = os.path.join(path, page["path"])
                 try:
-                    data = yaml.safe_load(open(fil, "r"))
+                    data = yaml.safe_load(open(fil))
                     data["BOOK"] = book["BOOK"]
                     data["PAGE"] = page["PAGE"]
                     data["name"] = page["name"]
@@ -78,7 +75,7 @@ def yml_read(fil, session):
                         comment=page["path"], data=yaml.dump(data))
                     cat.materials.append(g)
                 except Exception as e:
-                    print("error: {}: {}".format(page, e))
+                    print(f"error: {page}: {e}")
     return top
 
 

@@ -5,9 +5,8 @@ platform:
   - linux-32
 
 engine:
-  - python=2.7
-  - python=3.4
-  - python=3.5
+  - python=3.7
+  - python=3.8
 
 install:
   - conda config --set always_yes yes --set changeps1 no

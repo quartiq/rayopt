@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2014 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 import numpy as np
 
@@ -63,7 +60,7 @@ class Conjugate(NameMixin):
             yield "  %s" % _
 
     def dict(self):
-        dat = super(Conjugate, self).dict()
+        dat = super().dict()
         dat["pupil"] = self.pupil.dict()
         if self.projection != "rectilinear":
             dat["projection"] = self.projection
@@ -103,7 +100,7 @@ class FiniteConjugate(Conjugate):
     finite = True
 
     def __init__(self, radius=0., **kwargs):
-        super(FiniteConjugate, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.radius = radius
 
     @property
@@ -111,15 +108,14 @@ class FiniteConjugate(Conjugate):
         return not self.radius
 
     def dict(self):
-        dat = super(FiniteConjugate, self).dict()
+        dat = super().dict()
         if self.radius:
             dat["radius"] = float(self.radius)
         return dat
 
     def text(self):
         yield "Radius: %.3g" % self.radius
-        for _ in super(FiniteConjugate, self).text():
-            yield _
+        yield from super().text()
 
     def update(self, radius, pupil_distance, pupil_radius):
         self.pupil.update(pupil_distance, pupil_radius)
@@ -127,7 +123,7 @@ class FiniteConjugate(Conjugate):
             self.radius = radius
 
     def rescale(self, scale):
-        super(FiniteConjugate, self).rescale(scale)
+        super().rescale(scale)
         self.radius *= scale
 
     @property
@@ -177,7 +173,7 @@ class InfiniteConjugate(Conjugate):
     finite = False
 
     def __init__(self, angle=0., angle_deg=None, **kwargs):
-        super(InfiniteConjugate, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         if angle_deg is not None:
             angle = np.deg2rad(angle_deg)
         self.angle = angle
@@ -187,7 +183,7 @@ class InfiniteConjugate(Conjugate):
         return not self.angle
 
     def dict(self):
-        dat = super(InfiniteConjugate, self).dict()
+        dat = super().dict()
         if self.angle:
             dat["angle"] = float(self.angle)
         return dat
@@ -199,8 +195,7 @@ class InfiniteConjugate(Conjugate):
 
     def text(self):
         yield "Semi-Angle: %.3g deg" % np.rad2deg(self.angle)
-        for _ in super(InfiniteConjugate, self).text():
-            yield _
+        yield from super().text()
 
     @property
     def slope(self):

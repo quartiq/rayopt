@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 #   rayopt - raytracing for optical imaging systems
 #   Copyright (C) 2012 Robert Jordens <robert@joerdens.org>
@@ -16,8 +15,6 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import (absolute_import, print_function,
-                        unicode_literals, division)
 
 from struct import Struct
 import os
@@ -45,7 +42,7 @@ def zmf_read(file, session):
     cat.load(file)
     cat.name = os.path.splitext(os.path.basename(file))[0]
     cat.type, cat.source, cat.format = "lens", "zemax", "zmx"
-    f = io.open(file, "rb")
+    f = open(file, "rb")
     head = Struct("<I")
     lens = Struct("<100sIIIIIIIdd")
     shapes = "?EBPM"
@@ -73,7 +70,7 @@ def zmf_read(file, session):
         assert len(description) == li[7]
         description = zmf_obfuscate(description, l.efl, l.enp)
         description = description.decode("latin1")
-        assert description.startswith("VERS {:06d}\n".format(l.version))
+        assert description.startswith(f"VERS {l.version:06d}\n")
         l.data = description
         cat.lenses.append(l)
     return cat
@@ -84,7 +81,7 @@ def zmf_obfuscate(data, a, b):
     iv = np.cos(655*(np.pi/180)*iv) + iv
     p = np.arange(len(data))
     k = 13.2*(iv + np.sin(17*(p + 3)))*(p + 1)
-    k = (int(("{:.8e}".format(_))[4:7]) for _ in k)
+    k = (int((f"{_:.8e}")[4:7]) for _ in k)
     data = np.fromstring(data, np.uint8)
     data ^= np.fromiter(k, np.uint8, len(data))
     return data.tostring()
@@ -195,9 +192,9 @@ def agf_read(fil, session):
     session.add(cat)
     raw = open(fil, "rb").read(32)
     if raw.startswith(codecs.BOM_UTF16):
-        dat = io.open(fil, encoding="utf-16")
+        dat = open(fil, encoding="utf-16")
     else:
-        dat = io.open(fil, encoding="latin1")
+        dat = open(fil, encoding="latin1")
     for line in dat:
         if not line.strip():
             continue
