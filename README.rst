@@ -75,11 +75,11 @@ Examples
 --------
 
 Usage examples are at in their `own repository
-<https://github.com/jordens/rayopt-notebooks>`_ as `IPython
+<https://github.com/quartiq/rayopt-notebooks>`_ as `IPython
 Notebooks
-<http://nbviewer.ipython.org/github/jordens/rayopt-notebooks/tree/master/>`_,
+<https://nbviewer.org/github/quartiq/rayopt-notebooks/tree/master/>`_,
 specifically also the `Tutorial
-<http://nbviewer.ipython.org/github/jordens/rayopt-notebooks/blob/master/tutorial.ipynb>`_.
+<https://nbviewer.org/github/quartiq/rayopt-notebooks/tree/master/tutorial.ipynb>`_.
 
 Notes
 -----
